@@ -1,0 +1,14 @@
+.App {
+  min-height: 100vh;
+  background: #000;
+}
+
+body {
+  background: #000 !important;
+}
+
+/* Custom thin scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #0a0a0a; }
+::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #3a3a3a; }
