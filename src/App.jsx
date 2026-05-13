@@ -6,13 +6,15 @@ import ContactPage from './pages/ContactPage'
 import './App.css'
 
 function App() {
+  const basename = window.location.pathname.startsWith('/Qsphere') ? '/Qsphere' : import.meta.env.BASE_URL
+
   useEffect(() => {
     document.body.style.background = '#000'
   }, [])
 
   return (
     <div className="App">
-      <BrowserRouter basename={import.meta.env.BASE_URL}>
+      <BrowserRouter basename={basename}>
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/about" element={<AboutPage />} />
