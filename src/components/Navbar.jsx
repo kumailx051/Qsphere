@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import logoImg from '../assets/logo.png'
 
 const Navbar = ({ currentPage = 'home' }) => {
@@ -26,39 +27,39 @@ const Navbar = ({ currentPage = 'home' }) => {
 
             {/* Desktop Navigation */}
             <nav className="hidden md:flex items-center gap-8 text-[12px] tracking-[0.22em] text-white/90">
-              <a href="/" className={isHomePage ? "relative text-emerald-200" : "hover:text-emerald-200 transition-colors"}>
+              <Link to="/" className={isHomePage ? "relative text-emerald-200" : "hover:text-emerald-200 transition-colors"}>
                 Home
                 {isHomePage && (
                   <span className="absolute -bottom-2 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
                 )}
-              </a>
+              </Link>
               <a href="#" className="hover:text-emerald-200 transition-colors">Blogs</a>
               <a href="#" className="hover:text-emerald-200 transition-colors">Groups</a>
-              <a href="/about" className={isAboutPage ? "relative text-emerald-200" : "hover:text-emerald-200 transition-colors"}>
+              <Link to="/about" className={isAboutPage ? "relative text-emerald-200" : "hover:text-emerald-200 transition-colors"}>
                 About
                 {isAboutPage && (
                   <span className="absolute -bottom-2 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
                 )}
-              </a>
-              <a href="/contact" className={isContactPage ? "relative text-emerald-200" : "hover:text-emerald-200 transition-colors"}>
+              </Link>
+              <Link to="/contact" className={isContactPage ? "relative text-emerald-200" : "hover:text-emerald-200 transition-colors"}>
                 Contact
                 {isContactPage && (
                   <span className="absolute -bottom-2 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
                 )}
-              </a>
+              </Link>
             </nav>
 
             {/* CTA + Menu Button */}
             <div className="flex items-center gap-3">
-              <a
-                href="#"
+              <Link
+                to="/auth"
                 className="inline-flex items-center gap-2 rounded-full border border-emerald-400/50 bg-emerald-500/20 px-4 py-2 text-[11px] tracking-[0.2em] text-emerald-100 shadow-[0_0_22px_rgba(16,185,129,0.35)] hover:bg-emerald-500/30 transition-colors"
               >
                 Join Community
                 <span className="flex h-6 w-6 items-center justify-center rounded-full border border-emerald-400/60 bg-emerald-400/20 text-emerald-200">
                   →
                 </span>
-              </a>
+              </Link>
 
               {/* Mobile Menu Button */}
               <button
@@ -111,31 +112,31 @@ const Navbar = ({ currentPage = 'home' }) => {
             </div>
 
             <nav className="mt-10 flex flex-col gap-5 text-base text-white/90">
-              <a href="/" className={isHomePage ? "flex items-center justify-between text-emerald-200" : "hover:text-emerald-200 transition-colors"} onClick={() => setMenuOpen(false)}>
+              <Link to="/" className={isHomePage ? "flex items-center justify-between text-emerald-200" : "hover:text-emerald-200 transition-colors"} onClick={() => setMenuOpen(false)}>
                 Home
                 {isHomePage && (
                   <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
                 )}
-              </a>
+              </Link>
               <a href="#" className="hover:text-emerald-200 transition-colors" onClick={() => setMenuOpen(false)}>Blogs</a>
               <a href="#" className="hover:text-emerald-200 transition-colors" onClick={() => setMenuOpen(false)}>Groups</a>
-              <a href="/about" className={isAboutPage ? "flex items-center justify-between text-emerald-200" : "hover:text-emerald-200 transition-colors"} onClick={() => setMenuOpen(false)}>
+              <Link to="/about" className={isAboutPage ? "flex items-center justify-between text-emerald-200" : "hover:text-emerald-200 transition-colors"} onClick={() => setMenuOpen(false)}>
                 About
                 {isAboutPage && (
                   <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
                 )}
-              </a>
-              <a href="/contact" className={isContactPage ? "flex items-center justify-between text-emerald-200" : "hover:text-emerald-200 transition-colors"} onClick={() => setMenuOpen(false)}>
+              </Link>
+              <Link to="/contact" className={isContactPage ? "flex items-center justify-between text-emerald-200" : "hover:text-emerald-200 transition-colors"} onClick={() => setMenuOpen(false)}>
                 Contact
                 {isContactPage && (
                   <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
                 )}
-              </a>
+              </Link>
             </nav>
 
             <div className="mt-auto pt-8">
-              <a
-                href="#"
+              <Link
+                to="/auth"
                 className="inline-flex w-full items-center justify-between rounded-full border border-emerald-400/50 bg-emerald-500/20 px-4 py-3 text-[12px] tracking-[0.2em] text-emerald-100 shadow-[0_0_22px_rgba(16,185,129,0.35)] hover:bg-emerald-500/30 transition-colors"
                 onClick={() => setMenuOpen(false)}
               >
@@ -143,7 +144,7 @@ const Navbar = ({ currentPage = 'home' }) => {
                 <span className="flex h-7 w-7 items-center justify-center rounded-full border border-emerald-400/60 bg-emerald-400/20 text-emerald-200">
                   →
                 </span>
-              </a>
+              </Link>
             </div>
           </div>
         </div>
