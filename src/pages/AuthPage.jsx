@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
+import Navbar from '../components/Navbar'
 
 const ARR = (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -316,6 +317,7 @@ const AuthPage = () => {
 
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-[#030705] text-white">
+      <Navbar currentPage="auth" />
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap');
 
