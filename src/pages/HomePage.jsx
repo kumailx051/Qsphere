@@ -51,7 +51,7 @@ function getGlowColor(time) {
 const HomePage = () => {
   // All refs — no React state for animation = zero re-renders = zero lag
   const titleRef       = useRef(null)
-  const titleWrapRef   = useRef(null)
+  const navbarBrandRef = useRef(null)
   const galleryWrapRef = useRef(null)
   const glowRef        = useRef(null)
   const glowInnerRef   = useRef(null)
@@ -65,7 +65,14 @@ const HomePage = () => {
   const videoPlayingRef = useRef(false)
   const quoteVisible   = useInView(quoteRef, { amount: 0.2, once: false })
 
-  // Memoized scroll progress getter — direct, no lerp, no lag
+  const currentProgressRef = useRef(0)
+  const targetProgressRef = useRef(0)
+
+  const clamp01 = (value) => Math.min(1, Math.max(0, value))
+  const smoothstep = (value) => value * value * (3 - 2 * value)
+  const lerp = (start, end, amount) => start + (end - start) * amount
+
+  // Memoized scroll progress getter — direct raw value
   const getProgress = useCallback(() => {
     const section = scrollSectionRef.current
     const sectionTop = section ? section.offsetTop : 0
@@ -82,11 +89,21 @@ const HomePage = () => {
 
     const tick = (timestamp) => {
       if (!startTimeRef.current) startTimeRef.current = timestamp
-      const progress = getProgress()
+      
+      targetProgressRef.current = getProgress()
+      // Apply smooth linear interpolation (lerp) to create the "smooth lag" feel
+      currentProgressRef.current += (targetProgressRef.current - currentProgressRef.current) * 0.08
+      
+      const progress = currentProgressRef.current
 
-      // ── Text animation: scales up fast and fades out quickly ──
-      const infiniteScale   = 1 + progress * 2.5
-      const infiniteOpacity = Math.max(0, 1 - Math.max(0, progress - 0.15) / 0.15)
+      // ── Text animation: grows first, then travels into the navbar slot ──
+      const growProgress = smoothstep(clamp01(progress / 0.18))
+      const moveProgress = smoothstep(clamp01((progress - 0.12) / 0.42))
+      const settleProgress = smoothstep(clamp01((progress - 0.28) / 0.28))
+      const titleScale = progress < 0.18
+        ? lerp(1, 3.35, growProgress)
+        : lerp(3.35, 0.16, settleProgress)
+      const titleOpacity = 1
 
       // Gallery fades between 30%–50% scroll
       const galleryFade  = Math.max(0, 1 - Math.max(0, progress - 0.30) / 0.20)
@@ -114,11 +131,18 @@ const HomePage = () => {
 
       // ── Apply to DOM directly (no React re-renders) ──
 
-      if (titleRef.current)
-        titleRef.current.style.transform = `scale(${infiniteScale})`
+      const navBrandRect = navbarBrandRef.current?.getBoundingClientRect()
+      const startX = window.innerWidth / 2
+      const startY = window.innerHeight / 2
+      const endX = navBrandRect ? navBrandRect.left + navBrandRect.width / 2 + 36 : window.innerWidth * 0.21
+      const endY = navBrandRect ? navBrandRect.top + navBrandRect.height / 2 : 48
 
-      if (titleWrapRef.current)
-        titleWrapRef.current.style.opacity = infiniteOpacity
+      if (titleRef.current) {
+        titleRef.current.style.left = `${lerp(startX, endX, moveProgress)}px`
+        titleRef.current.style.top = `${lerp(startY, endY, moveProgress)}px`
+        titleRef.current.style.opacity = `${titleOpacity}`
+        titleRef.current.style.transform = `translate(-50%, -50%) scale(${titleScale}) translateZ(0)`
+      }
 
       if (galleryWrapRef.current)
         galleryWrapRef.current.style.opacity = galleryFade
@@ -142,7 +166,7 @@ const HomePage = () => {
       if (heroRef.current) {
         const translateY = (1 - heroIn) * 80
         heroRef.current.style.opacity   = heroOpacity
-        heroRef.current.style.transform = `translateY(${translateY}px)`
+        heroRef.current.style.transform = `translateY(${translateY}px) translateZ(0)`
       }
 
       raf = requestAnimationFrame(tick)
@@ -181,7 +205,7 @@ const HomePage = () => {
           />
 
           {/* Navbar */}
-          <Navbar currentPage="home" />
+          <Navbar currentPage="home" homeBrandRef={navbarBrandRef} />
 
           {/* Crosshairs */}
           <div ref={crosshairRef}>
@@ -197,33 +221,11 @@ const HomePage = () => {
             <InfiniteGallery scale={1} />
           </div>
 
-          {/* Center title — "QSphere" */}
-          <div
-            ref={titleWrapRef}
-            className="fixed inset-0 z-20 flex items-center justify-center pointer-events-none"
-          >
-            <h1
-              ref={titleRef}
-              className="text-white font-black tracking-tight text-center"
-              style={{
-                fontSize: 'clamp(4rem, 14vw, 14rem)',
-                fontFamily: "'Archivo Black', 'Inter', sans-serif",
-                transformOrigin: 'center center',
-                letterSpacing: '-0.04em',
-                lineHeight: 0.9,
-                textShadow:
-                  '0 0 60px rgba(0,0,0,0.8), 0 0 120px rgba(0,0,0,0.5), 0 4px 20px rgba(0,0,0,0.6)',
-              }}
-            >
-              QSphere
-            </h1>
-          </div>
-
           {/* Hero section */}
           <div
             ref={heroRef}
             className="fixed inset-0 z-40 pointer-events-none"
-            style={{ opacity: 0 }}
+            style={{ opacity: 0, willChange: 'transform, opacity' }}
           >
             <div className="absolute inset-0 bg-black" />
 
@@ -236,8 +238,6 @@ const HomePage = () => {
               playsInline
               preload="metadata"
             />
-
-            <div className="pointer-events-none absolute inset-0 bg-black/65" />
 
             <div className="relative z-10 h-full w-full flex flex-col justify-between p-8 md:p-14">
               <div className="max-w-5xl pointer-events-auto mt-12 md:mt-20">
@@ -280,13 +280,34 @@ const HomePage = () => {
             ref={vignetteRef}
             className="pointer-events-none absolute inset-0"
             style={{
-              background:
-                'radial-gradient(ellipse 70% 65% at 50% 50%, transparent 30%, rgba(0,0,0,0.55) 70%, rgba(0,0,0,0.85) 100%)',
+              background: 'transparent',
               zIndex: 8,
             }}
           />
         </div>
       </div>
+
+      {/* Center title — "QSphere" */}
+      <h1
+        ref={titleRef}
+        className="fixed z-[70] pointer-events-none text-white font-black tracking-tight text-center"
+        style={{
+          left: '50%',
+          top: '50%',
+          fontSize: 'clamp(4rem, 14vw, 14rem)',
+          fontFamily: "'Archivo Black', 'Inter', sans-serif",
+          transform: 'translate(-50%, -50%) scale(1) translateZ(0)',
+          transformOrigin: 'center center',
+          letterSpacing: '-0.04em',
+          lineHeight: 0.9,
+          opacity: 1,
+          willChange: 'transform, opacity, left, top',
+          textShadow:
+            '0 0 60px rgba(0,0,0,0.8), 0 0 120px rgba(0,0,0,0.5), 0 4px 20px rgba(0,0,0,0.6)',
+        }}
+      >
+        QSphere
+      </h1>
 
       {/* ─────────────────────────────────────────────────────────
           PART 2 — Curved scroll carousel (self-contained)

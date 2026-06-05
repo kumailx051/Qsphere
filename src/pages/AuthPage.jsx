@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
 import * as THREE from 'three'
 import Navbar from '../components/Navbar'
 
@@ -24,6 +25,8 @@ const EYE_CLOSED = (
 )
 
 const AuthPage = () => {
+  const navigate = useNavigate()
+  const location = useLocation()
   const canvasRef = useRef(null)
   const formWrapRef = useRef(null)
   const loginFaceRef = useRef(null)
@@ -93,19 +96,19 @@ const AuthPage = () => {
     )
 
     const pGeo = new THREE.BufferGeometry()
-    ;(() => {
-      const n = 1100
-      const positions = new Float32Array(n * 3)
-      for (let i = 0; i < n; i += 1) {
-        const r = 18 + Math.random() * 45
-        const t = Math.random() * Math.PI * 2
-        const ph = Math.acos(2 * Math.random() - 1)
-        positions[i * 3] = r * Math.sin(ph) * Math.cos(t)
-        positions[i * 3 + 1] = r * Math.sin(ph) * Math.sin(t) * 0.55
-        positions[i * 3 + 2] = r * Math.cos(ph)
-      }
-      pGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
-    })()
+      ; (() => {
+        const n = 1100
+        const positions = new Float32Array(n * 3)
+        for (let i = 0; i < n; i += 1) {
+          const r = 18 + Math.random() * 45
+          const t = Math.random() * Math.PI * 2
+          const ph = Math.acos(2 * Math.random() - 1)
+          positions[i * 3] = r * Math.sin(ph) * Math.cos(t)
+          positions[i * 3 + 1] = r * Math.sin(ph) * Math.sin(t) * 0.55
+          positions[i * 3 + 2] = r * Math.cos(ph)
+        }
+        pGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+      })()
 
     const particles = new THREE.Points(
       pGeo,
@@ -277,24 +280,10 @@ const AuthPage = () => {
     const registerFace = registerFaceRef.current
 
     if (mode === 'register') {
-      loginFace.style.transition = 'opacity .6s ease 0s, filter .6s ease 0s'
-      loginFace.style.opacity = '0'
-      loginFace.style.filter = 'blur(8px)'
       loginFace.style.pointerEvents = 'none'
-
-      registerFace.style.transition = 'opacity .6s ease .55s, filter .6s ease .55s'
-      registerFace.style.opacity = '1'
-      registerFace.style.filter = 'blur(0)'
       registerFace.style.pointerEvents = 'auto'
     } else {
-      registerFace.style.transition = 'opacity .6s ease 0s, filter .6s ease 0s'
-      registerFace.style.opacity = '0'
-      registerFace.style.filter = 'blur(8px)'
       registerFace.style.pointerEvents = 'none'
-
-      loginFace.style.transition = 'opacity .6s ease .55s, filter .6s ease .55s'
-      loginFace.style.opacity = '1'
-      loginFace.style.filter = 'blur(0)'
       loginFace.style.pointerEvents = 'auto'
     }
   }, [mode])
@@ -303,15 +292,25 @@ const AuthPage = () => {
     setLoginBusy(true)
     await new Promise((resolve) => setTimeout(resolve, 1200))
     setLoginBusy(false)
-    alert(`Welcome back to the Quantum Grid!`)
+    // mark as logged in (demo)
+    try { localStorage.setItem('qsphere_logged_in', '1') } catch (e) {}
+    alert(`Welcome back to the Quantum Community!`)
+    // navigate back to the page that requested auth if provided
+    try {
+      const redirectTo = location?.state?.redirectTo || '/'
+      navigate(redirectTo)
+    } catch (e) {
+      navigate('/')
+    }
   }
 
   const handleRegister = async () => {
     setRegisterBusy(true)
     await new Promise((resolve) => setTimeout(resolve, 1200))
     setRegisterBusy(false)
-    alert('Welcome to QSPHERE! Your dimension is ready.')
+    navigate('/otp')
   }
+
 
   const statusText = mode === 'login' ? 'QSPHERE · Entry Node Active' : 'QSPHERE · Genesis Chamber Active'
 
@@ -398,8 +397,6 @@ const AuthPage = () => {
           backface-visibility: hidden;
           -webkit-backface-visibility: hidden;
           transform-style: preserve-3d;
-          opacity: 0;
-          filter: blur(8px);
           pointer-events: none;
         }
 

