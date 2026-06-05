@@ -13,6 +13,7 @@ import BlogDetail from './pages/BlogDetail'
 import CreateBlogPage from './pages/CreateBlogPage'
 import CreateGroupPage from './pages/CreateGroupPage'
 import GroupsPage from './pages/GroupsPage'
+import GroupDetailPage from './pages/GroupDetailPage'
 
 import ScrollToTop from './components/ScrollToTop'
 import './App.css'
@@ -41,6 +42,7 @@ function App() {
           <Route path="/blogs/new" element={<CreateBlogPage />} />
           <Route path="/blogs/:id" element={<BlogDetail />} />
           <Route path="/groups" element={<GroupsPage />} />
+          <Route path="/groups/:id" element={<GroupDetailPage />} />
           <Route path="/groups/new" element={<CreateGroupPage />} />
         </Routes>
       </BrowserRouter>

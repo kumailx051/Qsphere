@@ -138,7 +138,6 @@ const GroupsPage = () => {
                         navigate('/auth', { state: { redirectTo: `/groups/${group.id}` } })
                         return
                       }
-                      // demo: navigate to a detail route (not implemented)
                       navigate(`/groups/${group.id}`)
                     }} className="px-6 py-2.5 rounded-xl border border-white/10 bg-white/[0.03] text-white/80 text-sm font-semibold hover:bg-white/[0.08] hover:text-white transition-all">
                       Details...
