@@ -1,6 +1,7 @@
-const STORAGE_KEY = 'qsphere_custom_groups'
-const OVERRIDES_KEY = 'qsphere_group_overrides'
-const DELETED_KEY = 'qsphere_deleted_group_ids'
+const STORAGE_KEY = 'qsphere_group_cache'
+const LEGACY_STORAGE_KEY = 'qsphere_custom_groups'
+const LEGACY_OVERRIDES_KEY = 'qsphere_group_overrides'
+const LEGACY_DELETED_KEY = 'qsphere_deleted_group_ids'
 
 const DEFAULT_GROUPS = [
   {
@@ -48,8 +49,8 @@ const writeJson = (key, value) => {
 }
 
 const applyGroupModifications = (groups) => {
-  const overrides = readJson(OVERRIDES_KEY, {})
-  const deletedIds = new Set(readJson(DELETED_KEY, []))
+  const overrides = readJson(LEGACY_OVERRIDES_KEY, {})
+  const deletedIds = new Set(readJson(LEGACY_DELETED_KEY, []))
 
   return groups
     .filter((group) => !deletedIds.has(group.id))
@@ -61,7 +62,12 @@ const applyGroupModifications = (groups) => {
 
 export const getStoredGroups = () => {
   try {
-    const customGroups = readJson(STORAGE_KEY, [])
+    const cachedGroups = readJson(STORAGE_KEY, null)
+    if (Array.isArray(cachedGroups) && cachedGroups.length > 0) {
+      return cachedGroups
+    }
+
+    const customGroups = readJson(LEGACY_STORAGE_KEY, [])
     return applyGroupModifications([...DEFAULT_GROUPS, ...customGroups])
   } catch (error) {
     console.error('Error loading stored groups:', error)
@@ -69,9 +75,56 @@ export const getStoredGroups = () => {
   }
 }
 
+const broadcastGroupsUpdated = () => {
+  window.dispatchEvent(new Event('qsphere-groups-updated'))
+}
+
+const syncGroupsToApi = async (method, group = null) => {
+  try {
+    const response = await fetch('/api/groups', {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: group ? JSON.stringify(group) : undefined,
+    })
+
+    if (!response.ok) {
+      throw new Error(`API request failed with status ${response.status}`)
+    }
+
+    const payload = await response.json()
+    if (Array.isArray(payload)) {
+      writeJson(STORAGE_KEY, payload)
+      broadcastGroupsUpdated()
+      return payload
+    }
+
+    return payload
+  } catch (error) {
+    console.error('Error syncing groups with API:', error)
+    return null
+  }
+}
+
+export const hydrateGroupsCache = async () => {
+  try {
+    const response = await fetch('/api/groups')
+    if (!response.ok) return getStoredGroups()
+
+    const groups = await response.json()
+    if (Array.isArray(groups) && groups.length > 0) {
+      writeJson(STORAGE_KEY, groups)
+      broadcastGroupsUpdated()
+      return groups
+    }
+  } catch (error) {
+    console.error('Error hydrating groups cache:', error)
+  }
+
+  return getStoredGroups()
+}
+
 export const saveNewGroup = (groupData) => {
   try {
-    const customGroups = readJson(STORAGE_KEY, [])
     const currentGroups = getStoredGroups()
     const maxId = currentGroups.reduce((max, group) => (group.id > max ? group.id : max), 0)
     const newGroup = {
@@ -83,8 +136,10 @@ export const saveNewGroup = (groupData) => {
       createdAt: new Date().toISOString(),
     }
 
-    customGroups.unshift(newGroup)
-    writeJson(STORAGE_KEY, customGroups)
+    const nextGroups = [newGroup, ...currentGroups]
+    writeJson(STORAGE_KEY, nextGroups)
+    broadcastGroupsUpdated()
+    void syncGroupsToApi('POST', newGroup)
     return newGroup
   } catch (error) {
     console.error('Error saving new group:', error)
@@ -94,22 +149,16 @@ export const saveNewGroup = (groupData) => {
 
 export const updateStoredGroup = (groupId, groupData) => {
   try {
-    const customGroups = readJson(STORAGE_KEY, [])
-    const customIndex = customGroups.findIndex((group) => group.id === groupId)
+    const currentGroups = getStoredGroups()
+    const updatedGroups = currentGroups.map((group) =>
+      group.id === groupId ? { ...group, ...groupData, id: groupId } : group,
+    )
 
-    if (customIndex >= 0) {
-      customGroups[customIndex] = { ...customGroups[customIndex], ...groupData, id: groupId }
-      writeJson(STORAGE_KEY, customGroups)
-    } else {
-      const overrides = readJson(OVERRIDES_KEY, {})
-      overrides[groupId] = { ...(overrides[groupId] ?? {}), ...groupData, id: groupId }
-      writeJson(OVERRIDES_KEY, overrides)
+    writeJson(STORAGE_KEY, updatedGroups)
+    broadcastGroupsUpdated()
+    void syncGroupsToApi('PUT', { id: groupId, ...groupData })
 
-      const deletedIds = readJson(DELETED_KEY, []).filter((id) => id !== groupId)
-      writeJson(DELETED_KEY, deletedIds)
-    }
-
-    return getStoredGroups().find((group) => group.id === groupId) ?? null
+    return updatedGroups.find((group) => group.id === groupId) ?? null
   } catch (error) {
     console.error('Error updating group:', error)
     return null
@@ -118,23 +167,11 @@ export const updateStoredGroup = (groupId, groupData) => {
 
 export const deleteStoredGroup = (groupId) => {
   try {
-    const customGroups = readJson(STORAGE_KEY, [])
-    const customIndex = customGroups.findIndex((group) => group.id === groupId)
-
-    if (customIndex >= 0) {
-      customGroups.splice(customIndex, 1)
-      writeJson(STORAGE_KEY, customGroups)
-    } else {
-      const deletedIds = new Set(readJson(DELETED_KEY, []))
-      deletedIds.add(groupId)
-      writeJson(DELETED_KEY, Array.from(deletedIds))
-    }
-
-    const overrides = readJson(OVERRIDES_KEY, {})
-    if (overrides[groupId]) {
-      delete overrides[groupId]
-      writeJson(OVERRIDES_KEY, overrides)
-    }
+    const currentGroups = getStoredGroups()
+    const nextGroups = currentGroups.filter((group) => group.id !== groupId)
+    writeJson(STORAGE_KEY, nextGroups)
+    broadcastGroupsUpdated()
+    void syncGroupsToApi('DELETE', { id: groupId })
 
     return true
   } catch (error) {

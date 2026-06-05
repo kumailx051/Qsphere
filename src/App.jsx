@@ -16,6 +16,7 @@ import GroupsPage from './pages/GroupsPage'
 import GroupDetailPage from './pages/GroupDetailPage'
 
 import ScrollToTop from './components/ScrollToTop'
+import { hydrateGroupsCache } from './utils/groupStore'
 import './App.css'
 
 function App() {
@@ -23,6 +24,10 @@ function App() {
 
   useEffect(() => {
     document.body.style.background = '#000'
+  }, [])
+
+  useEffect(() => {
+    void hydrateGroupsCache()
   }, [])
 
   return (

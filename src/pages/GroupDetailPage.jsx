@@ -110,8 +110,17 @@ const GroupDetailPage = () => {
   const navigate = useNavigate()
   const { id } = useParams()
   const groupId = Number(id)
-  const group = useMemo(() => getStoredGroups().find((item) => item.id === groupId) ?? null, [groupId])
+  const [groups, setGroups] = useState(() => getStoredGroups())
   const profile = useMemo(() => readStoredProfile(), [])
+
+  useEffect(() => {
+    const syncGroups = () => setGroups(getStoredGroups())
+    syncGroups()
+    window.addEventListener('qsphere-groups-updated', syncGroups)
+    return () => window.removeEventListener('qsphere-groups-updated', syncGroups)
+  }, [])
+
+  const group = useMemo(() => groups.find((item) => item.id === groupId) ?? null, [groups, groupId])
   const isAdmin = Boolean(group && profile && String(profile.fullName || '').trim().toLowerCase() === String(group.owner || '').trim().toLowerCase())
 
   const [activeTab, setActiveTab] = useState('details')

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
@@ -12,7 +12,14 @@ const GroupsPage = () => {
   })
 
   const navigate = useNavigate()
-  const groups = getStoredGroups()
+  const [groups, setGroups] = useState(() => getStoredGroups())
+
+  useEffect(() => {
+    const syncGroups = () => setGroups(getStoredGroups())
+    syncGroups()
+    window.addEventListener('qsphere-groups-updated', syncGroups)
+    return () => window.removeEventListener('qsphere-groups-updated', syncGroups)
+  }, [])
 
   const toggleFilter = (key) => {
     setFilters(prev => ({ ...prev, [key]: !prev[key] }))
