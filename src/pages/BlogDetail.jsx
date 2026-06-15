@@ -2,49 +2,131 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
-import videoBackground from '../assets/videoBackground.mp4'
-import { getStoredBlogs } from '../utils/blogStore'
 import { jsPDF } from 'jspdf'
+
+const formatDate = (dateStr) => {
+  if (!dateStr) return ''
+  try {
+    return new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+  } catch {
+    return dateStr
+  }
+}
 
 export default function BlogDetail() {
   const { id } = useParams()
   const postId = Number(id || 0)
-  const blogs = getStoredBlogs()
-  const post = blogs.find((p) => p.id === postId)
+  const navigate = useNavigate()
+
+  const [post, setPost] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [allBlogs, setAllBlogs] = useState([])
+  const [comments, setComments] = useState([])
+  const [shareOpen, setShareOpen] = useState(false)
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false)
+
+  const nameRef = useRef(null)
+  const commentRef = useRef(null)
 
   useEffect(() => {
     if (typeof window !== 'undefined') window.scrollTo(0, 0)
   }, [id])
 
-  const navigate = useNavigate()
-  const [shareOpen, setShareOpen] = useState(false)
-  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false)
-
-  // Comments state persisted to localStorage per post
-  const storageKey = `qsphere_comments_${postId}`
-  const [comments, setComments] = useState(() => {
-    try {
-      const raw = localStorage.getItem(storageKey)
-      return raw ? JSON.parse(raw) : []
-    } catch (e) {
-      return []
-    }
-  })
-  const nameRef = useRef(null)
-  const commentRef = useRef(null)
-
+  // Process links in blog content: add target="_blank" and rel="noopener noreferrer"
+  // so external links open in a new tab instead of navigating away.
   useEffect(() => {
-    try { localStorage.setItem(storageKey, JSON.stringify(comments)) } catch (e) { }
-  }, [comments, storageKey])
+    if (!post?.blogData) return
+    const container = document.querySelector('.prose')
+    if (!container) return
+    const links = container.querySelectorAll('a')
+    links.forEach((a) => {
+      if (!a.getAttribute('target')) a.setAttribute('target', '_blank')
+      const existingRel = a.getAttribute('rel') || ''
+      if (!existingRel.includes('noopener')) {
+        a.setAttribute('rel', `${existingRel} noopener noreferrer`.trim())
+      }
+      // Ensure external URLs have a protocol so they don't become relative paths
+      const href = a.getAttribute('href') || ''
+      if (href && !href.startsWith('/') && !href.startsWith('#') && !href.startsWith('mailto:') && !href.startsWith('http')) {
+        a.setAttribute('href', `https://${href}`)
+      }
+    })
+  }, [post?.blogData])
 
-  const addComment = (e) => {
+  // Fetch the blog post
+  useEffect(() => {
+    const loadBlog = async () => {
+      setLoading(true)
+      try {
+        const res = await fetch(`/api/blogs/${postId}`)
+        if (res.ok) {
+          const data = await res.json()
+          setPost(data)
+        } else {
+          setPost(null)
+        }
+      } catch (e) {
+        console.error('Failed to load blog:', e)
+        setPost(null)
+      } finally {
+        setLoading(false)
+      }
+    }
+    if (postId) loadBlog()
+  }, [postId])
+
+  // Fetch all blogs for the "More Blogs" carousel
+  useEffect(() => {
+    const loadAll = async () => {
+      try {
+        const res = await fetch('/api/blogs')
+        if (res.ok) {
+          const data = await res.json()
+          setAllBlogs(data)
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+    loadAll()
+  }, [])
+
+  // Fetch comments for this blog
+  useEffect(() => {
+    const loadComments = async () => {
+      try {
+        const res = await fetch(`/api/blogs/${postId}/comments`)
+        if (res.ok) {
+          const data = await res.json()
+          setComments(data)
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+    if (postId) loadComments()
+  }, [postId])
+
+  const addComment = async (e) => {
     e.preventDefault()
     const name = nameRef.current?.value?.trim() || 'Anonymous'
     const text = commentRef.current?.value?.trim()
     if (!text) return
-    const c = { id: Date.now(), name, text, date: new Date().toISOString() }
-    setComments((s) => [c, ...s])
-    if (commentRef.current) commentRef.current.value = ''
+
+    try {
+      const res = await fetch(`/api/blogs/${postId}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, text })
+      })
+      if (res.ok) {
+        const newComment = await res.json()
+        setComments((s) => [newComment, ...s])
+        if (commentRef.current) commentRef.current.value = ''
+      }
+    } catch (e) {
+      console.error('Failed to post comment:', e)
+    }
   }
 
   const loadImageAsDataUrl = async (src) => {
@@ -67,21 +149,247 @@ export default function BlogDetail() {
     }
   }
 
-  const addWrappedParagraph = (doc, text, x, y, maxWidth, options = {}) => {
-    const {
-      fontSize = 11,
-      lineHeight = 16,
-      color = [234, 240, 235],
-      fontStyle = 'normal',
-      fontName = 'helvetica',
-    } = options
+  const renderHtmlToPdf = (doc, html, x, y, maxWidth, pageHeight, margin) => {
+    const temp = document.createElement('div')
+    temp.innerHTML = html
 
-    doc.setFont(fontName, fontStyle)
-    doc.setFontSize(fontSize)
-    doc.setTextColor(...color)
-    const lines = doc.splitTextToSize(text || '', maxWidth)
-    doc.text(lines, x, y)
-    return y + lines.length * lineHeight
+    const pageBreak = (needed) => {
+      if (y + needed > pageHeight - margin) {
+        doc.addPage()
+        y = margin + 20
+      }
+    }
+
+    const renderText = (text, leftMargin, opts = {}) => {
+      const {
+        fontSize = 11,
+        fontStyle = 'normal',
+        color = [50, 50, 50],
+        indent = 0,
+        lineHeight = 14,
+        prefix = '',
+      } = opts
+      if (!text) return
+      const avail = maxWidth - leftMargin - indent
+      doc.setFont('helvetica', fontStyle)
+      doc.setFontSize(fontSize)
+      doc.setTextColor(...color)
+      const lines = doc.splitTextToSize(text, avail)
+      for (let i = 0; i < lines.length; i++) {
+        pageBreak(lineHeight)
+        if (i === 0 && prefix) {
+          doc.text(prefix, x + leftMargin + indent, y)
+          doc.text(lines[i], x + leftMargin + indent + doc.getTextWidth(prefix) + 2, y)
+        } else {
+          doc.text(lines[i], x + leftMargin + indent, y)
+        }
+        y += lineHeight
+      }
+    }
+
+    const walk = (parentNode, leftMargin) => {
+      for (let i = 0; i < parentNode.childNodes.length; i++) {
+        const node = parentNode.childNodes[i]
+        if (node.nodeType === Node.TEXT_NODE) {
+          const text = node.textContent.replace(/\s+/g, ' ').trim()
+          if (!text) continue
+          renderText(text, leftMargin)
+          continue
+        }
+        if (node.nodeType !== Node.ELEMENT_NODE) continue
+        const tag = node.nodeName.toLowerCase()
+
+        if (tag === 'h1' || tag === 'h2' || tag === 'h3') {
+          const text = node.textContent.replace(/\s+/g, ' ').trim()
+          if (!text) continue
+          pageBreak(30)
+          y += 8
+          const sizes = { h1: 20, h2: 15, h3: 13 }
+          renderText(text, leftMargin, {
+            fontSize: sizes[tag], fontStyle: 'bold', color: [16, 185, 129],
+            lineHeight: sizes[tag] + 10,
+          })
+          y += 4
+          continue
+        }
+
+        if (tag === 'p') {
+          if (node.children.length > 0) {
+            pageBreak(14)
+            walk(node, leftMargin)
+            y += 6
+          } else {
+            const text = node.textContent.replace(/\s+/g, ' ').trim()
+            if (!text) continue
+            renderText(text, leftMargin)
+            y += 4
+          }
+          continue
+        }
+
+        if (tag === 'a') {
+          const text = node.textContent.replace(/\s+/g, ' ').trim()
+          const href = node.getAttribute('href') || ''
+          if (!text) continue
+          renderText(text, leftMargin, {
+            fontSize: 11, fontStyle: 'normal', color: [37, 99, 235], lineHeight: 14,
+          })
+          continue
+        }
+
+        if (tag === 'strong' || tag === 'b') {
+          const text = node.textContent.replace(/\s+/g, ' ').trim()
+          if (!text) continue
+          renderText(text, leftMargin, { fontSize: 11, fontStyle: 'bold', color: [30, 30, 30] })
+          continue
+        }
+
+        if (tag === 'em' || tag === 'i') {
+          const text = node.textContent.replace(/\s+/g, ' ').trim()
+          if (!text) continue
+          renderText(text, leftMargin, { fontSize: 11, fontStyle: 'italic', color: [60, 60, 60] })
+          continue
+        }
+
+        if (tag === 'blockquote') {
+          const text = node.textContent.replace(/\s+/g, ' ').trim()
+          if (!text) continue
+          pageBreak(14)
+          renderText(text, leftMargin, {
+            fontSize: 10, fontStyle: 'italic', color: [100, 100, 100],
+            indent: 14, lineHeight: 13,
+          })
+          y += 6
+          continue
+        }
+
+        if (tag === 'ul' || tag === 'ol') {
+          let index = 1
+          for (const li of node.children) {
+            if (li.tagName?.toLowerCase() !== 'li') continue
+            const text = li.textContent.replace(/\s+/g, ' ').trim()
+            if (!text) continue
+            pageBreak(16)
+            const prefix = tag === 'ol' ? `${index}.` : '•'
+            renderText(text, leftMargin, {
+              fontSize: 11, fontStyle: 'normal', color: [50, 50, 50],
+              indent: 20, prefix, lineHeight: 15,
+            })
+            y += 2
+            index++
+          }
+          y += 4
+          continue
+        }
+
+        if (tag === 'br') {
+          y += 6
+          continue
+        }
+
+        if (tag === 'hr') {
+          pageBreak(14)
+          y += 6
+          doc.setDrawColor(200, 200, 200)
+          doc.setLineWidth(0.5)
+          doc.line(x + leftMargin, y, x + maxWidth, y)
+          y += 10
+          continue
+        }
+
+        // Table
+        if (tag === 'table') {
+          const rows = []
+          for (const tr of node.children) {
+            if (tr.tagName?.toLowerCase() !== 'tr') continue
+            const cells = []
+            for (const cell of tr.children) {
+              const cellTag = cell.tagName?.toLowerCase()
+              if (cellTag === 'td' || cellTag === 'th') {
+                cells.push({
+                  text: cell.textContent.replace(/\s+/g, ' ').trim(),
+                  isHeader: cellTag === 'th',
+                  colspan: parseInt(cell.getAttribute('colspan') || '1'),
+                  rowspan: parseInt(cell.getAttribute('rowspan') || '1'),
+                })
+              }
+            }
+            if (cells.length > 0) rows.push(cells)
+          }
+          if (rows.length === 0) continue
+
+          const colCount = Math.max(...rows.map(r => r.reduce((s, c) => s + c.colspan, 0)))
+          const colWidth = (maxWidth - leftMargin) / colCount
+          const cellPadding = 6
+          const fontSize = 9
+
+          doc.setFont('helvetica', 'normal')
+          doc.setFontSize(fontSize)
+
+          const rowHeights = rows.map((row) => {
+            let maxH = 0
+            for (const cell of row) {
+              const w = cell.colspan * colWidth - cellPadding * 2
+              const lines = doc.splitTextToSize(cell.text || '', w)
+              const h = lines.length * (fontSize + 3) + cellPadding * 2
+              if (h > maxH) maxH = h
+            }
+            return Math.max(maxH, fontSize + cellPadding * 2 + 6)
+          })
+
+          let tableY = y
+          for (let ri = 0; ri < rows.length; ri++) {
+            const row = rows[ri]
+            const rowH = rowHeights[ri]
+            if (tableY + rowH > pageHeight - margin) {
+              doc.addPage()
+              tableY = margin + 20
+            }
+
+            let cellX = x + leftMargin
+            let maxRowH = rowH
+            for (let ci = 0; ci < row.length; ci++) {
+              const cell = row[ci]
+              const w = cell.colspan * colWidth
+              const h = rowH
+
+              doc.setDrawColor(180, 180, 180)
+              doc.setLineWidth(0.3)
+              doc.rect(cellX, tableY, w, h)
+
+              if (cell.isHeader) {
+                doc.setFillColor(16, 185, 129, 0.12)
+                doc.rect(cellX, tableY, w, h, 'F')
+              }
+
+              const cellText = cell.text || ''
+              const lines = doc.splitTextToSize(cellText, w - cellPadding * 2)
+
+              doc.setFont('helvetica', cell.isHeader ? 'bold' : 'normal')
+              doc.setFontSize(fontSize)
+              doc.setTextColor(cell.isHeader ? [16, 185, 129] : [50, 50, 50])
+
+              for (let li = 0; li < lines.length; li++) {
+                doc.text(lines[li], cellX + cellPadding, tableY + cellPadding + (li + 1) * (fontSize + 3))
+              }
+
+              cellX += w
+            }
+            tableY += rowH
+          }
+          y = tableY + 10
+          continue
+        }
+
+        if (tag === 'div' || tag === 'section' || tag === 'article' || tag === 'span' || tag === 'thead' || tag === 'tbody' || tag === 'tfoot') {
+          walk(node, leftMargin)
+          continue
+        }
+        walk(node, leftMargin)
+      }
+    }
+    walk(temp, 0)
+    return y
   }
 
   const downloadPdf = async () => {
@@ -93,127 +401,45 @@ export default function BlogDetail() {
       const doc = new jsPDF({ unit: 'pt', format: 'a4' })
       const pageWidth = doc.internal.pageSize.getWidth()
       const pageHeight = doc.internal.pageSize.getHeight()
-      const margin = 42
+      const margin = 50
       const contentWidth = pageWidth - margin * 2
-      const brandGreen = [16, 185, 129]
-      const dark = [6, 10, 6]
 
-      // Cover block
-      doc.setFillColor(...dark)
-      doc.rect(0, 0, pageWidth, 210, 'F')
-      doc.setFillColor(10, 18, 13)
-      doc.rect(0, 0, pageWidth, 210, 'F')
+      let y = margin + 30
 
+      // Title
       doc.setFont('helvetica', 'bold')
-      doc.setFontSize(10)
-      doc.setTextColor(...brandGreen)
-      doc.text(String(post.category || 'BLOG').toUpperCase(), pageWidth / 2, 56, { align: 'center' })
-
-      doc.setFont('helvetica', 'bold')
-      doc.setFontSize(24)
-      doc.setTextColor(255, 255, 255)
-      const titleLines = doc.splitTextToSize(post.title || 'Untitled Article', contentWidth - 40)
-      doc.text(titleLines, pageWidth / 2, 92, { align: 'center' })
-
-      doc.setFont('helvetica', 'normal')
-      doc.setFontSize(10)
-      doc.setTextColor(210, 220, 214)
-      doc.text(`By ${post.author || 'QSphere Team'}  ·  ${post.readTime || ''}  ·  ${post.date || ''}`, pageWidth / 2, 132, { align: 'center' })
-
-      const coverImage = await loadImageAsDataUrl(post.image)
-      let y = 232
-      if (coverImage) {
-        const imageHeight = 210
-        doc.setDrawColor(30, 70, 52)
-        doc.roundedRect(margin, y, contentWidth, imageHeight, 16, 16, 'S')
-        doc.addImage(coverImage, 'JPEG', margin, y, contentWidth, imageHeight, undefined, 'FAST')
-        y += imageHeight + 28
-      }
-
-      // Article metadata and body
-      doc.setFont('helvetica', 'bold')
-      doc.setFontSize(13)
-      doc.setTextColor(...brandGreen)
-      doc.text('Article', margin, y)
-      y += 18
-
-      doc.setFont('helvetica', 'normal')
-      y = addWrappedParagraph(
-        doc,
-        `By ${post.author || 'QSphere Team'}   ·   ${post.date || ''}   ·   ${post.readTime || ''}`,
-        margin,
-        y,
-        contentWidth,
-        { fontSize: 10, lineHeight: 14, color: [170, 180, 172] },
-      )
-      y += 14
-
-      if (post.body) {
-        y = addWrappedParagraph(doc, post.body, margin, y, contentWidth, {
-          fontSize: 12,
-          lineHeight: 18,
-          color: [236, 240, 237],
-        })
-        y += 8
-      }
-
-      if (post.sections && post.sections.length > 0) {
-        post.sections.forEach((section) => {
-          if (y > pageHeight - 120) {
-            doc.addPage()
-            y = margin
-          }
-
-          doc.setFont('helvetica', 'bold')
-          doc.setFontSize(14)
-          doc.setTextColor(255, 255, 255)
-          doc.text(section.title || 'Section', margin, y)
-          y += 18
-
-          y = addWrappedParagraph(doc, section.content || '', margin, y, contentWidth, {
-            fontSize: 11,
-            lineHeight: 16,
-            color: [220, 228, 222],
-          })
-          y += 12
-        })
-      }
-
-      if (post.takeaways && post.takeaways.length > 0) {
-        if (y > pageHeight - 120) {
+      doc.setFontSize(22)
+      doc.setTextColor(16, 185, 129)
+      const titleLines = doc.splitTextToSize(post.title || 'Untitled Article', contentWidth)
+      for (const line of titleLines) {
+        if (y + 24 > pageHeight - margin) {
           doc.addPage()
-          y = margin
+          y = margin + 20
         }
-
-        doc.setFont('helvetica', 'bold')
-        doc.setFontSize(14)
-        doc.setTextColor(...brandGreen)
-        doc.text('Key Takeaways', margin, y)
-        y += 18
-
-        post.takeaways.forEach((takeaway) => {
-          if (y > pageHeight - 80) {
-            doc.addPage()
-            y = margin
-          }
-
-          doc.setFont('helvetica', 'normal')
-          doc.setFontSize(11)
-          doc.setTextColor(228, 234, 229)
-          const bulletLines = doc.splitTextToSize(`• ${takeaway}`, contentWidth)
-          doc.text(bulletLines, margin, y)
-          y += bulletLines.length * 16 + 4
-        })
+        doc.text(line, margin, y)
+        y += 22
       }
 
+      y += 16
+
+      // Separator
+      doc.setDrawColor(16, 185, 129, 0.4)
+      doc.setLineWidth(0.5)
+      doc.line(margin, y, pageWidth - margin, y)
+      y += 20
+
+      // Render blog body HTML
+      y = renderHtmlToPdf(doc, post.blogData || '', margin, y, contentWidth, pageHeight, margin)
+
+      // Page numbers
       const totalPages = doc.internal.getNumberOfPages()
       for (let page = 1; page <= totalPages; page += 1) {
         doc.setPage(page)
         doc.setFont('helvetica', 'normal')
-        doc.setFontSize(9)
-        doc.setTextColor(120, 132, 124)
-        doc.text(`QSphere Blog`, margin, pageHeight - 24)
-        doc.text(`${page} / ${totalPages}`, pageWidth - margin, pageHeight - 24, { align: 'right' })
+        doc.setFontSize(8)
+        doc.setTextColor(180, 180, 180)
+        doc.text(`QSphere Blog`, margin, pageHeight - 20)
+        doc.text(`${page} / ${totalPages}`, pageWidth - margin, pageHeight - 20, { align: 'right' })
       }
 
       const safeTitle = (post.title || 'blog-detail').replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase()
@@ -225,20 +451,34 @@ export default function BlogDetail() {
 
   const shareTo = (platform) => {
     const url = window.location.href
-    const text = encodeURIComponent(post.title)
+    const text = encodeURIComponent(post?.title || '')
     let shareUrl = '#'
     if (platform === 'facebook') shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`
     if (platform === 'linkedin') shareUrl = `https://www.linkedin.com/shareArticle?mini=true&url=${encodeURIComponent(url)}&title=${text}`
-    if (platform === 'instagram') shareUrl = `https://www.instagram.com/` // Instagram doesn't support direct share via URL
+    if (platform === 'instagram') shareUrl = `https://www.instagram.com/`
     window.open(shareUrl, '_blank', 'noopener,noreferrer')
   }
 
   // More blogs carousel
-  const others = useMemo(() => blogs.filter((p) => p.id !== postId), [postId, blogs])
+  const others = useMemo(() => allBlogs.filter((p) => p.id !== postId), [postId, allBlogs])
   const [carouselIndex, setCarouselIndex] = useState(0)
   const carouselVisible = 3
-  const nextCarousel = () => setCarouselIndex((i) => (i + carouselVisible) % others.length)
-  const prevCarousel = () => setCarouselIndex((i) => (i - carouselVisible + others.length) % others.length)
+  const nextCarousel = () => setCarouselIndex((i) => (i + carouselVisible) % Math.max(others.length, 1))
+  const prevCarousel = () => setCarouselIndex((i) => (i - carouselVisible + others.length) % Math.max(others.length, 1))
+
+  if (loading) {
+    return (
+      <div className="relative min-h-screen bg-[#060a06] text-white">
+        <Navbar currentPage="blogs" />
+        <main className="pt-28 px-6 md:px-12 lg:px-20">
+          <div className="max-w-4xl mx-auto py-40 text-center">
+            <p className="text-white/60">Loading article...</p>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    )
+  }
 
   if (!post) {
     return (
@@ -262,13 +502,13 @@ export default function BlogDetail() {
 
       {/* Hero / image with overlaid title */}
       <div className="relative w-full overflow-hidden">
-        <img src={post.image} alt={post.title} className="w-full h-[34vh] min-h-[240px] object-cover" />
+        <img src={post.coverImage} alt={post.title} className="w-full h-[50vh] min-h-[320px] object-cover" />
         <div className="absolute inset-0 bg-black/45" />
         <div className="absolute inset-0 z-20 flex items-center justify-center px-6 md:px-12">
           <div className="max-w-5xl text-center">
             <div className="text-emerald-400 text-[11px] tracking-[0.4em] mb-3 font-semibold">{post.category}</div>
             <h1 className="text-white font-black leading-tight" style={{ fontSize: 'clamp(1.8rem, 4vw, 3rem)', fontFamily: "'Archivo Black', 'Inter', sans-serif" }}>{post.title}</h1>
-            <div className="text-white/70 mt-3 text-sm">By {post.author} · {post.readTime} · {post.date}</div>
+            <div className="text-white/70 mt-3 text-sm">By {post.author} · {post.readingTime} · {formatDate(post.dateOfPublish)}</div>
           </div>
         </div>
       </div>
@@ -279,7 +519,7 @@ export default function BlogDetail() {
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
             <div>
               <div className="text-sm text-white/70">By <span className="font-semibold text-white">{post.author}</span></div>
-              <div className="text-xs text-white/50">{post.date} · {post.readTime}</div>
+              <div className="text-xs text-white/50">{formatDate(post.dateOfPublish)} · {post.readingTime}</div>
             </div>
 
             <div className="flex items-center gap-3">
@@ -298,36 +538,20 @@ export default function BlogDetail() {
             </div>
           </div>
 
-          {/* Content */}
-          <div className="prose prose-invert max-w-none text-white/85 mb-8">
-            <p className="text-lg leading-relaxed whitespace-pre-wrap">{post.body}</p>
-            
-            {/* Dynamic Custom Sections */}
-            {post.sections && post.sections.map((section, idx) => (
-              <div key={idx} className="mt-8">
-                <h3 className="text-xl font-bold text-white mb-3">{section.title}</h3>
-                <p className="text-white/80 leading-relaxed whitespace-pre-wrap">{section.content}</p>
-              </div>
-            ))}
+          {/* Excerpt */}
+          {post.excerpt && (
+            <div className="mb-6 text-white/60 text-base italic border-l-2 border-emerald-400/30 pl-4">
+              {post.excerpt}
+            </div>
+          )}
 
-            {/* Key Takeaways */}
-            <h3 className="mt-10 font-bold text-emerald-400 flex items-center gap-2">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-              Key Takeaways
-            </h3>
-            <ul className="mt-4 space-y-2 list-disc pl-5">
-              {post.takeaways && post.takeaways.length > 0 ? (
-                post.takeaways.map((takeaway, idx) => (
-                  <li key={idx} className="text-white/80 leading-relaxed">{takeaway}</li>
-                ))
-              ) : (
-                <>
-                  <li className="text-white/80 leading-relaxed">Summarized insight one about the topic.</li>
-                  <li className="text-white/80 leading-relaxed">Summarized insight two with practical implications.</li>
-                  <li className="text-white/80 leading-relaxed">Next steps and references for further reading.</li>
-                </>
-              )}
-            </ul>
+          {/* Content - render rich HTML from blogData */}
+          <div className="prose prose-invert max-w-none text-white/85 mb-8">
+            {post.blogData ? (
+              <div dangerouslySetInnerHTML={{ __html: post.blogData }} />
+            ) : (
+              <p className="text-lg leading-relaxed whitespace-pre-wrap">No content available.</p>
+            )}
           </div>
 
           {/* Comment section */}
@@ -348,7 +572,7 @@ export default function BlogDetail() {
                 <div key={c.id} className="bg-black/40 p-4 rounded-lg">
                   <div className="flex items-center justify-between">
                     <div className="font-semibold">{c.name}</div>
-                    <div className="text-xs text-white/50">{new Date(c.date).toLocaleString()}</div>
+                    <div className="text-xs text-white/50">{new Date(c.created_at).toLocaleString()}</div>
                   </div>
                   <div className="text-white/90 mt-2">{c.text}</div>
                 </div>
@@ -357,31 +581,33 @@ export default function BlogDetail() {
           </section>
 
           {/* More blogs carousel */}
-          <section className="mt-12">
-            <div className="flex items-center justify-between mb-4">
-              <h4 className="text-white font-semibold">More Blogs</h4>
-              <div className="flex items-center gap-2">
-                <button onClick={prevCarousel} className="px-3 py-2 bg-white/[0.04] rounded">‹</button>
-                <button onClick={nextCarousel} className="px-3 py-2 bg-white/[0.04] rounded">›</button>
+          {others.length > 0 && (
+            <section className="mt-12">
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="text-white font-semibold">More Blogs</h4>
+                <div className="flex items-center gap-2">
+                  <button onClick={prevCarousel} className="px-3 py-2 bg-white/[0.04] rounded">‹</button>
+                  <button onClick={nextCarousel} className="px-3 py-2 bg-white/[0.04] rounded">›</button>
+                </div>
               </div>
-            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {Array.from({ length: Math.min(carouselVisible, others.length) }).map((_, idx) => {
-                const item = others[(carouselIndex + idx) % others.length]
-                return (
-                  <article key={item.id} className="group relative flex flex-col rounded-2xl border border-emerald-400/8 bg-white/[0.02] overflow-hidden cursor-pointer" onClick={() => navigate(`/blogs/${item.id}`)}>
-                    <img src={item.image} alt={item.title} className="w-full h-48 object-cover" />
-                    <div className="p-4">
-                      <div className="text-emerald-400 text-xs tracking-[0.3em] mb-2">{item.category}</div>
-                      <h5 className="text-white font-semibold">{item.title}</h5>
-                      <p className="text-white/50 text-sm mt-2">{item.excerpt}</p>
-                    </div>
-                  </article>
-                )
-              })}
-            </div>
-          </section>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {Array.from({ length: Math.min(carouselVisible, others.length) }).map((_, idx) => {
+                  const item = others[(carouselIndex + idx) % others.length]
+                  return (
+                    <article key={item.id} className="group relative flex flex-col rounded-2xl border border-emerald-400/8 bg-white/[0.02] overflow-hidden cursor-pointer" onClick={() => navigate(`/blogs/${item.id}`)}>
+                      <img src={item.coverImage} alt={item.title} className="w-full h-48 object-cover" />
+                      <div className="p-4">
+                        <div className="text-emerald-400 text-xs tracking-[0.3em] mb-2">{item.category}</div>
+                        <h5 className="text-white font-semibold">{item.title}</h5>
+                        <p className="text-white/50 text-sm mt-2">{item.excerpt}</p>
+                      </div>
+                    </article>
+                  )
+                })}
+              </div>
+            </section>
+          )}
         </div>
       </main>
 

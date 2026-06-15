@@ -201,7 +201,7 @@ export default function CurvedCarousel() {
           align-items: center;
           perspective: 1800px;
           perspective-origin: 50% 50%;
-          background: #0a0a0a;
+          z-index: 10;
         }
 
         /* ── Top progress bar ── */
@@ -351,9 +351,7 @@ export default function CurvedCarousel() {
         └───────────────────────────────────────────────────────────────┘
       */}
       <div className="cs-wrapper" ref={wrapperRef}>
-        <div className="cs-sticky">
-
-          <div className="cs-top-bar">
+        <div className="cs-sticky">          <div className="cs-top-bar">
             <span className="cs-label">Scroll Horizontally</span>
             <div className="cs-track-line">
               <div className="cs-track-fill" ref={trackFillRef} />

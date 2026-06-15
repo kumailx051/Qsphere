@@ -3,18 +3,80 @@ import { Link } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import videoBackground from '../assets/videoBackground.mp4'
-import { getStoredBlogs } from '../utils/blogStore'
+
+const formatDate = (dateStr) => {
+  if (!dateStr) return ''
+  try {
+    return new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+  } catch {
+    return dateStr
+  }
+}
+
+const PER_PAGE = 4
 
 const BlogPage = () => {
   const videoRef = useRef(null)
+  const sentinelRef = useRef(null)
   const [blogs, setBlogs] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [visibleCount, setVisibleCount] = useState(PER_PAGE)
+  const [loadingMore, setLoadingMore] = useState(false)
 
   useEffect(() => {
-    setBlogs(getStoredBlogs())
+    const loadBlogs = async () => {
+      try {
+        const res = await fetch('/api/blogs')
+        if (res.ok) {
+          const data = await res.json()
+          setBlogs(data)
+        }
+      } catch (e) {
+        console.error('Failed to load blogs:', e)
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadBlogs()
     if (videoRef.current) {
       videoRef.current.play().catch(() => {})
     }
   }, [])
+
+  const loadTimerRef = useRef(null)
+
+  // Infinite scroll via IntersectionObserver
+  useEffect(() => {
+    if (loading || blogs.length === 0) return
+
+    const sentinel = sentinelRef.current
+    if (!sentinel) return
+
+    const allShown = visibleCount >= blogs.length
+    if (allShown) return
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && !loadingMore) {
+          setLoadingMore(true)
+          loadTimerRef.current = setTimeout(() => {
+            setVisibleCount(prev => Math.min(prev + PER_PAGE, blogs.length))
+            setLoadingMore(false)
+          }, 300)
+        }
+      },
+      { rootMargin: '200px' }
+    )
+
+    observer.observe(sentinel)
+    return () => {
+      observer.disconnect()
+      if (loadTimerRef.current) {
+        clearTimeout(loadTimerRef.current)
+        loadTimerRef.current = null
+      }
+    }
+  }, [loading, blogs, visibleCount, loadingMore])
 
   return (
     <div className="relative bg-[#060a06]" style={{ minHeight: '100vh' }}>
@@ -80,9 +142,12 @@ const BlogPage = () => {
 
       {/* Main Content - Blog Grid */}
       <div className="relative z-10 w-full px-6 md:px-10 lg:px-14 pb-32 pt-10 bg-[#060a06]">
-        <div className="w-full">
-          <div className="grid gap-8 md:grid-cols-2 lg:gap-12">
-            {blogs.map((post, i) => (
+        <div className="w-full">          <div className="grid gap-8 md:grid-cols-2 lg:gap-12">
+            {loading ? (
+              <div className="col-span-full text-center py-20 text-white/50 text-sm">Loading blogs...</div>
+            ) : blogs.length === 0 ? (
+              <div className="col-span-full text-center py-20 text-white/50 text-sm">No blog posts yet. Be the first to write one!</div>
+            ) : blogs.slice(0, visibleCount).map((post, i) => (
               <Link
                 key={post.id} 
                 to={`/blogs/${post.id}`}
@@ -104,7 +169,7 @@ const BlogPage = () => {
                 <div className="relative h-64 md:h-80 overflow-hidden">
                   <div className="absolute inset-0 bg-black/20 z-10 group-hover:bg-transparent transition-colors duration-500" />
                   <img 
-                    src={post.image} 
+                    src={post.coverImage} 
                     alt={post.title} 
                     className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700 ease-out"
                   />
@@ -117,9 +182,9 @@ const BlogPage = () => {
 
                 <div className="p-8 flex flex-col flex-grow">
                   <div className="flex items-center gap-4 text-xs text-white/40 mb-4 font-medium tracking-wide">
-                    <span>{post.date}</span>
+                    <span>{formatDate(post.dateOfPublish)}</span>
                     <span className="w-1 h-1 rounded-full bg-emerald-400/40" />
-                    <span>{post.readTime}</span>
+                    <span>{post.readingTime}</span>
                   </div>
 
                   <h3 
@@ -144,10 +209,22 @@ const BlogPage = () => {
             ))}
           </div>
 
-          <div className="mt-20 flex justify-center" style={{ animation: 'blogFadeUp 0.8s ease-out 1s both' }}>
-            <button className="inline-flex items-center gap-3 bg-white/[0.05] border border-white/10 text-white font-semibold text-sm px-8 py-4 rounded-xl hover:bg-white/[0.1] hover:border-emerald-400/30 transition-all duration-300">
-              Load More Articles
-            </button>
+          {/* Infinite scroll sentinel & loading indicator */}
+          <div ref={sentinelRef} className="mt-16 flex justify-center">
+            {visibleCount < blogs.length ? (
+              <div className="flex flex-col items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-emerald-400/60 animate-pulse" />
+                  <span className="h-2 w-2 rounded-full bg-emerald-400/40 animate-pulse" style={{ animationDelay: '0.2s' }} />
+                  <span className="h-2 w-2 rounded-full bg-emerald-400/20 animate-pulse" style={{ animationDelay: '0.4s' }} />
+                </div>
+                <span className="text-xs text-white/30 font-mono">
+                  {loadingMore ? 'Loading more...' : 'Scroll for more articles'}
+                </span>
+              </div>
+            ) : blogs.length > PER_PAGE ? (
+              <span className="text-xs text-white/20 font-mono">All articles loaded</span>
+            ) : null}
           </div>
         </div>
       </div>

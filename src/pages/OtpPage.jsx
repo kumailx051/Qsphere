@@ -20,6 +20,30 @@ const OtpPage = () => {
 
   const [otp, setOtp] = useState(() => Array(otpLength).fill(''))
   const [busy, setBusy] = useState(false)
+  const [cooldown, setCooldown] = useState(0)
+  const [emailToVerify, setEmailToVerify] = useState('')
+  const [errorMessage, setErrorMessage] = useState('')
+  const [statusMessage, setStatusMessage] = useState('')
+  const [statusType, setStatusType] = useState('info')
+
+  useEffect(() => {
+    const email = localStorage.getItem('qsphere_email_to_verify')
+    if (!email) {
+      setStatusMessage('No verification target found. Redirecting to Sign In.')
+      setStatusType('error')
+      navigate('/auth')
+    } else {
+      setEmailToVerify(email)
+    }
+  }, [navigate])
+
+  useEffect(() => {
+    if (cooldown <= 0) return
+    const timer = setInterval(() => {
+      setCooldown((prev) => prev - 1)
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [cooldown])
 
   const otpHelper = useMemo(
     () => ({
@@ -28,6 +52,11 @@ const OtpPage = () => {
     }),
     []
   )
+
+  const showPageMessage = (message, type = 'info') => {
+    setStatusMessage(message)
+    setStatusType(type)
+  }
 
   useEffect(() => {
     const previousOverflow = document.documentElement.style.overflow
@@ -261,12 +290,65 @@ const OtpPage = () => {
   const handleVerify = async () => {
     const normalized = otp.join('')
     if (normalized.length !== otpLength) return
+    if (!emailToVerify) {
+      showPageMessage('Email address missing. Please try signing up again.', 'error')
+      navigate('/auth')
+      return
+    }
 
     setBusy(true)
-    await new Promise((resolve) => setTimeout(resolve, 900))
-    setBusy(false)
+    setErrorMessage('')
+    showPageMessage('Verifying code...', 'info')
+    try {
+      const response = await fetch('/api/auth/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ emailAddress: emailToVerify, otp: normalized })
+      })
 
-    navigate('/onboarding', { state: { verified: true } })
+      const result = await response.json()
+      if (!response.ok) {
+        throw new Error(result.error || 'Verification failed')
+      }
+
+      showPageMessage('Email verified successfully! Proceeding to Onboarding.', 'success')
+      navigate('/onboarding', { state: { verified: true } })
+    } catch (error) {
+      const message = error.message || 'OTP verification failed.'
+      setErrorMessage(message)
+      showPageMessage(message, 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleResend = async () => {
+    if (!emailToVerify) return
+
+    setBusy(true)
+    setErrorMessage('')
+    showPageMessage('Resending code...', 'info')
+    try {
+      const response = await fetch('/api/auth/resend-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ emailAddress: emailToVerify })
+      })
+
+      const result = await response.json()
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to resend code')
+      }
+
+      showPageMessage('A new 6-digit verification code has been sent to your email.', 'success')
+      setCooldown(60)
+    } catch (error) {
+      const message = error.message || 'Failed to resend OTP.'
+      setErrorMessage(message)
+      showPageMessage(message, 'error')
+    } finally {
+      setBusy(false)
+    }
   }
 
   const statusText = 'QSPHERE · Verification Node Active'
@@ -430,6 +512,35 @@ const OtpPage = () => {
           line-height: 1.1;
           color: #fff;
           margin-bottom: 6px;
+          .banner {
+            margin-bottom: 18px;
+            padding: 12px 14px;
+            border-radius: 12px;
+            border: 1px solid rgba(0,229,160,0.14);
+            background: rgba(0,229,160,0.06);
+            color: rgba(220,252,231,0.95);
+            font-size: 13px;
+            line-height: 1.5;
+          }
+
+          .banner.error {
+            border-color: rgba(239,68,68,0.22);
+            background: rgba(127,29,29,0.2);
+            color: rgba(254,202,202,0.98);
+          }
+
+          .banner.success {
+            border-color: rgba(34,197,94,0.24);
+            background: rgba(20,83,45,0.24);
+            color: rgba(220,252,231,0.98);
+          }
+
+          .otp-error {
+            margin-top: 12px;
+            font-size: 12px;
+            color: rgba(248,113,113,0.98);
+            min-height: 16px;
+          }
           text-shadow: 0 0 40px rgba(0,229,160,0.2);
           pointer-events: auto;
         }
@@ -461,6 +572,13 @@ const OtpPage = () => {
           font-family: 'DM Sans', sans-serif;
           transition: border-color .25s, box-shadow .25s, background .25s;
           box-shadow: inset 0 1px 0 rgba(0,229,160,0.04), inset 0 0 20px rgba(0,0,0,0.3);
+          }
+
+          .otp-input.error {
+            border-color: rgba(239,68,68,0.65);
+            background: rgba(127,29,29,0.2);
+            box-shadow: 0 0 0 3px rgba(239,68,68,0.12), inset 0 0 24px rgba(127,29,29,0.14);
+          }
         }
 
         .otp-input {
@@ -654,6 +772,8 @@ const OtpPage = () => {
             <div className="h1">Verify your <span>Quantum</span><br />access.</div>
             <p className="sub">{otpHelper.subtitle}</p>
 
+            {statusMessage ? <div className={`banner ${statusType}`}>{statusMessage}</div> : null}
+
               <div className="fstack">
               <div className="fi">
                 <div
@@ -670,7 +790,7 @@ const OtpPage = () => {
                     return (
                       <input
                         key={idx}
-                        className="otp-input"
+                        className={`otp-input ${errorMessage ? 'error' : ''}`}
                         type="text"
                         inputMode="numeric"
                         aria-label={`OTP digit ${idx + 1}`}
@@ -762,10 +882,14 @@ const OtpPage = () => {
                 <div style={{ marginTop: 8, textAlign: 'center', color: 'rgba(255,255,255,.45)', fontSize: 12 }}>
                   Enter {otpLength}-digit verification code
                 </div>
+                {errorMessage && (
+                  <div className="otp-error" style={{ textAlign: 'center' }}>
+                    {errorMessage}
+                  </div>
+                )}
               </div>
 
               <button className="btn" type="button" disabled={busy || otp.join('').length !== otpLength} onClick={handleVerify}>
-
                 <span className="row" style={{ gap: 8 }}>
                   {busy ? <span className="spin" /> : 'Verify'}
                   {!busy && ARR}
@@ -777,10 +901,11 @@ const OtpPage = () => {
                 <button
                   className="ghost"
                   type="button"
-                  style={{ fontWeight: 600 }}
-                  onClick={() => alert('Resend OTP (demo)')}
+                  disabled={cooldown > 0 || busy}
+                  style={{ fontWeight: 600, opacity: cooldown > 0 ? 0.5 : 1, cursor: cooldown > 0 ? 'default' : 'pointer' }}
+                  onClick={handleResend}
                 >
-                  Resend
+                  {cooldown > 0 ? `Resend (${cooldown}s)` : 'Resend'}
                 </button>
               </div>
 

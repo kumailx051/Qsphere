@@ -1,9 +1,29 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { ArrowRight, CheckCircle2, LayoutDashboard, Sparkles, Upload, Users } from 'lucide-react'
+import { ArrowRight, CheckCircle2, LayoutDashboard, Sparkles, Upload } from 'lucide-react'
 import { onboardingCommonFields, onboardingRoleFields, onboardingRoles } from '../data/onboarding'
 
 const storageKey = 'qsphere_onboarding_profile'
+
+const formatPhoneNumber = (value) => {
+  const clean = value.replace(/\D/g, '')
+  const truncated = clean.slice(0, 11)
+  if (truncated.length > 4) {
+    return `${truncated.slice(0, 4)}-${truncated.slice(4)}`
+  }
+  return truncated
+}
+
+const formatCNIC = (value) => {
+  const clean = value.replace(/\D/g, '')
+  const truncated = clean.slice(0, 13)
+  if (truncated.length > 12) {
+    return `${truncated.slice(0, 5)}-${truncated.slice(5, 12)}-${truncated.slice(12)}`
+  } else if (truncated.length > 5) {
+    return `${truncated.slice(0, 5)}-${truncated.slice(5)}`
+  }
+  return truncated
+}
 
 const emptyValues = {
   fullName: '',
@@ -39,19 +59,25 @@ const readStoredProfile = () => {
   try {
     const raw = localStorage.getItem(storageKey)
     return raw ? JSON.parse(raw) : null
-  } catch (error) {
+  } catch (_) {
     return null
   }
 }
 
 const fieldWrapperClass = 'rounded-2xl border border-white/10 bg-white/[0.03] p-4 shadow-[0_0_0_1px_rgba(255,255,255,0.02)_inset]'
 
-const InputControl = ({ field, value, onChange }) => {
-  const commonClassName = 'mt-2 w-full rounded-xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white placeholder:text-white/30 outline-none transition focus:border-emerald-400/40 focus:bg-black/35 focus:shadow-[0_0_0_4px_rgba(16,185,129,0.12)]'
+const InputControl = ({ field, value, onChange, hasError }) => {
+  const commonClassName = `mt-2 w-full rounded-xl border bg-black/25 px-4 py-3 text-sm text-white placeholder:text-white/30 outline-none transition ${
+    hasError
+      ? 'border-rose-500/40 focus:border-rose-500/60 focus:bg-black/35 focus:shadow-[0_0_0_4px_rgba(244,63,94,0.12)]'
+      : 'border-white/10 focus:border-emerald-400/40 focus:bg-black/35 focus:shadow-[0_0_0_4px_rgba(16,185,129,0.12)]'
+  }`
 
   if (field.type === 'select') {
     return (
       <select
+        id={field.name}
+        name={field.name}
         value={value}
         onChange={(event) => onChange(field.name, event.target.value)}
         className={commonClassName}
@@ -68,6 +94,8 @@ const InputControl = ({ field, value, onChange }) => {
   if (field.type === 'textarea') {
     return (
       <textarea
+        id={field.name}
+        name={field.name}
         value={value}
         onChange={(event) => onChange(field.name, event.target.value)}
         placeholder={field.placeholder}
@@ -79,6 +107,8 @@ const InputControl = ({ field, value, onChange }) => {
 
   return (
     <input
+      id={field.name}
+      name={field.name}
       value={value}
       onChange={(event) => onChange(field.name, event.target.value)}
       type={field.type || 'text'}
@@ -95,6 +125,20 @@ const OnboardingPage = () => {
   const [avatarPreview, setAvatarPreview] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [values, setValues] = useState(() => ({ ...emptyValues }))
+  const [emailToOnboard, setEmailToOnboard] = useState('')
+  const [errors, setErrors] = useState({})
+  const [submitError, setSubmitError] = useState('')
+
+  useEffect(() => {
+    const email = localStorage.getItem('qsphere_email_to_verify')
+    if (!email) {
+      alert('Verification session expired or not found. Redirecting to Sign In.')
+      navigate('/auth')
+    } else {
+      setEmailToOnboard(email)
+      setValues((current) => ({ ...current, email: email }))
+    }
+  }, [navigate])
 
   const roleConfig = useMemo(
     () => onboardingRoles.find((role) => role.id === selectedRole) ?? onboardingRoles[0],
@@ -105,7 +149,21 @@ const OnboardingPage = () => {
   const verifiedFromOtp = Boolean(location.state?.verified)
 
   const handleFieldChange = (name, nextValue) => {
-    setValues((current) => ({ ...current, [name]: nextValue }))
+    let formattedValue = nextValue
+    if (name === 'cellMain' || name === 'cellAlt') {
+      formattedValue = formatPhoneNumber(nextValue)
+    } else if (name === 'cnic') {
+      formattedValue = formatCNIC(nextValue)
+    }
+
+    setValues((current) => ({ ...current, [name]: formattedValue }))
+    if (errors[name]) {
+      setErrors((current) => {
+        const next = { ...current }
+        delete next[name]
+        return next
+      })
+    }
   }
 
   const handleAvatarChange = (event) => {
@@ -122,25 +180,149 @@ const OnboardingPage = () => {
   const handleSubmit = async (event) => {
     event.preventDefault()
     setSubmitting(true)
+    setSubmitError('')
 
-    const profile = {
+    const newErrors = {}
+
+    // Validate common fields
+    onboardingCommonFields.forEach((field) => {
+      const val = (values[field.name] || '').toString().trim()
+      if (field.required && !val) {
+        newErrors[field.name] = 'This field is required'
+      } else if (val) {
+        if ((field.name === 'cellMain' || field.name === 'cellAlt') && val.replace(/\D/g, '').length !== 11) {
+          newErrors[field.name] = 'Phone number must be exactly 11 digits (xxxx-xxxxxxx)'
+        }
+        if (field.name === 'cnic' && val.replace(/\D/g, '').length !== 13) {
+          newErrors[field.name] = 'CNIC must be exactly 13 digits (xxxxx-xxxxxxx-x)'
+        }
+      }
+    })
+
+    // Validate role specific fields
+    roleFields.forEach((field) => {
+      const val = (values[field.name] || '').toString().trim()
+      if (field.required && !val) {
+        newErrors[field.name] = 'This field is required'
+      }
+    })
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors)
+      setSubmitting(false)
+      const firstErrorField = Object.keys(newErrors)[0]
+      const element = document.getElementById(firstErrorField)
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        element.focus()
+      }
+      return
+    }
+
+    const payload = {
+      emailAddress: emailToOnboard,
       role: selectedRole,
-      roleLabel: roleConfig.label,
-      verifiedFromOtp,
-      avatarPreview,
-      ...values,
-      submittedAt: new Date().toISOString(),
+      gender: values.gender || 'Male',
+      cellMain: values.cellMain,
+      cellAlternative: values.cellAlt,
+      cnic: values.cnic,
+      passportNo: values.passportNo,
+      dateOfBirth: values.dob,
+      city: values.city,
+      address: values.address,
+      avatarPreview: avatarPreview,
+      // Role specific fields
+      institute: values.institute,
+      degree: values.degree,
+      semester: values.semester,
+      majors: values.majors,
+      interests: values.interests,
+      referralId: values.referralId,
+      discipline: values.discipline,
+      dateOfGraduation: values.graduationDate,
+      organization: values.organization,
+      jobDescription: values.jobDescription,
+      roleTitle: values.roleTitle,
+      qualification: values.qualification,
+      experience: values.experience,
+      designation: values.designation,
+      post: values.post,
+      researchInterest: values.researchInterest,
+      researchFocus: values.researchFocus,
     }
 
     try {
-      localStorage.setItem(storageKey, JSON.stringify(profile))
-    } catch (error) {
-      // localStorage may be unavailable in privacy-restricted contexts.
-    }
+      const response = await fetch('/api/users/onboarding', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
 
-    await new Promise((resolve) => setTimeout(resolve, 700))
-    setSubmitting(false)
-    navigate('/dashboard', { state: { profile } })
+      let result = {}
+      const contentType = response.headers.get('content-type')
+      if (contentType && contentType.includes('application/json')) {
+        result = await response.json()
+      } else {
+        const text = await response.text()
+        throw new Error(text || `Server error: ${response.status} ${response.statusText}`)
+      }
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Onboarding submission failed')
+      }
+
+      const { user } = result
+      const profile = {
+        role: user.role,
+        roleLabel: roleConfig.label,
+        verifiedFromOtp,
+        avatarPreview: user.profileImage || avatarPreview,
+        submittedAt: new Date().toISOString(),
+        fullName: user.fullName,
+        email: user.emailAddress,
+        gender: user.gender,
+        cellMain: user.cellMain,
+        cellAlt: user.cellAlternative,
+        cnic: user.cnic,
+        passportNo: user.passportNo,
+        dob: user.dateOfBirth,
+        city: user.city,
+        address: user.address,
+        // Role specific fields mapping
+        institute: user.institute,
+        degree: user.degree,
+        semester: user.semester,
+        majors: user.majors,
+        interests: user.interests,
+        referralId: user.referralId,
+        discipline: user.discipline,
+        graduationDate: user.dateOfGraduation,
+        organization: user.organization,
+        jobDescription: user.jobDescription,
+        roleTitle: user.roleTitle,
+        qualification: user.qualification,
+        experience: user.experience,
+        designation: user.designation,
+        post: user.post,
+        researchInterest: user.researchInterest,
+        researchFocus: user.researchFocus
+      }
+
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(profile))
+        localStorage.removeItem('qsphere_email_to_verify')
+        localStorage.setItem('qsphere_logged_in', '1')
+      } catch (_) {
+        // localStorage restriction fallback
+      }
+
+      window.dispatchEvent(new CustomEvent('qsphere-snackbar', { detail: { message: 'Logged in successfully', type: 'success' } }))
+      navigate('/dashboard', { state: { profile } })
+    } catch (error) {
+      setSubmitError(error.message || 'An error occurred during onboarding submission.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const draftProfile = readStoredProfile()
@@ -288,7 +470,11 @@ const OnboardingPage = () => {
                       <button
                         key={role.id}
                         type="button"
-                        onClick={() => setSelectedRole(role.id)}
+                        onClick={() => {
+                          setSelectedRole(role.id)
+                          setErrors({})
+                          setSubmitError('')
+                        }}
                         className={`rounded-2xl border px-4 py-3 text-left transition ${active ? 'border-emerald-400/50 bg-emerald-500/15 shadow-[0_0_0_1px_rgba(16,185,129,0.25)_inset]' : 'border-white/10 bg-white/[0.03] hover:border-emerald-400/25 hover:bg-emerald-500/8'}`}
                       >
                         <div className="text-[10px] uppercase tracking-[0.28em] text-emerald-200/70">{role.eyebrow}</div>
@@ -300,46 +486,7 @@ const OnboardingPage = () => {
                 </div>
               </div>
 
-              <div className={fieldWrapperClass}>
-                <div className="mb-4 flex items-center gap-2 text-white/70">
-                  <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-200">
-                    <Users size={16} />
-                  </span>
-                  <div>
-                    <div className="text-sm font-semibold text-white">Core details</div>
-                    <div className="text-xs text-white/45">Required for every role</div>
-                  </div>
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-1 xl:grid-cols-2">
-                  <div>
-                    <label className="text-sm text-white/75">Full Name <span className="text-emerald-300">*</span></label>
-                    <input
-                      value={values.fullName}
-                      onChange={(event) => handleFieldChange('fullName', event.target.value)}
-                      type="text"
-                      placeholder="Enter your full name"
-                      className="mt-2 w-full rounded-xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white placeholder:text-white/30 outline-none transition focus:border-emerald-400/40 focus:bg-black/35 focus:shadow-[0_0_0_4px_rgba(16,185,129,0.12)]"
-                      required
-                    />
-
-                    </div>
-
-                  <div>
-                    <label className="text-sm text-white/75">Membership As</label>
-                    <div className="mt-2 w-full rounded-xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white/60">
-                      {roleConfig.label}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="text-sm text-white/75">Profile Picture</label>
-                    <div className="mt-2 rounded-xl border border-dashed border-white/12 bg-black/20 px-4 py-3 text-sm text-white/45">
-                      {avatarPreview ? 'Image ready for dashboard preview' : 'Optional upload from the panel on the right'}
-                    </div>
-                  </div>
-                </div>
-              </div>
+              
 
               <div className={fieldWrapperClass}>
                 <div className="mb-4 flex items-center gap-2 text-white/70">
@@ -357,10 +504,18 @@ const OnboardingPage = () => {
                     const spanClass = field.span === 2 ? 'xl:col-span-2' : field.span === 3 ? 'xl:col-span-3' : ''
                     return (
                       <div key={field.name} className={spanClass}>
-                        <label className="text-sm text-white/75">
+                        <label className="text-sm text-white/75" htmlFor={field.name}>
                           {field.label} {field.required ? <span className="text-emerald-300">*</span> : null}
                         </label>
-                        <InputControl field={field} value={values[field.name] ?? ''} onChange={handleFieldChange} />
+                        <InputControl
+                          field={field}
+                          value={values[field.name] ?? ''}
+                          onChange={handleFieldChange}
+                          hasError={Boolean(errors[field.name])}
+                        />
+                        {errors[field.name] && (
+                          <p className="mt-1.5 text-xs font-medium text-rose-400">{errors[field.name]}</p>
+                        )}
                       </div>
                     )
                   })}
@@ -383,15 +538,29 @@ const OnboardingPage = () => {
                     const spanClass = field.span === 2 ? 'xl:col-span-2' : field.span === 3 ? 'xl:col-span-3' : ''
                     return (
                       <div key={field.name} className={spanClass}>
-                        <label className="text-sm text-white/75">
+                        <label className="text-sm text-white/75" htmlFor={field.name}>
                           {field.label} {field.required ? <span className="text-emerald-300">*</span> : null}
                         </label>
-                        <InputControl field={field} value={values[field.name] ?? ''} onChange={handleFieldChange} />
+                        <InputControl
+                          field={field}
+                          value={values[field.name] ?? ''}
+                          onChange={handleFieldChange}
+                          hasError={Boolean(errors[field.name])}
+                        />
+                        {errors[field.name] && (
+                          <p className="mt-1.5 text-xs font-medium text-rose-400">{errors[field.name]}</p>
+                        )}
                       </div>
                     )
                   })}
                 </div>
               </div>
+
+              {submitError && (
+                <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 p-4 text-sm text-rose-300">
+                  {submitError}
+                </div>
+              )}
 
               <div className="flex flex-col gap-4 border-t border-white/10 pt-6 sm:flex-row sm:items-center sm:justify-between">
                 <div className="max-w-xl text-sm text-white/50">

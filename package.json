@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host",
-    "server": "node server/index.js",
+    "server": "node backend/server/index.js",
     "dev:full": "concurrently \"npm run server\" \"npm run dev\"",
     "build": "vite build",
     "lint": "eslint .",
@@ -19,6 +19,7 @@
     "framer-motion": "^12.40.0",
     "jspdf": "^4.2.1",
     "lucide-react": "^1.17.0",
+    "multer": "^2.1.1",
     "pg": "^8.21.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",

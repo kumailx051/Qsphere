@@ -14,8 +14,11 @@ import CreateBlogPage from './pages/CreateBlogPage'
 import CreateGroupPage from './pages/CreateGroupPage'
 import GroupsPage from './pages/GroupsPage'
 import GroupDetailPage from './pages/GroupDetailPage'
+import ProjectDetailsPage from './pages/ProjectDetailsPage'
+import NotFoundPage from './pages/NotFoundPage'
 
 import ScrollToTop from './components/ScrollToTop'
+import GlobalSnackbar from './components/GlobalSnackbar'
 import { hydrateGroupsCache } from './utils/groupStore'
 import './App.css'
 
@@ -34,6 +37,7 @@ function App() {
     <div className="App">
       <BrowserRouter basename={basename}>
         <ScrollToTop />
+        <GlobalSnackbar />
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/about" element={<AboutPage />} />
@@ -49,6 +53,8 @@ function App() {
           <Route path="/groups" element={<GroupsPage />} />
           <Route path="/groups/:id" element={<GroupDetailPage />} />
           <Route path="/groups/new" element={<CreateGroupPage />} />
+          <Route path="/projects/:id" element={<ProjectDetailsPage />} />
+          <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </BrowserRouter>
     </div>

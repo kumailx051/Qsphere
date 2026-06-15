@@ -27,11 +27,13 @@ import {
   Heading2,
   Heading3,
   Text,
-  FileText
+  FileText,
+  X,
+  CornerDownRight
 } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
-import { saveCustomCategory, saveNewBlog } from '../utils/blogStore'
+import GhostInput from '../components/GhostInput'
 
 export default function CreateBlogPage() {
   const navigate = useNavigate()
@@ -59,14 +61,44 @@ export default function CreateBlogPage() {
 
   const [error, setError] = useState('')
   const [successMsg, setSuccessMsg] = useState('')
+
+  useEffect(() => {
+    const logged = localStorage.getItem('qsphere_logged_in') === '1'
+    if (!logged) {
+      navigate('/auth', { state: { redirectTo: '/blogs/new' } })
+    }
+  }, [navigate])
   // SEO panel state
   const [seoOpen, setSeoOpen] = useState(false)
   const [seoResults, setSeoResults] = useState(null)
+  // Modal for incomplete SEO checks
+  const [seoIncompleteModalOpen, setSeoIncompleteModalOpen] = useState(false)
+  const [missingSeoChecks, setMissingSeoChecks] = useState([])
+  
+  // AI assistant state
+  const [aiGenerating, setAiGenerating] = useState(false)
+  const [aiExcerptGenerating, setAiExcerptGenerating] = useState(false)
+  const [aiContentGenerating, setAiContentGenerating] = useState(false)
+
   // Link modal state
   const [linkModalOpen, setLinkModalOpen] = useState(false)
   const [linkUrl, setLinkUrl] = useState('')
   const [linkRel, setLinkRel] = useState('dofollow')
+  const [linkOpenInNewTab, setLinkOpenInNewTab] = useState(true)
   const savedRangeRef = useRef(null)
+
+  // Floating AI Toolbar state
+  const [floatingToolbarProps, setFloatingToolbarProps] = useState(null)
+  const [floatingPrompt, setFloatingPrompt] = useState('')
+  const [isModifyingText, setIsModifyingText] = useState(false)
+
+  // Image properties state
+  const [selectedImageNode, setSelectedImageNode] = useState(null)
+  const [imageAltText, setImageAltText] = useState('')
+
+  // Title suggestions state
+  const [showTitleSuggestions, setShowTitleSuggestions] = useState(false)
+  const [suggestedTitles, setSuggestedTitles] = useState([])
 
   // Auto Save States
   const [autoSaveEnabled, setAutoSaveEnabled] = useState(() => {
@@ -75,17 +107,24 @@ export default function CreateBlogPage() {
   })
   const [lastSavedTime, setLastSavedTime] = useState('')
   const [hasDraftToRestore, setHasDraftToRestore] = useState(false)
+  const [currentDraftId, setCurrentDraftId] = useState(null)
+  const [draftsList, setDraftsList] = useState([])
+  const [showDraftsModal, setShowDraftsModal] = useState(false)
 
-  // Load custom categories, author profile, and check for draft
+  // Load custom categories from API, author profile, and check for draft
   useEffect(() => {
-    const rawCustomCats = localStorage.getItem('qsphere_custom_categories')
-    if (rawCustomCats) {
+    const loadCategories = async () => {
       try {
-        setCustomCategories(JSON.parse(rawCustomCats))
+        const res = await fetch('/api/blog-categories')
+        if (res.ok) {
+          const cats = await res.json()
+          setCustomCategories(cats.map(c => c.name))
+        }
       } catch (e) {
-        setCustomCategories([])
+        // fallback: keep empty
       }
     }
+    loadCategories()
 
     try {
       const profileRaw = localStorage.getItem('qsphere_onboarding_profile')
@@ -99,44 +138,51 @@ export default function CreateBlogPage() {
       // ignore
     }
 
-    // Check for existing draft
-    const draft = localStorage.getItem('qsphere_blog_draft')
-    if (draft) {
-      setHasDraftToRestore(true)
+    // Check for existing drafts
+    const draftsRaw = localStorage.getItem('qsphere_blog_drafts')
+    if (draftsRaw) {
+      try {
+        const parsed = JSON.parse(draftsRaw)
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setDraftsList(parsed)
+          setHasDraftToRestore(true)
+        }
+      } catch (e) {}
     }
   }, [])
 
-  // Restore draft content
-  const restoreDraft = () => {
-    const draftRaw = localStorage.getItem('qsphere_blog_draft')
-    if (!draftRaw) return
-
-    try {
-      const draft = JSON.parse(draftRaw)
-      setTitle(draft.title || '')
-      setExcerpt(draft.excerpt || '')
-      setCategory(draft.category || '')
-      setCoverImageBase64(draft.coverImageBase64 || '')
-      setImageFileName(draft.imageFileName || '')
-      if (draft.author) setAuthor(draft.author)
-      
-      if (editorRef.current) {
-        editorRef.current.innerHTML = draft.body || ''
-      }
-      setSuccessMsg('Draft restored successfully!')
-      setTimeout(() => setSuccessMsg(''), 3000)
-    } catch (e) {
-      setError('Failed to restore draft.')
+  // Restore specific draft content
+  const restoreSpecificDraft = (draft) => {
+    setCurrentDraftId(draft.id)
+    setTitle(draft.title || '')
+    setExcerpt(draft.excerpt || '')
+    setCategory(draft.category || '')
+    setCoverImageBase64(draft.coverImageBase64 || '')
+    setImageFileName(draft.imageFileName || '')
+    if (draft.author) setAuthor(draft.author)
+    
+    if (editorRef.current) {
+      editorRef.current.innerHTML = draft.body || ''
     }
+    setSuccessMsg('Draft restored successfully!')
+    setTimeout(() => setSuccessMsg(''), 3000)
+    setShowDraftsModal(false)
     setHasDraftToRestore(false)
   }
 
-  // Discard draft content
-  const discardDraft = () => {
-    localStorage.removeItem('qsphere_blog_draft')
+  const deleteDraft = (id) => {
+    const updated = draftsList.filter(d => d.id !== id)
+    setDraftsList(updated)
+    localStorage.setItem('qsphere_blog_drafts', JSON.stringify(updated))
+    if (updated.length === 0) {
+      setShowDraftsModal(false)
+      setHasDraftToRestore(false)
+    }
+  }
+
+  // Dismiss banner
+  const dismissDraftBanner = () => {
     setHasDraftToRestore(false)
-    setSuccessMsg('Draft discarded.')
-    setTimeout(() => setSuccessMsg(''), 3000)
   }
 
   // Debounced auto-save effect
@@ -150,7 +196,13 @@ export default function CreateBlogPage() {
     }
 
     const timer = setTimeout(() => {
+      let draftId = currentDraftId
+      if (!draftId) {
+        draftId = Date.now().toString()
+        setCurrentDraftId(draftId)
+      }
       const draftData = {
+        id: draftId,
         title,
         excerpt,
         category,
@@ -158,9 +210,25 @@ export default function CreateBlogPage() {
         imageFileName,
         author,
         body: editorRef.current ? editorRef.current.innerHTML : '',
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        date: new Date().toLocaleDateString()
       }
-      localStorage.setItem('qsphere_blog_draft', JSON.stringify(draftData))
+      
+      let drafts = []
+      const draftsRaw = localStorage.getItem('qsphere_blog_drafts')
+      if (draftsRaw) {
+        try { drafts = JSON.parse(draftsRaw) } catch(e){}
+      }
+      
+      const existingIdx = drafts.findIndex(d => d.id === draftId)
+      if (existingIdx >= 0) {
+        drafts[existingIdx] = draftData
+      } else {
+        drafts.push(draftData)
+      }
+      
+      localStorage.setItem('qsphere_blog_drafts', JSON.stringify(drafts))
+      setDraftsList(drafts)
       setLastSavedTime(draftData.timestamp)
     }, 1500) // 1.5 seconds debounce
 
@@ -178,8 +246,10 @@ export default function CreateBlogPage() {
         e.preventDefault()
         e.returnValue = 'You have unsaved changes. Are you sure you want to leave?'
 
-        // Auto-save one final time just in case they decide to exit
+        let draftId = currentDraftId
+        if (!draftId) draftId = Date.now().toString()
         const draftData = {
+          id: draftId,
           title,
           excerpt,
           category,
@@ -187,9 +257,23 @@ export default function CreateBlogPage() {
           imageFileName,
           author,
           body: editorRef.current ? editorRef.current.innerHTML : '',
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          date: new Date().toLocaleDateString()
         }
-        localStorage.setItem('qsphere_blog_draft', JSON.stringify(draftData))
+        
+        let drafts = []
+        const draftsRaw = localStorage.getItem('qsphere_blog_drafts')
+        if (draftsRaw) {
+          try { drafts = JSON.parse(draftsRaw) } catch(e){}
+        }
+        
+        const existingIdx = drafts.findIndex(d => d.id === draftId)
+        if (existingIdx >= 0) {
+          drafts[existingIdx] = draftData
+        } else {
+          drafts.push(draftData)
+        }
+        localStorage.setItem('qsphere_blog_drafts', JSON.stringify(drafts))
       }
     }
 
@@ -286,24 +370,37 @@ export default function CreateBlogPage() {
     return { score, checks }
   }
 
-  // Handle category creation
-  const handleCreateCategory = (e) => {
+  // Handle category creation via API
+  const handleCreateCategory = async (e) => {
     e.preventDefault()
     const trimmed = newCategoryName.trim().toUpperCase()
     if (!trimmed) return
 
-    const success = saveCustomCategory(trimmed)
-    if (success) {
-      const rawCustomCats = localStorage.getItem('qsphere_custom_categories')
-      const updated = rawCustomCats ? JSON.parse(rawCustomCats) : []
-      setCustomCategories(updated)
-      setCategory(trimmed)
-      setNewCategoryName('')
-      setSuccessMsg(`Category "${trimmed}" created successfully!`)
-      setTimeout(() => setSuccessMsg(''), 3000)
-      setError('')
-    } else {
-      setError('Category already exists or failed to save.')
+    try {
+      const res = await fetch('/api/blog-categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: trimmed })
+      })
+
+      if (res.ok) {
+        // Refresh categories from API
+        const catRes = await fetch('/api/blog-categories')
+        if (catRes.ok) {
+          const cats = await catRes.json()
+          setCustomCategories(cats.map(c => c.name))
+        }
+        setCategory(trimmed)
+        setNewCategoryName('')
+        setSuccessMsg(`Category "${trimmed}" created successfully!`)
+        setTimeout(() => setSuccessMsg(''), 3000)
+        setError('')
+      } else {
+        const data = await res.json()
+        setError(data.error || 'Category already exists or failed to save.')
+      }
+    } catch (err) {
+      setError('Failed to create category. Network error.')
     }
   }
 
@@ -335,8 +432,23 @@ export default function CreateBlogPage() {
     if (sel && sel.rangeCount > 0) {
       savedRangeRef.current = sel.getRangeAt(0)
     }
-    setLinkUrl('')
-    setLinkRel('dofollow')
+    // Detect if selection is inside an existing link
+    let existingUrl = ''
+    let existingRel = 'dofollow'
+    if (sel && sel.anchorNode) {
+      let node = sel.anchorNode.nodeType === 3 ? sel.anchorNode.parentElement : sel.anchorNode
+      while (node && node !== editorRef.current) {
+        if (node.tagName === 'A') {
+          existingUrl = node.getAttribute('href') || ''
+          existingRel = (node.getAttribute('rel') || '').includes('nofollow') ? 'nofollow' : 'dofollow'
+          break
+        }
+        node = node.parentElement
+      }
+    }
+    setLinkUrl(existingUrl && /^https?:\/\//.test(existingUrl) ? existingUrl : (existingUrl ? 'https://' + existingUrl : 'https://'))
+    setLinkRel(existingRel)
+    setLinkOpenInNewTab(true)
     setLinkModalOpen(true)
   }
 
@@ -359,41 +471,52 @@ export default function CreateBlogPage() {
     }
 
     // 3. Create the link element
-    if (sel && sel.isCollapsed) {
-      // If no text was highlighted, insert URL as active link text
-      const htmlText = `<a href="${linkUrl}" ${linkRel === 'nofollow' ? 'rel="nofollow noopener noreferrer"' : ''}>${linkUrl}</a>`
-      document.execCommand('insertHTML', false, htmlText)
-    } else {
-      // Standard highlight wrapper
-      document.execCommand('createLink', false, linkUrl)
+      const targetAttr = linkOpenInNewTab ? ' target="_blank"' : ''
+      const relAttr = linkRel === 'nofollow' ? 'rel="nofollow noopener noreferrer"' : (linkOpenInNewTab ? 'rel="noopener noreferrer"' : '')
 
-      // Try to find the created anchor to apply relational attributes
-      let anchorEl = null
-      if (sel && sel.anchorNode) {
-        let node = sel.anchorNode.nodeType === 3 ? sel.anchorNode.parentElement : sel.anchorNode
-        while (node && node !== editorRef.current) {
-          if (node.tagName === 'A') {
-            anchorEl = node
-            break
+      if (sel && sel.isCollapsed) {
+        // If no text was highlighted, insert URL as active link text
+        const htmlText = `<a href="${linkUrl}"${targetAttr} ${relAttr}>${linkUrl}</a>`
+        document.execCommand('insertHTML', false, htmlText)
+      } else {
+        // Standard highlight wrapper
+        document.execCommand('createLink', false, linkUrl)
+
+        // Try to find the created anchor to apply relational attributes
+        let anchorEl = null
+        if (sel && sel.anchorNode) {
+          let node = sel.anchorNode.nodeType === 3 ? sel.anchorNode.parentElement : sel.anchorNode
+          while (node && node !== editorRef.current) {
+            if (node.tagName === 'A') {
+              anchorEl = node
+              break
+            }
+            node = node.parentElement
           }
-          node = node.parentElement
         }
-      }
 
-      if (anchorEl) {
-        if (linkRel === 'nofollow') {
-          anchorEl.setAttribute('rel', 'nofollow noopener noreferrer')
-        } else {
-          anchorEl.removeAttribute('rel')
+        if (anchorEl) {
+          if (linkOpenInNewTab) {
+            anchorEl.setAttribute('target', '_blank')
+          } else {
+            anchorEl.removeAttribute('target')
+          }
+          if (linkRel === 'nofollow') {
+            anchorEl.setAttribute('rel', 'nofollow noopener noreferrer')
+          } else if (linkOpenInNewTab) {
+            anchorEl.setAttribute('rel', 'noopener noreferrer')
+          } else {
+            anchorEl.removeAttribute('rel')
+          }
         }
       }
-    }
 
     // 4. Update stats and clean state
     handleEditorChange()
     setLinkModalOpen(false)
     setLinkUrl('')
     setLinkRel('dofollow')
+    setLinkOpenInNewTab(true)
     savedRangeRef.current = null
   }
 
@@ -401,56 +524,265 @@ export default function CreateBlogPage() {
     setLinkModalOpen(false)
     setLinkUrl('')
     setLinkRel('dofollow')
+    setLinkOpenInNewTab(true)
     savedRangeRef.current = null
   }
 
-  // Final Publish
-  const handlePublish = (e) => {
-    e.preventDefault()
+  // AI Suggest Titles
+  const suggestTitles = async () => {
+    if (!title.trim() && !excerpt.trim()) {
+      setError('Please provide a basic title or excerpt to get suggestions.')
+      return
+    }
     setError('')
+    setAiGenerating(true)
+    try {
+      const res = await fetch('/api/ai/suggest-titles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ topic: title || excerpt })
+      })
+      const data = await res.json()
+      if (res.ok && data.titles) {
+        setSuggestedTitles(data.titles)
+        setShowTitleSuggestions(true)
+      } else {
+        throw new Error(data.error || 'Failed to suggest titles')
+      }
+    } catch (err) {
+      setError(err.message || 'Error communicating with Qubi assistant')
+    } finally {
+      setAiGenerating(false)
+    }
+  }
 
+  // Handle Selection Change for Floating AI Toolbar
+  const handleSelectionChangeEvt = (e) => {
+    // If clicking inside the floating toolbar, do not dismiss it
+    if (e && e.target && e.target.closest && e.target.closest('#qubi-floating-toolbar')) {
+      return
+    }
+
+    const selection = window.getSelection()
+    if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
+      setFloatingToolbarProps(null)
+      return
+    }
+
+    const range = selection.getRangeAt(0)
+    let node = range.commonAncestorContainer
+    while (node && node !== document.body) {
+      if (node === editorRef.current) break
+      node = node.parentNode
+    }
+    
+    if (node !== editorRef.current) {
+      setFloatingToolbarProps(null)
+      return
+    }
+
+    const text = selection.toString().trim()
+    if (!text) {
+      setFloatingToolbarProps(null)
+      return
+    }
+
+    const rect = range.getBoundingClientRect()
+    setFloatingToolbarProps({
+      top: rect.top - 60,
+      left: rect.left + rect.width / 2,
+      text,
+      range
+    })
+  }
+
+  useEffect(() => {
+    document.addEventListener('mouseup', handleSelectionChangeEvt)
+    document.addEventListener('keyup', handleSelectionChangeEvt)
+    return () => {
+      document.removeEventListener('mouseup', handleSelectionChangeEvt)
+      document.removeEventListener('keyup', handleSelectionChangeEvt)
+    }
+  }, [])
+
+  const modifySelectedText = async (mode) => {
+    if (!floatingToolbarProps) return
+    setIsModifyingText(true)
+    
+    try {
+      const res = await fetch('/api/ai/modify-text', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          text: floatingToolbarProps.text, 
+          prompt: floatingPrompt,
+          mode 
+        })
+      })
+      
+      const data = await res.json()
+      if (res.ok && data.text) {
+        const selection = window.getSelection()
+        selection.removeAllRanges()
+        selection.addRange(floatingToolbarProps.range)
+        document.execCommand('insertText', false, data.text)
+        setFloatingToolbarProps(null)
+        setFloatingPrompt('')
+        handleEditorChange()
+      }
+    } catch (err) {
+      console.error('Error modifying text:', err)
+    } finally {
+      setIsModifyingText(false)
+    }
+  }
+
+  // AI Generate Excerpt
+  const generateAIExcerpt = async () => {
     if (!title.trim()) {
-      setError('Please enter a title for your blog.')
+      setError('Please enter a title first before generating an excerpt.')
       return
     }
-    if (!category) {
-      setError('Please select or create a category.')
+    setError('')
+    setAiExcerptGenerating(true)
+    try {
+      const content = editorRef.current ? editorRef.current.innerText : ''
+      const res = await fetch('/api/ai/generate-blog-excerpt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, content })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to generate excerpt')
+      setExcerpt(data.excerpt)
+      setSuccessMsg('Qubi has written your excerpt!')
+      setTimeout(() => setSuccessMsg(''), 3000)
+    } catch (err) {
+      setError(err.message || 'Error generating excerpt')
+    } finally {
+      setAiExcerptGenerating(false)
+    }
+  }
+
+  // AI Write Blog Content
+  const generateAIBlogContent = async () => {
+    if (!title.trim()) {
+      setError('Please enter a title first before generating blog content.')
       return
     }
-    if (!coverImageBase64) {
-      setError('Please upload a cover photo of your choice.')
-      return
+    setError('')
+    setAiContentGenerating(true)
+    try {
+      const res = await fetch('/api/ai/generate-blog-content', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to generate content')
+      // Convert markdown to simple HTML for the editor
+      const html = data.content
+        .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+        .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+        .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.+?)\*/g, '<em>$1</em>')
+        .replace(/^- (.+)$/gm, '<li>$1</li>')
+        .replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>')
+        .replace(/\n\n/g, '</p><p>')
+        .replace(/^(?!<[h|u|l])/gm, '')
+      if (editorRef.current) {
+        editorRef.current.innerHTML = `<p>${html}</p>`
+        handleEditorChange()
+      }
+      setSuccessMsg('Qubi has written your blog!')
+      setTimeout(() => setSuccessMsg(''), 3000)
+    } catch (err) {
+      setError(err.message || 'Error generating blog content')
+    } finally {
+      setAiContentGenerating(false)
     }
-    if (!excerpt.trim()) {
-      setError('Please write a short excerpt summary.')
-      return
+  }
+
+  // Final Publish via API
+  // Helper to perform actual publish request
+  const doPublish = async () => {
+    // Get author email from profile
+    let authorEmail = ''
+    try {
+      const profileRaw = localStorage.getItem('qsphere_onboarding_profile')
+      if (profileRaw) {
+        const parsed = JSON.parse(profileRaw)
+        authorEmail = parsed.email || parsed.emailAddress || ''
+      }
+    } catch (e) {}
+    if (!authorEmail) {
+      authorEmail = localStorage.getItem('qsphere_email_to_verify') || ''
     }
 
     const htmlContent = editorRef.current ? editorRef.current.innerHTML : ''
     const textContent = editorRef.current ? editorRef.current.innerText : ''
+    const payload = {
+      title: title.trim(),
+      excerpt: excerpt.trim(),
+      blogData: htmlContent,
+      coverImage: coverImageBase64,
+      category: category,
+      author: author.trim() ? author.trim() : 'QSphere Contributor',
+      authorEmail: authorEmail,
+      readingTime: getAutoReadTime(),
+    }
 
-    if (!textContent.trim()) {
-      setError('Please write some content inside your blog.')
+    try {
+      setSuccessMsg('Publishing...')
+      const res = await fetch('/api/blogs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      if (res.ok) {
+        // Remove the published draft from localStorage drafts
+        if (currentDraftId) {
+          const draftsRaw = localStorage.getItem('qsphere_blog_drafts')
+          if (draftsRaw) {
+            try {
+              const drafts = JSON.parse(draftsRaw)
+              const updated = drafts.filter(d => d.id !== currentDraftId)
+              if (updated.length === 0) {
+                localStorage.removeItem('qsphere_blog_drafts')
+              } else {
+                localStorage.setItem('qsphere_blog_drafts', JSON.stringify(updated))
+              }
+            } catch (e) {}
+          }
+        }
+        navigate('/blogs')
+      } else {
+        const data = await res.json()
+        setError(data.error || 'Error occurred while publishing. Please try again.')
+        setSuccessMsg('')
+      }
+    } catch (err) {
+      setError('Network error while publishing. Please try again.')
+      setSuccessMsg('')
+    }
+  }
+
+  const handlePublish = async (e) => {
+    e.preventDefault()
+    setError('')
+
+    // Compute SEO results and show modal with any incomplete tasks
+    const seo = seoResults || computeSeoScore()
+    const incomplete = seo.checks.filter(c => !c.passed)
+    if (incomplete.length > 0) {
+      setMissingSeoChecks(incomplete)
+      setSeoIncompleteModalOpen(true)
       return
     }
 
-    const blogData = {
-      title: title.trim(),
-      category: category,
-      readTime: getAutoReadTime(),
-      excerpt: excerpt.trim(),
-      image: coverImageBase64,
-      author: author.trim() ? author.trim() : 'QSphere Contributor',
-      body: htmlContent // Save as styled HTML directly
-    }
-
-    const saved = saveNewBlog(blogData)
-    if (saved) {
-      localStorage.removeItem('qsphere_blog_draft')
-      navigate('/blogs')
-    } else {
-      setError('Error occurred while publishing. Please try again.')
-    }
+    // All SEO checks passed, proceed to publish
+    await doPublish()
   }
 
   return (
@@ -466,7 +798,7 @@ export default function CreateBlogPage() {
 
       {/* Editor top navigation bar */}
       <div className="relative z-10 w-full bg-white/[0.04] border-b border-white/[0.08] backdrop-blur-xl pt-24 px-6 md:px-10 lg:px-14">
-        <div className="mx-auto max-w-7xl flex flex-col md:flex-row md:items-center justify-between py-4 gap-4">
+        <div className="mx-auto w-full flex flex-col md:flex-row md:items-center justify-between py-6 gap-4">
           <div className="flex items-center gap-4">
             <button
               onClick={() => navigate(-1)}
@@ -494,7 +826,7 @@ export default function CreateBlogPage() {
 
       {/* Editor container */}
       <main className="relative z-10 flex-grow px-6 md:px-10 lg:px-14 py-8">
-        <div className="mx-auto max-w-7xl">
+        <div className="mx-auto w-full">
 
           {hasDraftToRestore && (
             <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4 rounded-2xl border border-emerald-400/20 bg-emerald-500/10 p-5 text-emerald-300 shadow-[0_18px_60px_-35px_rgba(16,185,129,0.55)]">
@@ -508,17 +840,17 @@ export default function CreateBlogPage() {
               <div className="flex items-center gap-3 shrink-0">
                 <button
                   type="button"
-                  onClick={discardDraft}
+                  onClick={dismissDraftBanner}
                   className="px-4 py-1.5 rounded-xl border border-white/10 text-white/70 hover:text-white text-xs font-semibold transition"
                 >
-                  Discard Draft
+                  Dismiss
                 </button>
                 <button
                   type="button"
-                  onClick={restoreDraft}
+                  onClick={() => setShowDraftsModal(true)}
                   className="px-4 py-1.5 rounded-xl bg-emerald-400 text-black hover:bg-emerald-300 text-xs font-bold transition shadow-[0_0_15px_rgba(16,185,129,0.2)]"
                 >
-                  Restore Draft
+                  View Drafts ({draftsList.length})
                 </button>
               </div>
             </div>
@@ -545,22 +877,58 @@ export default function CreateBlogPage() {
               
               {/* Document metadata heading area */}
               <div className="rounded-3xl border border-white/[0.08] bg-white/[0.035] p-6 space-y-4 shadow-[0_20px_70px_-45px_rgba(0,0,0,0.7)] backdrop-blur-xl">
-                <input
-                  type="text"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Enter Title..."
-                  className="w-full bg-transparent text-white font-black text-3xl md:text-4xl outline-none placeholder-white/30 border-b border-white/10 focus:border-emerald-400/30 pb-4 transition-all"
-                  style={{ fontFamily: "'Archivo Black', 'Inter', sans-serif" }}
-                />
-                
-                <input
-                  type="text"
-                  value={excerpt}
-                  onChange={(e) => setExcerpt(e.target.value)}
-                  placeholder="Provide a short summary / teaser excerpt..."
-                  className="w-full bg-transparent text-white/70 text-sm outline-none placeholder-white/20"
-                />
+                <div className="flex flex-col md:flex-row md:items-start gap-4">
+                  <GhostInput
+                    value={title}
+                    onChange={(v) => setTitle(v)}
+                    placeholder="Enter Title..."
+                    className="flex-1 w-full text-white font-black text-3xl md:text-4xl outline-none placeholder-white/30 border-b border-white/10 focus:border-emerald-400/30 pb-4 transition-all"
+                    style={{ fontFamily: "'Archivo Black', 'Inter', sans-serif" }}
+                  />
+                  <button
+                    type="button"
+                    disabled={aiGenerating || (!title.trim() && !excerpt.trim())}
+                    onClick={suggestTitles}
+                    className="shrink-0 md:mt-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-400 text-black font-bold text-sm shadow-[0_4px_15px_-4px_rgba(16,185,129,0.5)] hover:scale-105 transition disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-2"
+                  >
+                    {aiGenerating ? (
+                      <span className="flex items-center gap-2">
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-black border-t-transparent" />
+                        Generating...
+                      </span>
+                    ) : (
+                      <>
+                        <Sparkles size={16} /> Suggest Title
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-4 text-xs font-medium text-white/50" />
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={excerpt}
+                    onChange={(e) => setExcerpt(e.target.value)}
+                    placeholder="Provide a short summary / teaser excerpt..."
+                    className="flex-1 bg-transparent text-white/70 text-sm outline-none placeholder-white/20"
+                  />
+                  <button
+                    type="button"
+                    disabled={aiExcerptGenerating || !title.trim()}
+                    onClick={generateAIExcerpt}
+                    title="AI Generate Excerpt"
+                    className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/15 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/25 text-xs font-semibold transition disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {aiExcerptGenerating ? (
+                      <div className="h-3 w-3 animate-spin rounded-full border-2 border-emerald-400 border-t-transparent" />
+                    ) : (
+                      <Sparkles size={12} />
+                    )}
+                    {aiExcerptGenerating ? 'Writing...' : 'Qubi Write'}
+                  </button>
+                </div>
               </div>
 
               {/* The Jodit-like Visual editor */}
@@ -615,7 +983,15 @@ export default function CreateBlogPage() {
                   contentEditable="true"
                   onInput={handleEditorChange}
                   onKeyUp={handleEditorChange}
-                  onClick={handleEditorChange}
+                  onClick={(e) => {
+                    handleEditorChange()
+                    if (e.target.tagName === 'IMG') {
+                      setSelectedImageNode(e.target)
+                      setImageAltText(e.target.getAttribute('alt') || '')
+                    } else {
+                      setSelectedImageNode(null)
+                    }
+                  }}
                   className="w-full min-h-[450px] bg-white/[0.03] text-white p-6 leading-relaxed outline-none focus:bg-white/[0.05] transition-all prose prose-invert max-w-none"
                   style={{
                     overflowY: 'auto',
@@ -681,6 +1057,35 @@ export default function CreateBlogPage() {
                   </div>
                 )}
               </div>
+
+              {/* Image Properties Panel (Only shows when an image is selected in the editor) */}
+              {selectedImageNode && (
+                <div className="rounded-3xl border border-emerald-400/30 bg-emerald-950/20 p-6 space-y-4 shadow-[0_20px_70px_-45px_rgba(16,185,129,0.3)] backdrop-blur-xl animate-in slide-in-from-top-4 fade-in">
+                  <h2 className="text-emerald-400 text-sm font-bold tracking-wider uppercase flex items-center justify-between">
+                    <span>Image Properties</span>
+                    <Settings size={14} />
+                  </h2>
+                  <div className="space-y-2">
+                    <label className="block text-xs font-bold text-white/70">Alt Text (SEO)</label>
+                    <input
+                      type="text"
+                      value={imageAltText}
+                      onChange={(e) => {
+                        setImageAltText(e.target.value)
+                        if (selectedImageNode) {
+                          selectedImageNode.setAttribute('alt', e.target.value)
+                          handleEditorChange()
+                        }
+                      }}
+                      placeholder="Describe this image..."
+                      className="w-full rounded-xl bg-black/40 border border-emerald-400/20 px-4 py-2.5 text-sm text-white placeholder-white/30 focus:border-emerald-400 focus:outline-none transition-colors"
+                    />
+                    <p className="text-[10px] text-white/40 leading-relaxed">
+                      Alt text improves accessibility and helps search engines understand the image. It is saved automatically as you type.
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* Auto Save Settings Panel */}
               <div className="rounded-3xl border border-white/[0.08] bg-white/[0.035] p-6 space-y-4 shadow-[0_20px_70px_-45px_rgba(0,0,0,0.7)] backdrop-blur-xl">
@@ -854,13 +1259,16 @@ export default function CreateBlogPage() {
             <div className="space-y-3">
               <div>
                 <label className="block text-xs text-white/50 mb-1">URL</label>
-                <input
-                  type="text"
-                  value={linkUrl}
-                  onChange={(e) => setLinkUrl(e.target.value)}
-                  placeholder="https://example.com"
-                  className="w-full bg-white/[0.04] border border-white/10 rounded-xl px-3.5 py-2 text-xs text-white placeholder-white/35 outline-none"
-                />
+                <div className="flex items-center w-full bg-white/[0.04] border border-white/10 rounded-xl px-3.5 py-2">
+                  <span className="text-emerald-300 text-xs mr-1 select-none">https://</span>
+                  <input
+                    type="text"
+                    value={linkUrl.replace(/^https:\/\//, '')}
+                    onChange={(e) => setLinkUrl('https://' + e.target.value.replace(/^https?:\/\//, ''))}
+                    placeholder="example.com"
+                    className="flex-1 bg-transparent text-xs text-white placeholder-white/35 outline-none"
+                  />
+                </div>
               </div>
 
               <div>
@@ -871,6 +1279,16 @@ export default function CreateBlogPage() {
                 </div>
               </div>
 
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={linkOpenInNewTab}
+                  onChange={(e) => setLinkOpenInNewTab(e.target.checked)}
+                  className="w-3.5 h-3.5 rounded border-white/20 bg-white/[0.06] text-emerald-400 focus:ring-emerald-400/30"
+                />
+                <span className="text-xs text-white/60">Open in new tab</span>
+              </label>
+
               <div className="flex justify-end gap-2 pt-4">
                 <button type="button" onClick={cancelLink} className="px-4 py-2 rounded-xl bg-white/[0.06] text-white/70">Cancel</button>
                 <button type="button" onClick={applyLink} className="px-4 py-2 rounded-xl bg-emerald-400 text-black">Insert</button>
@@ -880,7 +1298,249 @@ export default function CreateBlogPage() {
         </div>
       ) : null}
 
-      <Footer />
+      {/* Floating AI Text Modification Toolbar */}
+      {floatingToolbarProps && (
+        <div 
+          id="qubi-floating-toolbar"
+          className="fixed z-50 flex items-center gap-2 rounded-2xl bg-[#111c16] border border-emerald-400/20 p-2 shadow-2xl backdrop-blur-xl transform -translate-x-1/2 -translate-y-full"
+          style={{ top: floatingToolbarProps.top, left: floatingToolbarProps.left }}
+        >
+          <div className="flex items-center gap-2 bg-white/[0.04] rounded-xl px-3 py-1.5 border border-white/[0.08]">
+            <Sparkles size={14} className="text-emerald-400" />
+            <input 
+              type="text"
+              value={floatingPrompt}
+              onChange={(e) => setFloatingPrompt(e.target.value)}
+              placeholder="Ask Qubi to modify..."
+              className="bg-transparent text-xs text-white outline-none w-48 placeholder:text-white/40"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && floatingPrompt.trim()) {
+                  e.preventDefault()
+                  modifySelectedText('prompt')
+                }
+              }}
+            />
+            <button 
+              type="button"
+              disabled={isModifyingText || !floatingPrompt.trim()}
+              onClick={() => modifySelectedText('prompt')}
+              className="p-1 rounded hover:bg-emerald-500/20 text-emerald-300 disabled:opacity-50"
+            >
+              <CornerDownRight size={14} />
+            </button>
+          </div>
+          <span className="w-[1px] h-6 bg-white/10" />
+          <button 
+            type="button"
+            disabled={isModifyingText}
+            onClick={() => modifySelectedText('paraphrase')}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 text-xs font-semibold border border-emerald-500/20 disabled:opacity-50 transition"
+          >
+            {isModifyingText ? 'Processing...' : 'Paraphrase'}
+          </button>
+          <button
+            type="button"
+            onClick={() => { setFloatingToolbarProps(null); setFloatingPrompt(''); }}
+            className="p-1.5 rounded-xl hover:bg-red-500/10 text-red-400/70 hover:text-red-400 transition ml-1"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
+      {/* AI Title Suggestions Modal */}
+      {showTitleSuggestions && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowTitleSuggestions(false)} />
+          <div className="relative z-60 w-full max-w-2xl rounded-3xl border border-emerald-400/20 bg-[#08100c] p-8 shadow-[0_40px_100px_-20px_rgba(16,185,129,0.3)]">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400">
+                <Sparkles size={20} />
+              </div>
+              <div>
+                <h3 className="text-xl font-black text-white tracking-tight">AI Title Suggestions</h3>
+                <p className="text-xs text-white/50">Highly optimized for SEO and readability</p>
+              </div>
+              <button 
+                type="button" 
+                onClick={() => setShowTitleSuggestions(false)}
+                className="ml-auto p-2 rounded-xl border border-white/10 bg-white/[0.05] hover:bg-white/10 text-white/60 transition"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            
+            <div className="space-y-3">
+              {suggestedTitles.map((t, i) => (
+                <div key={i} className="flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4 hover:border-emerald-400/30 transition group">
+                  <div className="flex-1 min-w-0">
+                    <h4 className="text-base font-bold text-white mb-1 truncate">{t.title}</h4>
+                    <div className="flex items-center gap-2">
+                      <div className="h-1.5 w-16 bg-white/10 rounded-full overflow-hidden">
+                        <div className="h-full bg-emerald-400" style={{ width: `${t.rating}%` }} />
+                      </div>
+                      <span className="text-[10px] font-mono text-emerald-300/70">SEO Score: {t.rating}/100</span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTitle(t.title)
+                      setShowTitleSuggestions(false)
+                    }}
+                    className="shrink-0 rounded-xl bg-emerald-400/10 border border-emerald-400/20 text-emerald-300 px-4 py-2 text-xs font-bold opacity-0 group-hover:opacity-100 transition-opacity hover:bg-emerald-400 hover:text-black"
+                  >
+                    Select Title
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Drafts Modal */}
+      {showDraftsModal && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowDraftsModal(false)} />
+          <div className="relative z-60 w-full max-w-4xl max-h-[85vh] flex flex-col rounded-3xl border border-white/10 bg-[#0b1510] shadow-[0_40px_100px_-20px_rgba(0,0,0,0.8)]">
+            <div className="flex items-center justify-between border-b border-white/10 p-6">
+              <div>
+                <h3 className="text-xl font-black text-white tracking-tight">Your Drafts</h3>
+                <p className="text-xs text-white/50 mt-1">Manage or restore your saved blog drafts</p>
+              </div>
+              <button 
+                type="button" 
+                onClick={() => setShowDraftsModal(false)}
+                className="p-2 rounded-xl border border-white/10 bg-white/[0.05] hover:bg-white/10 text-white/60 transition"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto flex-1 grid gap-4">
+              {draftsList.length === 0 ? (
+                <div className="text-center py-12">
+                  <div className="text-white/40 text-sm">No drafts found.</div>
+                </div>
+              ) : (
+                draftsList.sort((a, b) => new Date(b.date + ' ' + b.timestamp) - new Date(a.date + ' ' + a.timestamp)).map(draft => (
+                  <div key={draft.id} className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 hover:border-emerald-400/30 transition flex flex-col sm:flex-row gap-4 sm:items-center justify-between">
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-base font-bold text-white mb-1 truncate">{draft.title || 'Untitled Draft'}</h4>
+                      <p className="text-xs text-white/50 line-clamp-2 leading-relaxed mb-3">
+                        {draft.excerpt || (draft.body ? draft.body.replace(/<[^>]*>?/gm, '') : 'No content yet')}
+                      </p>
+                      <div className="flex items-center gap-3 text-[10px] font-mono text-white/40">
+                        <span>{draft.date}</span>
+                        <span>•</span>
+                        <span>{draft.timestamp}</span>
+                        {draft.id === currentDraftId && (
+                          <>
+                            <span>•</span>
+                            <span className="text-emerald-400">CURRENT</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => deleteDraft(draft.id)}
+                        className="p-2.5 rounded-xl border border-red-500/20 bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white transition"
+                        title="Delete Draft"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                      <button
+                        type="button"
+                        disabled={draft.id === currentDraftId}
+                        onClick={() => restoreSpecificDraft(draft)}
+                        className="px-5 py-2.5 rounded-xl bg-emerald-400/10 border border-emerald-400/20 text-emerald-300 text-sm font-bold transition hover:bg-emerald-400 hover:text-black disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {draft.id === currentDraftId ? 'Active' : 'Restore'}
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+            
+            <div className="border-t border-white/10 p-4 bg-white/[0.02] flex justify-end rounded-b-3xl">
+              <button
+                type="button"
+                onClick={() => setShowDraftsModal(false)}
+                className="px-5 py-2.5 rounded-xl border border-white/10 text-white/70 hover:text-white text-sm font-semibold transition"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {seoIncompleteModalOpen && (
+  <div className="fixed inset-0 z-[70] flex items-center justify-center">
+    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setSeoIncompleteModalOpen(false)} />
+    <div className="relative z-60 w-full max-w-lg rounded-3xl border border-white/[0.08] bg-[#0b1510] p-8 shadow-[0_40px_100px_-40px_rgba(0,0,0,0.8)]">
+      <div className="flex items-center gap-3 mb-5">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400">
+          <AlertCircle size={20} />
+        </div>
+        <div>
+          <h3 className="text-xl font-black text-white tracking-tight">SEO Suggestions Incomplete</h3>
+          <p className="text-xs text-white/50">These unfinished tasks could affect the ranking of your blog</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setSeoIncompleteModalOpen(false)}
+          className="ml-auto p-2 rounded-xl border border-white/10 bg-white/[0.05] hover:bg-white/10 text-white/60 transition"
+        >
+          <X size={16} />
+        </button>
+      </div>
+
+      <div className="mb-2 text-xs font-semibold text-white/50 uppercase tracking-wider">Missing checks</div>
+      <ul className="space-y-2 mb-6">
+        {missingSeoChecks.map((c) => (
+          <li key={c.key} className="flex items-start gap-3 rounded-xl border border-white/[0.06] bg-white/[0.03] p-3">
+            <div className="shrink-0 mt-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500/20 text-red-400 text-xs font-bold">✕</div>
+            <div className="flex-1">
+              <div className="text-sm font-semibold text-white">{c.label}</div>
+              <div className="text-xs text-white/40 mt-0.5">{c.advice}</div>
+            </div>
+          </li>
+        ))}
+      </ul>
+
+      <div className="text-xs text-white/50 mb-6 p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+        These items help search engines understand and rank your content better. Publishing without them may reduce visibility.
+      </div>
+
+      <div className="flex justify-end gap-3">
+        <button
+          type="button"
+          onClick={() => setSeoIncompleteModalOpen(false)}
+          className="flex-1 px-4 py-3 rounded-xl border border-white/10 bg-white/[0.05] text-white/70 hover:bg-white/10 hover:text-white text-sm font-semibold transition"
+        >
+          Edit Blog
+        </button>
+        <button
+          type="button"
+          onClick={async () => {
+            setSeoIncompleteModalOpen(false);
+            await doPublish();
+          }}
+          className="flex-1 px-4 py-3 rounded-xl bg-emerald-400 text-black hover:bg-emerald-300 text-sm font-bold transition shadow-[0_0_20px_rgba(16,185,129,0.25)]"
+        >
+          Publish Anyway
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+<Footer />
     </div>
   )
 }

@@ -11,9 +11,25 @@ node_modules
 dist
 dist-ssr
 *.local
+
+# Environment and secrets
 .env
 .env.*
 !.env.example
+.envrc
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+*.der
+*.kdbx
+*.sqlite
+*.sqlite3
+*.db
+*.db-shm
+*.db-wal
 
 # Editor directories and files
 .vscode/*
@@ -27,3 +43,5 @@ dist-ssr
 *.sw?
 
 .vercel
+.cache
+.turbo

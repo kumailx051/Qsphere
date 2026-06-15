@@ -14,7 +14,7 @@ const readStoredProfile = () => {
   }
 }
 
-const Navbar = ({ currentPage = 'home', homeBrandRef = null }) => {
+const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = null }) => {
   const [menuOpen, setMenuOpen] = useState(false)
   const [profile, setProfile] = useState(readStoredProfile)
   const [dropdownOpen, setDropdownOpen] = useState(false)
@@ -27,11 +27,44 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null }) => {
   const [chatMessages, setChatMessages] = useState([
     { id: 1, role: 'assistant', text: 'Hi, I am Qubi, your AI assistant.' },
   ])
+  const [isTyping, setIsTyping] = useState(false)
+  const [typedGreeting, setTypedGreeting] = useState('')
+  const typingTimerRef = useRef(null)
   const dropdownRef = useRef(null)
   const blogsMenuRef = useRef(null)
   const groupsMenuRef = useRef(null)
   const hoverCloseTimerRef = useRef(null)
   const navigate = useNavigate()
+
+  // Draggable Qubi avatar state
+  const [avatarPos, setAvatarPos] = useState(() => {
+    try {
+      const saved = localStorage.getItem('qsphere_avatar_position')
+      return saved ? JSON.parse(saved) : null
+    } catch { return null }
+  })
+  const [isDragging, setIsDragging] = useState(false)
+  const dragRef = useRef({ startX: 0, startY: 0, posX: 0, posY: 0, moved: false, currentX: 0, currentY: 0 })
+
+  // Clamp saved position if window resizes
+  useEffect(() => {
+    const handleResize = () => {
+      setAvatarPos(prev => {
+        if (!prev) return null
+        const clamped = {
+          x: Math.min(prev.x, window.innerWidth - 160),
+          y: Math.min(prev.y, window.innerHeight - 200),
+        }
+        if (clamped.x !== prev.x || clamped.y !== prev.y) {
+          localStorage.setItem('qsphere_avatar_position', JSON.stringify(clamped))
+          return clamped
+        }
+        return prev
+      })
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
 
   const isHomePage = currentPage === 'home'
   const isAboutPage = currentPage === 'about'
@@ -40,6 +73,86 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null }) => {
   const isGroupsPage = currentPage === 'groups'
 
   const isLoggedIn = !!profile
+
+  // Qubi avatar drag handlers
+  const handleDragStart = (e) => {
+    e.preventDefault()
+    const fallback = { x: window.innerWidth - 160, y: window.innerHeight - 200 }
+    const currentPos = avatarPos || fallback
+    dragRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      posX: currentPos.x,
+      posY: currentPos.y,
+      moved: false,
+      currentX: currentPos.x,
+      currentY: currentPos.y,
+    }
+    setIsDragging(true)
+  }
+
+  const handleTouchDragStart = (e) => {
+    const touch = e.touches[0]
+    if (!touch) return
+    const fallback = { x: window.innerWidth - 160, y: window.innerHeight - 200 }
+    const currentPos = avatarPos || fallback
+    dragRef.current = {
+      startX: touch.clientX,
+      startY: touch.clientY,
+      posX: currentPos.x,
+      posY: currentPos.y,
+      moved: false,
+      currentX: currentPos.x,
+      currentY: currentPos.y,
+    }
+    setIsDragging(true)
+  }
+
+  useEffect(() => {
+    if (!isDragging) return
+
+    const handleMove = (e) => {
+      const clientX = e.clientX ?? e.touches?.[0]?.clientX ?? 0
+      const clientY = e.clientY ?? e.touches?.[0]?.clientY ?? 0
+      if (!clientX && !clientY) return
+
+      const dx = clientX - dragRef.current.startX
+      const dy = clientY - dragRef.current.startY
+
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+        dragRef.current.moved = true
+      }
+
+      const newX = Math.max(0, Math.min(window.innerWidth - 160, dragRef.current.posX + dx))
+      const newY = Math.max(0, Math.min(window.innerHeight - 200, dragRef.current.posY + dy))
+
+      dragRef.current.currentX = newX
+      dragRef.current.currentY = newY
+      setAvatarPos({ x: newX, y: newY })
+    }
+
+    const handleEnd = () => {
+      if (dragRef.current.moved) {
+        localStorage.setItem('qsphere_avatar_position', JSON.stringify({
+          x: dragRef.current.currentX,
+          y: dragRef.current.currentY,
+        }))
+      }
+      setIsDragging(false)
+    }
+
+    window.addEventListener('mousemove', handleMove)
+    window.addEventListener('mouseup', handleEnd)
+    window.addEventListener('touchmove', handleMove, { passive: true })
+    window.addEventListener('touchend', handleEnd)
+
+    return () => {
+      window.removeEventListener('mousemove', handleMove)
+      window.removeEventListener('mouseup', handleEnd)
+      window.removeEventListener('touchmove', handleMove)
+      window.removeEventListener('touchend', handleEnd)
+    }
+  }, [isDragging])
 
   const clearHoverCloseTimer = () => {
     if (hoverCloseTimerRef.current) {
@@ -91,6 +204,34 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null }) => {
     return () => window.clearTimeout(timer)
   }, [profile])
 
+  const greetingText = 'Hi, I am Qubi, your AI assistant'
+
+  // Typing animation for the hover greeting
+  useEffect(() => {
+    if (!assistantWaving || assistantOpen) {
+      setTypedGreeting('')
+      return
+    }
+
+    let index = 0
+    typingTimerRef.current = setInterval(() => {
+      index++
+      setTypedGreeting(greetingText.slice(0, index))
+      if (index >= greetingText.length) {
+        clearInterval(typingTimerRef.current)
+        typingTimerRef.current = null
+      }
+    }, 45)
+
+    return () => {
+      if (typingTimerRef.current) {
+        clearInterval(typingTimerRef.current)
+        typingTimerRef.current = null
+      }
+    }
+  }, [assistantWaving, assistantOpen])
+
+  // Auto-hide waving after 6.2s
   useEffect(() => {
     if (!assistantWaving) return undefined
     const timer = window.setTimeout(() => setAssistantWaving(false), 6200)
@@ -113,9 +254,13 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null }) => {
   const handleLogout = () => {
     localStorage.removeItem(storageKey)
     localStorage.removeItem('qsphere_logged_in')
+    localStorage.removeItem('qsphere_email')
+    localStorage.removeItem('qsphere_onboarding_profile')
     setProfile(null)
     setDropdownOpen(false)
     setMenuOpen(false)
+    window.dispatchEvent(new Event('storage'))
+    window.dispatchEvent(new CustomEvent('qsphere-snackbar', { detail: { message: 'Logged out successfully', type: 'error' } }))
     navigate('/')
   }
 
@@ -125,7 +270,7 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null }) => {
     navigate('/account', { state: { profile } })
   }
 
-  const handleAssistantSend = (event) => {
+  const handleAssistantSend = async (event) => {
     event.preventDefault()
     const text = chatInput.trim()
     if (!text) return
@@ -133,9 +278,36 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null }) => {
     setChatMessages((current) => [
       ...current,
       { id: Date.now(), role: 'user', text },
-      { id: Date.now() + 1, role: 'assistant', text: 'AI replies will be connected here once you share the API.' },
     ])
     setChatInput('')
+    setIsTyping(true)
+
+    try {
+      const res = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text })
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setChatMessages((current) => [
+          ...current,
+          { id: Date.now() + 1, role: 'assistant', text: data.reply }
+        ])
+      } else {
+        setChatMessages((current) => [
+          ...current,
+          { id: Date.now() + 1, role: 'assistant', text: 'Sorry, I am having trouble connecting to my neural net.' }
+        ])
+      }
+    } catch (err) {
+      setChatMessages((current) => [
+        ...current,
+        { id: Date.now() + 1, role: 'assistant', text: 'Network error. Please try again later.' }
+      ])
+    } finally {
+      setIsTyping(false)
+    }
   }
 
   // Get initials for avatar fallback
@@ -148,6 +320,13 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null }) => {
         .slice(0, 2)
     : '?'
 
+  // Determine chat panel anchor direction based on avatar position
+  // Avatar on right half → right-0 (extends leftward, away from right edge)
+  // Avatar on left half → left-0 (extends rightward, away from left edge)
+  const chatAlignRight = avatarPos
+    ? (avatarPos.x + 70) >= window.innerWidth / 2
+    : true // default bottom-right → right-0 (extends leftward)
+
   const navItemClassName = (active) => active ? 'relative text-emerald-200' : 'hover:text-emerald-200 transition-colors'
   const submenuClassName = 'absolute left-1/2 top-full mt-3 w-44 -translate-x-1/2 rounded-2xl border border-emerald-400/20 bg-black/90 p-2 text-left shadow-[0_20px_60px_-15px_rgba(0,0,0,0.9)] backdrop-blur-2xl transition-all duration-200'
 
@@ -156,7 +335,7 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null }) => {
       {/* Desktop + Tablet Navbar */}
       <div className="fixed left-0 right-0 top-0 z-50 pointer-events-none">
         <div className="pointer-events-auto mx-auto w-full max-w-7xl px-6 pt-6">
-          <div className="flex items-center justify-between rounded-full border border-emerald-400/35 bg-black/70 px-5 py-3.5 backdrop-blur-2xl shadow-[0_0_36px_rgba(16,185,129,0.28)]">
+          <div ref={homeNavFrameRef} className="flex items-center justify-between rounded-full border border-emerald-400/35 bg-black/70 px-5 py-3.5 backdrop-blur-2xl shadow-[0_0_36px_rgba(16,185,129,0.28)]">
             {/* Logo */}
             <div className="flex items-center">
               <div
@@ -394,24 +573,51 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null }) => {
         </div>
       </div>
 
-      {/* Floating Qubi Assistant */}
+      {/* Draggable Floating Qubi Assistant */}
       {isLoggedIn && assistantVisible ? (
-        <div className="fixed bottom-5 right-5 z-[70]">
+        <div
+          className="z-[70]"
+          style={{
+            position: 'fixed',
+            ...(avatarPos
+              ? { top: avatarPos.y, left: avatarPos.x }
+              : { bottom: '1.25rem', right: '1.25rem' }
+            ),
+            cursor: isDragging ? 'grabbing' : 'grab',
+            userSelect: 'none',
+            touchAction: 'none',
+          }}
+        >
           {assistantOpen ? (
-            <div className="w-[min(92vw,320px)] overflow-hidden rounded-[28px] border border-emerald-400/20 bg-black/90 shadow-[0_25px_80px_-24px_rgba(0,0,0,0.95),0_0_40px_rgba(16,185,129,0.18)] backdrop-blur-2xl">
+            <div className={`absolute bottom-[150px] ${chatAlignRight ? 'right-0' : 'left-0'} w-[min(92vw,320px)] overflow-hidden rounded-[28px] border border-emerald-400/20 bg-black/90 shadow-[0_25px_80px_-24px_rgba(0,0,0,0.95),0_0_40px_rgba(16,185,129,0.18)] backdrop-blur-2xl`}>
               <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-3">
                 <div>
                   <div className="text-xs uppercase tracking-[0.28em] text-emerald-300/70">Qubi Assistant</div>
                   <div className="text-sm font-semibold text-white">Ask me anything</div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setAssistantOpen(false)}
-                  className="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white"
-                  aria-label="Close assistant"
-                >
-                  ×
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setChatMessages([{ id: Date.now(), role: 'assistant', text: 'Hi, I am Qubi, your AI assistant.' }])}
+                    className="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white transition-colors"
+                    aria-label="New chat"
+                    title="New Chat"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="12" y1="5" x2="12" y2="19" />
+                      <line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAssistantOpen(false)}
+                    className="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white transition-colors"
+                    aria-label="Close assistant"
+                    title="Close"
+                  >
+                    ×
+                  </button>
+                </div>
               </div>
 
               <div className="max-h-72 space-y-3 overflow-y-auto px-4 py-4">
@@ -427,6 +633,15 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null }) => {
                     </div>
                   </div>
                 ))}
+                {isTyping && (
+                  <div className="flex justify-start">
+                    <div className="max-w-[85%] rounded-2xl px-4 py-3 bg-white/5 border border-white/[0.06] flex items-center gap-1.5">
+                      <span className="h-1.5 w-1.5 rounded-full bg-white/50 animate-[bounce_1.4s_infinite_ease-in-out_both]" style={{ animationDelay: '-0.32s' }} />
+                      <span className="h-1.5 w-1.5 rounded-full bg-white/50 animate-[bounce_1.4s_infinite_ease-in-out_both]" style={{ animationDelay: '-0.16s' }} />
+                      <span className="h-1.5 w-1.5 rounded-full bg-white/50 animate-[bounce_1.4s_infinite_ease-in-out_both]" />
+                    </div>
+                  </div>
+                )}
               </div>
 
               <form onSubmit={handleAssistantSend} className="border-t border-white/[0.06] p-3">
@@ -451,14 +666,29 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null }) => {
 
           <button
             type="button"
-            onClick={() => setAssistantOpen((current) => !current)}
+            onClick={() => {
+              if (!dragRef.current.moved) {
+                setAssistantOpen((current) => !current)
+              }
+              dragRef.current.moved = false
+            }}
+            onDoubleClick={() => {
+              setAvatarPos(null)
+              localStorage.removeItem('qsphere_avatar_position')
+            }}
+            onMouseDown={handleDragStart}
+            onTouchStart={handleTouchDragStart}
             className="group relative flex h-[140px] w-[140px] items-end justify-end rounded-none bg-transparent p-0 shadow-none backdrop-blur-0 transition"
             aria-label="Open Qubi assistant"
+            style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
           >
-            {assistantWaving ? (
+            {assistantWaving && !assistantOpen ? (
               <span className="absolute bottom-[118px] left-1/2 -translate-x-1/2 rounded-full border border-emerald-400/15 bg-emerald-500/8 px-3 py-1 text-center text-[11px] leading-5 text-emerald-50 shadow-[0_10px_30px_rgba(0,0,0,0.22)]">
                 <span className="absolute -bottom-1 left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 border-r border-b border-emerald-400/10 bg-emerald-500/8" />
-                <span className="block font-medium">Hi, I am Qubi, your AI assistant</span>
+                <span className="block font-medium min-w-[60px]">
+                  {typedGreeting}
+                  <span className="inline-block w-[2px] h-[14px] bg-emerald-300/70 ml-0.5 align-middle animate-pulse" />
+                </span>
               </span>
             ) : null}
 

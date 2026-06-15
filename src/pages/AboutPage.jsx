@@ -85,6 +85,21 @@ const AboutPage = () => {
     },
   ]
 
+  const identityPillars = [
+    {
+      title: 'Collaboration',
+      text: 'Students, researchers, industry professionals, and experts come together in one ecosystem built to share knowledge and move ideas forward.',
+    },
+    {
+      title: 'Education',
+      text: 'We support the next generation of quantum scientists through mentorship, community learning, and access to meaningful opportunities.',
+    },
+    {
+      title: 'Impact',
+      text: 'We focus on bridging research and real-world application so quantum technologies can create lasting value across industries and society.',
+    },
+  ]
+
   return (
     <div
       className="relative bg-black"
@@ -287,6 +302,86 @@ const AboutPage = () => {
           </div>
         </div>
       </div>
+
+      <section
+        className="relative overflow-hidden border-t border-emerald-400/10 bg-[#040704] px-6 py-20 md:px-12 md:py-28 lg:px-16"
+        aria-labelledby="who-we-are-title"
+      >
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background:
+              'radial-gradient(circle at 12% 22%, rgba(16,185,129,0.14), transparent 30%), radial-gradient(circle at 84% 18%, rgba(34,211,238,0.10), transparent 24%), linear-gradient(180deg, rgba(255,255,255,0.01), rgba(0,0,0,0))',
+          }}
+        />
+
+        <div className="relative mx-auto max-w-7xl">
+          <div className="grid gap-12 lg:grid-cols-[0.95fr_1.3fr] lg:gap-16">
+            <div className="lg:pr-8">
+              <div className="mb-6 inline-flex items-center gap-3 text-[11px] font-semibold tracking-[0.4em] text-emerald-400">
+                <span
+                  className="h-2.5 w-2.5 rounded-full bg-emerald-400"
+                  style={{
+                    boxShadow: '0 0 12px rgba(16,185,129,0.8), 0 0 24px rgba(16,185,129,0.35)',
+                  }}
+                />
+                WHO WE ARE
+              </div>
+
+              <h2
+                id="who-we-are-title"
+                className="text-white font-bold leading-[0.96] tracking-tight"
+                style={{
+                  fontSize: 'clamp(2rem, 4.5vw, 4.5rem)',
+                  fontFamily: "'Archivo Black', 'Inter', sans-serif",
+                  letterSpacing: '-0.035em',
+                }}
+              >
+                A quantum community built to turn bold research into meaningful progress.
+              </h2>
+
+              <p className="mt-6 max-w-xl text-base leading-relaxed text-white/60 md:text-lg">
+                We are a passionate and forward-thinking collective united by a shared vision to build the future of quantum science.
+              </p>
+            </div>
+
+            <div className="space-y-8">
+              <div
+                className="rounded-[28px] border border-white/8 bg-white/[0.03] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)] backdrop-blur-sm md:p-8"
+                style={{
+                  boxShadow: '0 24px 80px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.04)',
+                }}
+              >
+                <p className="text-sm leading-7 text-white/72 md:text-base md:leading-8">
+                  Our community brings together students, researchers, industry professionals, and experts to form a dynamic ecosystem that fosters collaboration, innovation, and education. At the core of our mission is the belief that the transformative potential of quantum technologies can drive groundbreaking advancements and shape a brighter, more sustainable future for humanity.
+                </p>
+
+                <p className="mt-6 text-sm leading-7 text-white/72 md:text-base md:leading-8">
+                  By bridging the gap between academia and industry, we aim to accelerate the development and real-world applications of quantum science, ensuring that research not only pushes the boundaries of knowledge but also serves the greater good. Through this collaborative platform, we strive to nurture the next generation of quantum scientists, support cutting-edge research, and drive the adoption of quantum technologies that have the power to change the world.
+                </p>
+
+                <p className="mt-6 text-sm leading-7 text-white/72 md:text-base md:leading-8">
+                  Our ultimate goal is to build a thriving community where collaboration thrives, and quantum science becomes a force for meaningful impact across sectors, advancing human progress and innovation for generations to come.
+                </p>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-3">
+                {identityPillars.map((pillar) => (
+                  <div
+                    key={pillar.title}
+                    className="rounded-2xl border border-emerald-400/10 bg-emerald-400/[0.035] p-5"
+                  >
+                    <div className="mb-3 text-xs font-semibold uppercase tracking-[0.28em] text-emerald-300/90">
+                      {pillar.title}
+                    </div>
+                    <p className="text-sm leading-6 text-white/62">{pillar.text}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* ─── Keyframe animations ─── */}
       <style>{`

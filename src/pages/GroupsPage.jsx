@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
-import { getStoredGroups } from '../utils/groupStore'
 
 const GroupsPage = () => {
   const [filters, setFilters] = useState({
@@ -12,14 +11,22 @@ const GroupsPage = () => {
   })
 
   const navigate = useNavigate()
-  const [groups, setGroups] = useState(() => getStoredGroups())
+  const [groups, setGroups] = useState([])
 
   useEffect(() => {
-    const syncGroups = () => setGroups(getStoredGroups())
-    syncGroups()
-    window.addEventListener('qsphere-groups-updated', syncGroups)
-    return () => window.removeEventListener('qsphere-groups-updated', syncGroups)
+    fetch('/api/groups')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) setGroups(data)
+      })
+      .catch(err => console.error('Error fetching groups:', err))
   }, [])
+
+  const currentUserEmail = typeof window !== 'undefined' ? (
+    (JSON.parse(localStorage.getItem('qsphere_onboarding_profile') || '{}')).emailAddress || 
+    localStorage.getItem('qsphere_email') || 
+    ''
+  ) : ''
 
   const toggleFilter = (key) => {
     setFilters(prev => ({ ...prev, [key]: !prev[key] }))
@@ -131,11 +138,16 @@ const GroupsPage = () => {
 
                 {/* Left: Info & Buttons */}
                 <div className="relative z-10 flex-1">
-                  <h3 className="text-white font-bold text-xl md:text-2xl mb-2 group-hover:text-emerald-300 transition-colors" style={{ fontFamily: "'Inter', sans-serif" }}>
-                    {group.title}
+                  <h3 className="text-white font-bold text-xl md:text-2xl mb-1 group-hover:text-emerald-300 transition-colors" style={{ fontFamily: "'Inter', sans-serif" }}>
+                    {group.groupTitle}
                   </h3>
-                  <p className="text-white/50 text-sm md:text-base italic mb-6">
-                    {group.description}
+                  {group.groupDescription && (
+                    <p className="text-white/70 text-sm md:text-base mb-2">
+                      {group.groupDescription}
+                    </p>
+                  )}
+                  <p className="text-white/40 text-sm italic mb-6">
+                    Scope: {group.groupScope}
                   </p>
                   
                   <div className="flex flex-wrap items-center gap-4">
@@ -149,16 +161,32 @@ const GroupsPage = () => {
                     }} className="px-6 py-2.5 rounded-xl border border-white/10 bg-white/[0.03] text-white/80 text-sm font-semibold hover:bg-white/[0.08] hover:text-white transition-all">
                       Details...
                     </button>
-                    <button onClick={() => {
-                      const logged = typeof window !== 'undefined' && localStorage.getItem('qsphere_logged_in') === '1'
-                      if (!logged) {
-                        navigate('/auth', { state: { redirectTo: '/groups' } })
-                        return
-                      }
-                      alert('Request to join sent (demo)')
-                    }} className="px-6 py-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 text-sm font-semibold hover:bg-emerald-500/20 hover:border-emerald-400/50 hover:shadow-[0_0_15px_rgba(16,185,129,0.2)] transition-all">
-                      Request to Join
-                    </button>
+                    {currentUserEmail !== group.ownerEmail && (
+                      <button onClick={async () => {
+                        const logged = typeof window !== 'undefined' && localStorage.getItem('qsphere_logged_in') === '1'
+                        if (!logged) {
+                          navigate('/auth', { state: { redirectTo: '/groups' } })
+                          return
+                        }
+                        try {
+                          const res = await fetch(`/api/groups/${group.id}/members`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ userEmail: currentUserEmail })
+                          })
+                          if (!res.ok) {
+                            const errData = await res.json()
+                            alert(errData.error || 'Failed to send request')
+                            return
+                          }
+                          alert('Request to join sent!')
+                        } catch (err) {
+                          alert('Network error')
+                        }
+                      }} className="px-6 py-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 text-sm font-semibold hover:bg-emerald-500/20 hover:border-emerald-400/50 hover:shadow-[0_0_15px_rgba(16,185,129,0.2)] transition-all">
+                        Request to Join
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -166,7 +194,7 @@ const GroupsPage = () => {
                 <div className="relative z-10 flex sm:flex-col items-center gap-4 sm:gap-3 sm:min-w-[140px] pt-5 sm:pt-0 border-t border-white/5 sm:border-t-0 mt-2 sm:mt-0">
                   <div className="w-14 h-14 rounded-full border border-emerald-400/30 p-0.5 bg-black/50 shadow-[0_0_15px_rgba(16,185,129,0.15)] group-hover:border-emerald-400/60 group-hover:shadow-[0_0_20px_rgba(16,185,129,0.3)] transition-all">
                     <div className="w-full h-full rounded-full bg-white/10 overflow-hidden flex items-center justify-center">
-                      <img src={group.avatar} alt={group.owner} className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity" />
+                      <img src={group.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(group.owner || 'U')}`} alt={group.owner} className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity" />
                     </div>
                   </div>
                   <div className="text-center">

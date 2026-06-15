@@ -39,6 +39,19 @@ const AuthPage = () => {
   const [showRegisterPassword, setShowRegisterPassword] = useState(false)
   const [loginBusy, setLoginBusy] = useState(false)
   const [registerBusy, setRegisterBusy] = useState(false)
+  const [pageMessage, setPageMessage] = useState('')
+  const [pageMessageType, setPageMessageType] = useState('info')
+  const [loginErrors, setLoginErrors] = useState({})
+  const [registerErrors, setRegisterErrors] = useState({})
+
+  // Input States
+  const [lEmail, setLEmail] = useState('')
+  const [lPass, setLPass] = useState('')
+  const [rName, setRName] = useState('')
+  const [rEmail, setREmail] = useState('')
+  const [rPass, setRPass] = useState('')
+  const [rCfm, setRCfm] = useState('')
+  const [rememberMe, setRememberMe] = useState(false)
 
   useEffect(() => {
     modeRef.current = mode
@@ -288,27 +301,175 @@ const AuthPage = () => {
     }
   }, [mode])
 
+  const showInlineMessage = (message, type = 'info') => {
+    setPageMessage(message)
+    setPageMessageType(type)
+  }
+
+  const getMissingFieldMessage = () => 'Fill this field'
+
+  const applyRequiredFieldErrors = (fields, message) => {
+    const nextErrors = {}
+
+    fields.forEach((field) => {
+      nextErrors[field] = getMissingFieldMessage()
+    })
+
+    if (mode === 'login') {
+      setLoginErrors(nextErrors)
+    } else {
+      setRegisterErrors(nextErrors)
+    }
+
+    showInlineMessage(message || 'Please fill in the highlighted fields.', 'error')
+  }
+
   const handleLogin = async () => {
+    const emailAddress = lEmail.trim()
+    const password = lPass.trim()
+
+    const nextErrors = {
+      email: emailAddress ? '' : getMissingFieldMessage(),
+      password: password ? '' : getMissingFieldMessage(),
+    }
+
+    setLoginErrors(nextErrors)
+    setRegisterErrors({})
+
+    if (nextErrors.email || nextErrors.password) {
+      showInlineMessage('Please fill in the highlighted fields.', 'error')
+      return
+    }
+
     setLoginBusy(true)
-    await new Promise((resolve) => setTimeout(resolve, 1200))
-    setLoginBusy(false)
-    // mark as logged in (demo)
-    try { localStorage.setItem('qsphere_logged_in', '1') } catch (e) {}
-    alert(`Welcome back to the Quantum Community!`)
-    // navigate back to the page that requested auth if provided
+    showInlineMessage('Signing you in...', 'info')
     try {
-      const redirectTo = location?.state?.redirectTo || '/'
-      navigate(redirectTo)
-    } catch (e) {
-      navigate('/')
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ emailAddress, password })
+      })
+
+      const result = await response.json()
+      if (!response.ok) {
+        if (response.status === 403 && result.needsVerification) {
+          localStorage.setItem('qsphere_email_to_verify', result.emailAddress || emailAddress)
+          showInlineMessage(result.error || 'Your email is not verified yet. Redirecting to OTP verification.', 'error')
+          navigate('/otp')
+          return
+        }
+
+        if (response.status === 400 && /emailAddress and password are required/i.test(result.error || '')) {
+          applyRequiredFieldErrors(['email', 'password'], result.error)
+          return
+        }
+
+        throw new Error(result.error || 'Login failed')
+      }
+
+      const { user } = result
+      if (!user.isVerified) {
+        localStorage.setItem('qsphere_email_to_verify', user.emailAddress)
+        showInlineMessage('Your email is not verified yet. Redirecting to OTP verification.', 'success')
+        navigate('/otp')
+        return
+      }
+
+      if (!user.isOnboarded) {
+        localStorage.setItem('qsphere_email_to_verify', user.emailAddress)
+        showInlineMessage('You have not completed onboarding yet. Redirecting to onboarding.', 'success')
+        navigate('/onboarding', { state: { verified: true } })
+        return
+      }
+
+      // Fully logged in and onboarded!
+      try {
+        localStorage.setItem('qsphere_logged_in', '1')
+        localStorage.setItem('qsphere_onboarding_profile', JSON.stringify(user))
+      } catch (e) {}
+
+      showInlineMessage(`Welcome back to the Quantum Community, ${user.fullName}!`, 'success')
+      window.dispatchEvent(new CustomEvent('qsphere-snackbar', { detail: { message: 'Logged in successfully', type: 'success' } }))
+      const redirectTo = location?.state?.redirectTo || '/dashboard'
+      setTimeout(() => navigate(redirectTo), 500)
+    } catch (error) {
+      showInlineMessage(error.message || 'An error occurred during login. Please try again.', 'error')
+    } finally {
+      setLoginBusy(false)
     }
   }
 
   const handleRegister = async () => {
+    const fullName = rName.trim()
+    const emailAddress = rEmail.trim()
+    const password = rPass.trim()
+    const confirmPassword = rCfm.trim()
+
+    const nextErrors = {
+      name: fullName ? '' : getMissingFieldMessage(),
+      email: emailAddress ? '' : getMissingFieldMessage(),
+      password: password ? '' : getMissingFieldMessage(),
+      confirm: confirmPassword ? '' : getMissingFieldMessage(),
+    }
+
+    setRegisterErrors(nextErrors)
+    setLoginErrors({})
+
+    if (nextErrors.name || nextErrors.email || nextErrors.password || nextErrors.confirm) {
+      showInlineMessage('Please fill in the highlighted fields.', 'error')
+      return
+    }
+
+    if (password !== confirmPassword) {
+      setRegisterErrors((current) => ({ ...current, password: 'Passwords do not match.', confirm: 'Passwords do not match.' }))
+      showInlineMessage('Passwords do not match.', 'error')
+      return
+    }
+
     setRegisterBusy(true)
-    await new Promise((resolve) => setTimeout(resolve, 1200))
-    setRegisterBusy(false)
-    navigate('/otp')
+    showInlineMessage('Creating your account...', 'info')
+    try {
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fullName,
+          emailAddress,
+          password
+        })
+      })
+
+      const result = await response.json()
+      if (!response.ok) {
+        if (response.status === 409 && result.pendingRegistration) {
+          localStorage.setItem('qsphere_email_to_verify', result.emailAddress || emailAddress)
+          showInlineMessage(result.message || 'You already have a pending verification. Redirecting to OTP.', 'success')
+          navigate('/otp')
+          return
+        }
+
+        if (response.status === 400 && /fullName, emailAddress, and password are required/i.test(result.error || '')) {
+          applyRequiredFieldErrors(['name', 'email', 'password'], result.error)
+          return
+        }
+
+        if (response.status === 400 && /already registered/i.test(result.error || '')) {
+          setRegisterErrors((current) => ({ ...current, email: result.error || 'This email is already registered.' }))
+          showInlineMessage(result.error || 'This email is already registered.', 'error')
+          return
+        }
+
+        throw new Error(result.error || 'Registration failed')
+      }
+
+      localStorage.setItem('qsphere_email_to_verify', emailAddress)
+      showInlineMessage('Registration successful! Verification code sent to your email.', 'success')
+      navigate('/otp')
+    } catch (error) {
+      showInlineMessage(error.message || 'An error occurred during registration.', 'error')
+    } finally {
+      setRegisterBusy(false)
+    }
   }
 
 
@@ -536,6 +697,17 @@ const AuthPage = () => {
           box-shadow: 0 0 0 3px rgba(0,229,160,0.12), inset 0 0 24px rgba(0,229,160,0.06);
         }
 
+        .fi.err input {
+          border-color: rgba(239,68,68,0.65);
+          background: rgba(127,29,29,0.18);
+          box-shadow: 0 0 0 3px rgba(239,68,68,0.12), inset 0 0 24px rgba(127,29,29,0.12);
+        }
+
+        .fi.err input:focus {
+          border-color: rgba(248,113,113,0.9);
+          box-shadow: 0 0 0 3px rgba(239,68,68,0.18), inset 0 0 24px rgba(127,29,29,0.16);
+        }
+
         .fi label {
           position: absolute;
           left: 14px;
@@ -566,6 +738,14 @@ const AuthPage = () => {
           pointer-events: none;
           display: flex;
           align-items: center;
+        }
+
+        .fi-msg {
+          margin-top: 6px;
+          font-size: 11px;
+          color: rgba(248,113,113,0.95);
+          letter-spacing: .01em;
+          min-height: 14px;
         }
 
         .fi .eye {
@@ -773,6 +953,22 @@ const AuthPage = () => {
           font-family: 'DM Sans', sans-serif;
         }
 
+        #status.msg-error {
+          border-color: rgba(239,68,68,0.25);
+          color: rgba(254,202,202,0.9);
+        }
+
+        #status.msg-success {
+          border-color: rgba(0,229,160,0.28);
+          color: rgba(220,252,231,0.9);
+        }
+
+        .status-msg {
+          max-width: min(56vw, 520px);
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
         @keyframes pulse {
           0%, 100% { opacity: 1; box-shadow: 0 0 8px var(--g); }
           50% { opacity: .5; box-shadow: 0 0 4px var(--g); }
@@ -849,6 +1045,11 @@ const AuthPage = () => {
       <div id="bd" aria-hidden="true" />
 
       <div id="fw">
+        <div id="status" className={pageMessage ? `msg-${pageMessageType}` : ''}>
+          <div className="sdot" />
+          <span>{statusText}</span>
+          {pageMessage ? <span className="status-msg">{pageMessage}</span> : null}
+        </div>
         <div ref={formWrapRef} id="fl" className={mode === 'register' ? 'reg' : ''}>
           <div ref={loginFaceRef} id="lf">
             <div className="card">
@@ -865,8 +1066,15 @@ const AuthPage = () => {
               <p className="sub">Access your dimension of cutting-edge quantum science and collaboration.</p>
 
               <div className="fstack">
-                <div className="fi">
-                  <input type="email" id="lEmail" placeholder=" " autoComplete="email" />
+                <div className={`fi ${loginErrors.email ? 'err' : ''}`}>
+                  <input
+                    type="email"
+                    id="lEmail"
+                    placeholder=" "
+                    autoComplete="email"
+                    value={lEmail}
+                    onChange={(e) => setLEmail(e.target.value)}
+                  />
                   <label htmlFor="lEmail">Email address</label>
                   <span className="ico">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -874,21 +1082,36 @@ const AuthPage = () => {
                       <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
                     </svg>
                   </span>
+                  <div className="fi-msg">{loginErrors.email || '\u00A0'}</div>
                 </div>
 
-                <div className="fi">
-                  <input type={showLoginPassword ? 'text' : 'password'} id="lPass" placeholder=" " autoComplete="current-password" />
+                <div className={`fi ${loginErrors.password ? 'err' : ''}`}>
+                  <input
+                    type={showLoginPassword ? 'text' : 'password'}
+                    id="lPass"
+                    placeholder=" "
+                    autoComplete="current-password"
+                    value={lPass}
+                    onChange={(e) => setLPass(e.target.value)}
+                  />
                   <label htmlFor="lPass">Password</label>
                   <button className="eye" id="lEyeBtn" type="button" onClick={() => setShowLoginPassword((value) => !value)}>
                     <svg id="lEyeSvg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                       {showLoginPassword ? EYE_CLOSED : EYE_OPEN}
                     </svg>
                   </button>
+                  <div className="fi-msg">{loginErrors.password || '\u00A0'}</div>
                 </div>
 
                 <div className="row-sb" style={{ fontSize: '13px' }}>
                   <label className="row" style={{ gap: 8, cursor: 'pointer', color: 'rgba(255,255,255,.55)' }}>
-                    <input type="checkbox" className="cb" checked readOnly id="lRem" />
+                    <input 
+                      type="checkbox" 
+                      className="cb" 
+                      checked={rememberMe} 
+                      onChange={(e) => setRememberMe(e.target.checked)} 
+                      id="lRem" 
+                    />
                     Remember me
                   </label>
                   <button className="ghost" style={{ fontSize: '11px' }} type="button">Forgot password?</button>
@@ -938,8 +1161,14 @@ const AuthPage = () => {
               <p className="sub">Collaborate with 50+ researchers and pioneers shaping the future of quantum science.</p>
 
               <div className="fstack">
-                <div className="fi">
-                  <input type="text" id="rName" placeholder=" " />
+                <div className={`fi ${registerErrors.name ? 'err' : ''}`}>
+                  <input
+                    type="text"
+                    id="rName"
+                    placeholder=" "
+                    value={rName}
+                    onChange={(e) => setRName(e.target.value)}
+                  />
                   <label htmlFor="rName">Full name</label>
                   <span className="ico">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -947,10 +1176,18 @@ const AuthPage = () => {
                       <circle cx="12" cy="7" r="4" />
                     </svg>
                   </span>
+                  <div className="fi-msg">{registerErrors.name || '\u00A0'}</div>
                 </div>
 
-                <div className="fi">
-                  <input type="email" id="rEmail" placeholder=" " autoComplete="email" />
+                <div className={`fi ${registerErrors.email ? 'err' : ''}`}>
+                  <input
+                    type="email"
+                    id="rEmail"
+                    placeholder=" "
+                    autoComplete="email"
+                    value={rEmail}
+                    onChange={(e) => setREmail(e.target.value)}
+                  />
                   <label htmlFor="rEmail">Email address</label>
                   <span className="ico">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -958,16 +1195,31 @@ const AuthPage = () => {
                       <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
                     </svg>
                   </span>
+                  <div className="fi-msg">{registerErrors.email || '\u00A0'}</div>
                 </div>
 
                 <div className="grid2">
-                  <div className="fi">
-                    <input type={showRegisterPassword ? 'text' : 'password'} id="rPass" placeholder=" " />
+                  <div className={`fi ${registerErrors.password ? 'err' : ''}`}>
+                    <input
+                      type={showRegisterPassword ? 'text' : 'password'}
+                      id="rPass"
+                      placeholder=" "
+                      value={rPass}
+                      onChange={(e) => setRPass(e.target.value)}
+                    />
                     <label htmlFor="rPass">Password</label>
+                    <div className="fi-msg">{registerErrors.password || '\u00A0'}</div>
                   </div>
-                  <div className="fi">
-                    <input type={showRegisterPassword ? 'text' : 'password'} id="rCfm" placeholder=" " />
+                  <div className={`fi ${registerErrors.confirm ? 'err' : ''}`}>
+                    <input
+                      type={showRegisterPassword ? 'text' : 'password'}
+                      id="rCfm"
+                      placeholder=" "
+                      value={rCfm}
+                      onChange={(e) => setRCfm(e.target.value)}
+                    />
                     <label htmlFor="rCfm">Confirm</label>
+                    <div className="fi-msg">{registerErrors.confirm || '\u00A0'}</div>
                   </div>
                 </div>
 
@@ -1018,11 +1270,6 @@ const AuthPage = () => {
 
       <div className="vig" />
       <div className="scl" />
-
-      <div id="status">
-        <div className="sdot" />
-        <span>{statusText}</span>
-      </div>
 
       <div id="foot">Tilt your cursor to explore the quantum field</div>
     </div>

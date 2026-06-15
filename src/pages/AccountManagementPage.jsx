@@ -1,27 +1,43 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
   Bell,
-  CheckCircle2,
+  Bold,
   BookOpen,
+  CheckCircle2,
+  Eraser,
+  FileText,
+  Heading1,
+  Heading2,
+  Heading3,
+  Italic,
   KeyRound,
+  List,
+  ListOrdered,
   Pencil,
-  Upload,
+  Quote,
+  RotateCcw,
+  RotateCw,
   Save,
   ShieldCheck,
   Sparkles,
+  Text,
   Trash2,
+  Underline,
+  Upload,
   User,
   UserCog,
   Users2,
+  Link as LinkIcon,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  AlignJustify,
 } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
-import RichTextEditor from '../components/RichTextEditor'
 import { onboardingCommonFields, onboardingRoleFields, onboardingRoles } from '../data/onboarding'
-import { deleteStoredBlog, getStoredBlogs, updateStoredBlog } from '../utils/blogStore'
-import { deleteStoredGroup, getStoredGroups, updateStoredGroup } from '../utils/groupStore'
 
 const storageKey = 'qsphere_onboarding_profile'
 const prefsStorageKey = 'qsphere_account_preferences'
@@ -58,8 +74,16 @@ const readStoredPrefs = () => {
 
 const getCompletion = (profile, roleFields) => {
   if (!profile) return 0
-  const requiredCommon = ['fullName', ...onboardingCommonFields.filter((f) => f.required).map((f) => f.name)]
-  const requiredRole = roleFields.filter((f) => f.required).map((f) => f.name)
+
+  const mapKey = (key) => {
+    if (key === 'email') return 'emailAddress'
+    if (key === 'dob') return 'dateOfBirth'
+    if (key === 'cellAlt') return 'cellAlternative'
+    return key
+  }
+
+  const requiredCommon = ['fullName', ...onboardingCommonFields.filter((f) => f.required).map((f) => mapKey(f.name))]
+  const requiredRole = roleFields.filter((f) => f.required).map((f) => mapKey(f.name))
   const required = [...requiredCommon, ...requiredRole]
   const filled = required.filter((key) => String(profile[key] ?? '').trim().length > 0).length
   return required.length ? Math.round((filled / required.length) * 100) : 100
@@ -69,6 +93,9 @@ const fieldLabelMap = {
   fullName: 'Full Name',
   roleLabel: 'Role',
   submittedAt: 'Joined',
+  dateOfBirth: 'D.O.B',
+  emailAddress: 'Email',
+  cellAlternative: 'Cell No. (Alternative)',
 }
 
 const inputClassName =
@@ -88,17 +115,15 @@ const makeBlogDraft = (blog) => ({
   id: blog?.id ?? null,
   title: blog?.title ?? '',
   category: blog?.category ?? '',
-  readTime: blog?.readTime ?? '',
   excerpt: blog?.excerpt ?? '',
-  image: typeof blog?.image === 'string' ? blog.image : '',
-  author: blog?.author ?? '',
-  body: blog?.body ?? '',
+  image: typeof blog?.coverImage === 'string' ? blog.coverImage : (typeof blog?.image === 'string' ? blog.image : ''),
+  body: blog?.blogData ?? blog?.body ?? '',
 })
 
 const makeGroupDraft = (group) => ({
   id: group?.id ?? null,
-  title: group?.title ?? '',
-  description: group?.description ?? '',
+  title: group?.groupTitle ?? group?.title ?? '',
+  description: group?.groupScope ?? group?.description ?? '',
   owner: group?.owner ?? '',
   avatar: group?.avatar ?? '',
 })
@@ -139,22 +164,44 @@ const AccountManagementPage = () => {
   const navigate = useNavigate()
   const location = useLocation()
   const initialProfile = location.state?.profile ?? readStoredProfile()
-  const initialBlogs = useMemo(() => getStoredBlogs(), [])
-  const initialGroups = useMemo(() => getStoredGroups(), [])
 
-  const [profile, setProfile] = useState(initialProfile)
+  const [profile, setProfile] = useState(initialProfile || {})
+  const [profileLoading, setProfileLoading] = useState(true)
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
   const [prefs, setPrefs] = useState(readStoredPrefs)
   const [passwordForm, setPasswordForm] = useState({ current: '', next: '', confirm: '' })
   const [activeTab, setActiveTab] = useState('account')
-  const [blogs, setBlogs] = useState(initialBlogs)
-  const [groups, setGroups] = useState(initialGroups)
-  const [selectedBlogId, setSelectedBlogId] = useState(initialBlogs[0]?.id ?? null)
-  const [selectedGroupId, setSelectedGroupId] = useState(initialGroups[0]?.id ?? null)
-  const [blogDraft, setBlogDraft] = useState(() => makeBlogDraft(initialBlogs[0]))
-  const [groupDraft, setGroupDraft] = useState(() => makeGroupDraft(initialGroups[0]))
+  const [blogs, setBlogs] = useState([])
+  const [groups, setGroups] = useState([])
+  
+  useEffect(() => {
+    const logged = localStorage.getItem('qsphere_logged_in') === '1'
+    if (!logged) {
+      navigate('/auth', { state: { redirectTo: '/account' } })
+    }
+  }, [navigate])
+  const [selectedBlogId, setSelectedBlogId] = useState(null)
+  const [selectedGroupId, setSelectedGroupId] = useState(null)
+  const [blogDraft, setBlogDraft] = useState(() => makeBlogDraft(null))
+  const [groupDraft, setGroupDraft] = useState(() => makeGroupDraft(null))
+  const [categories, setCategories] = useState([])
+  const [categoryOpen, setCategoryOpen] = useState(false)
+  const categoryRef = useRef(null)
+  // Editor state for inline rich text
+  const editorRef = useRef(null)
+  const [wordCount, setWordCount] = useState(0)
+  const [charCount, setCharCount] = useState(0)
+  const [activeTags, setActiveTags] = useState(['P'])
+
+  // Link modal state
+  const [linkModalOpen, setLinkModalOpen] = useState(false)
+  const [linkUrl, setLinkUrl] = useState('')
+  const [linkRel, setLinkRel] = useState('dofollow')
+  const [linkOpenInNewTab, setLinkOpenInNewTab] = useState(true)
+  const savedRangeRef = useRef(null)
+
   const [blogSaving, setBlogSaving] = useState(false)
   const [groupSaving, setGroupSaving] = useState(false)
 
@@ -177,15 +224,146 @@ const AccountManagementPage = () => {
   const completion = getCompletion(profile, roleFields)
 
   useEffect(() => {
-    setBlogDraft(makeBlogDraft(selectedBlog))
-  }, [selectedBlog])
+    const fetchProfile = async () => {
+      const email = initialProfile?.emailAddress || initialProfile?.email || localStorage.getItem('qsphere_email_to_verify')
+      if (!email) {
+        setProfileLoading(false)
+        return
+      }
+      try {
+        const res = await fetch(`/api/users/profile/${encodeURIComponent(email)}`)
+        if (res.ok) {
+          const user = await res.json()
+          setProfile(user)
+        }
+      } catch (err) {
+        console.error('Failed to fetch profile', err)
+      } finally {
+        setProfileLoading(false)
+      }
+    }
+    fetchProfile()
+  }, [])
+
+  useEffect(() => {
+    const fetchUserBlogs = async () => {
+      let email = profile?.email || profile?.emailAddress || localStorage.getItem('qsphere_email_to_verify')
+      if (!email) return
+      
+      try {
+        const res = await fetch(`/api/blogs/user/${email}`)
+        if (res.ok) {
+          const data = await res.json()
+          setBlogs(data)
+          if (data.length > 0 && !selectedBlogId) {
+            setSelectedBlogId(data[0].id)
+          }
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+    fetchUserBlogs()
+  }, [profile])
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (categoryRef.current && !categoryRef.current.contains(e.target)) {
+        setCategoryOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  useEffect(() => {
+    fetch('/api/blog-categories')
+      .then(res => res.ok ? res.json() : [])
+      .then(data => setCategories(data))
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    const fetchUserGroups = async () => {
+      let email = profile?.email || profile?.emailAddress || localStorage.getItem('qsphere_email_to_verify')
+      if (!email) return
+      
+      try {
+        const res = await fetch(`/api/groups/my/${encodeURIComponent(email)}`)
+        if (res.ok) {
+          const data = await res.json()
+          setGroups(data)
+          if (data.length > 0 && !selectedGroupId) {
+            setSelectedGroupId(data[0].id)
+          }
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+    fetchUserGroups()
+  }, [profile])
+
+  // Fetch full blog detail (including blogData) when a blog is selected
+  useEffect(() => {
+    if (!selectedBlogId) return
+    let cancelled = false
+    const fetchFullBlog = async () => {
+      try {
+        const res = await fetch(`/api/blogs/${selectedBlogId}`)
+        if (res.ok) {
+          const full = await res.json()
+          if (cancelled) return
+          const draft = makeBlogDraft(full)
+          setBlogDraft(draft)
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+    fetchFullBlog()
+    return () => { cancelled = true }
+  }, [selectedBlogId])
+
+  // Sync editor content when blogDraft.body changes OR selectedBlogId changes.
+  // activeTab is also needed because the editor is only mounted when
+  // activeTab === 'blogs'. Without it, the effect fires before the
+  // editor exists (while the user is on the Account tab).
+  useEffect(() => {
+    if (!editorRef.current) return
+    const body = blogDraft.body || ''
+    const current = editorRef.current.innerHTML || ''
+    if (current !== body) {
+      editorRef.current.innerHTML = body
+    }
+  }, [selectedBlogId, blogDraft.body, activeTab])
 
   useEffect(() => {
     setGroupDraft(makeGroupDraft(selectedGroup))
   }, [selectedGroup])
 
   const handleProfileFieldChange = (fieldName, value) => {
-    setProfile((current) => ({ ...current, [fieldName]: value }))
+    let formattedValue = value
+
+    if (fieldName === 'cellMain' || fieldName === 'cellAlternative' || fieldName === 'cellAlt') {
+      const digits = value.replace(/\D/g, '')
+      if (digits.length <= 4) {
+        formattedValue = digits
+      } else {
+        formattedValue = `${digits.slice(0, 4)}-${digits.slice(4, 11)}`
+      }
+    } else if (fieldName === 'cnic') {
+      const digits = value.replace(/\D/g, '')
+      if (digits.length <= 5) {
+        formattedValue = digits
+      } else if (digits.length <= 12) {
+        formattedValue = `${digits.slice(0, 5)}-${digits.slice(5, 12)}`
+      } else {
+        formattedValue = `${digits.slice(0, 5)}-${digits.slice(5, 12)}-${digits.slice(12, 13)}`
+      }
+    }
+
+    setProfile((current) => ({ ...current, [fieldName]: formattedValue }))
   }
 
   const handleAvatarChange = (event) => {
@@ -209,19 +387,40 @@ const AccountManagementPage = () => {
     setMessage('')
 
     try {
-      localStorage.setItem(storageKey, JSON.stringify(profile))
-      localStorage.setItem(prefsStorageKey, JSON.stringify(prefs))
+      const email = profile?.emailAddress || profile?.email || localStorage.getItem('qsphere_email_to_verify')
+      const payload = {
+        ...profile,
+        emailAddress: email
+      }
+
+      const res = await fetch('/api/users/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+
+      if (res.ok) {
+        const { user } = await res.json()
+        setProfile(user)
+        try {
+          localStorage.setItem(prefsStorageKey, JSON.stringify(prefs))
+        } catch {
+          // ignore
+        }
+        setMessage('Account settings updated successfully.')
+        setEditing(false)
+      } else {
+        const data = await res.json()
+        setMessage(data.error || 'Failed to update profile.')
+      }
     } catch {
-      // localStorage may be blocked in strict privacy mode.
+      setMessage('Network error. Failed to update profile.')
     }
 
-    await new Promise((resolve) => window.setTimeout(resolve, 500))
     setSaving(false)
-    setEditing(false)
-    setMessage('Account settings updated successfully.')
   }
 
-  const handleChangePassword = () => {
+  const handleChangePassword = async () => {
     if (!passwordForm.current || !passwordForm.next || !passwordForm.confirm) {
       setMessage('Please complete all password fields.')
       return
@@ -235,11 +434,164 @@ const AccountManagementPage = () => {
       return
     }
 
-    setPasswordForm({ current: '', next: '', confirm: '' })
-    setMessage('Password change request captured. Connect backend API to finalize updates.')
+    try {
+      const email = profile?.emailAddress || profile?.email || localStorage.getItem('qsphere_email_to_verify')
+      const res = await fetch('/api/users/password', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          emailAddress: email,
+          currentPassword: passwordForm.current,
+          newPassword: passwordForm.next
+        })
+      })
+
+      if (res.ok) {
+        setPasswordForm({ current: '', next: '', confirm: '' })
+        
+        // Show success snackbar element if it exists in DOM or just set message
+        setMessage('Password changed successfully.')
+        
+        // Find existing snackbar element if any, or create a simple temporary one
+        const snackbar = document.createElement('div')
+        snackbar.className = 'fixed bottom-4 left-1/2 -translate-x-1/2 z-50 rounded-2xl border border-emerald-400/20 bg-emerald-500/90 backdrop-blur px-6 py-3 text-sm font-semibold text-white shadow-lg animate-in slide-in-from-bottom-5'
+        snackbar.innerText = 'Password changed successfully.'
+        document.body.appendChild(snackbar)
+        setTimeout(() => snackbar.remove(), 4000)
+      } else {
+        const data = await res.json()
+        setMessage(data.error || 'Failed to change password.')
+      }
+    } catch {
+      setMessage('Network error. Failed to change password.')
+    }
   }
 
-  const handleSaveBlog = () => {
+  const execCmd = (command, value = null) => {
+    document.execCommand(command, false, value)
+    if (editorRef.current) editorRef.current.focus()
+    handleEditorChange()
+  }
+
+  // Link Modal Operations
+  const insertLink = () => {
+    const sel = window.getSelection()
+    if (sel && sel.rangeCount > 0) {
+      savedRangeRef.current = sel.getRangeAt(0)
+    }
+    // Detect if selection is inside an existing link
+    let existingUrl = ''
+    let existingRel = 'dofollow'
+    if (sel && sel.anchorNode) {
+      let node = sel.anchorNode.nodeType === 3 ? sel.anchorNode.parentElement : sel.anchorNode
+      while (node && node !== editorRef.current) {
+        if (node.tagName === 'A') {
+          existingUrl = node.getAttribute('href') || ''
+          existingRel = (node.getAttribute('rel') || '').includes('nofollow') ? 'nofollow' : 'dofollow'
+          break
+        }
+        node = node.parentElement
+      }
+    }
+    setLinkUrl(existingUrl && /^https?:\/\//.test(existingUrl) ? existingUrl : (existingUrl ? 'https://' + existingUrl : 'https://'))
+    setLinkRel(existingRel)
+    setLinkOpenInNewTab(true)
+    setLinkModalOpen(true)
+  }
+
+  const applyLink = () => {
+    if (!editorRef.current) return
+    editorRef.current.focus()
+
+    const sel = window.getSelection()
+    if (sel && savedRangeRef.current) {
+      sel.removeAllRanges()
+      sel.addRange(savedRangeRef.current)
+    }
+
+    if (!linkUrl) {
+      setLinkModalOpen(false)
+      return
+    }
+
+    const targetAttr = linkOpenInNewTab ? ' target="_blank"' : ''
+    const relAttr = linkRel === 'nofollow' ? 'rel="nofollow noopener noreferrer"' : (linkOpenInNewTab ? 'rel="noopener noreferrer"' : '')
+
+    if (sel && sel.isCollapsed) {
+      const htmlText = `<a href="${linkUrl}"${targetAttr} ${relAttr}>${linkUrl}</a>`
+      document.execCommand('insertHTML', false, htmlText)
+    } else {
+      document.execCommand('createLink', false, linkUrl)
+
+      let anchorEl = null
+      if (sel && sel.anchorNode) {
+        let node = sel.anchorNode.nodeType === 3 ? sel.anchorNode.parentElement : sel.anchorNode
+        while (node && node !== editorRef.current) {
+          if (node.tagName === 'A') { anchorEl = node; break }
+          node = node.parentElement
+        }
+      }
+      if (anchorEl) {
+        if (linkOpenInNewTab) {
+          anchorEl.setAttribute('target', '_blank')
+        } else {
+          anchorEl.removeAttribute('target')
+        }
+        if (linkRel === 'nofollow') {
+          anchorEl.setAttribute('rel', 'nofollow noopener noreferrer')
+        } else if (linkOpenInNewTab) {
+          anchorEl.setAttribute('rel', 'noopener noreferrer')
+        } else {
+          anchorEl.removeAttribute('rel')
+        }
+      }
+    }
+
+    handleEditorChange()
+    setLinkModalOpen(false)
+    setLinkUrl('')
+    setLinkRel('dofollow')
+    setLinkOpenInNewTab(true)
+    savedRangeRef.current = null
+  }
+
+  const cancelLink = () => {
+    setLinkModalOpen(false)
+    setLinkUrl('')
+    setLinkRel('dofollow')
+    setLinkOpenInNewTab(true)
+    savedRangeRef.current = null
+  }
+
+  const handleEditorChange = () => {
+    if (!editorRef.current) return
+    const content = editorRef.current.innerHTML || ''
+    const text = editorRef.current.innerText || ''
+
+    setBlogDraft((prev) => ({ ...prev, body: content }))
+
+    const titleWords = blogDraft.title.trim().split(/\s+/).filter(Boolean).length
+    const excerptWords = blogDraft.excerpt.trim().split(/\s+/).filter(Boolean).length
+    const bodyWords = text.trim().split(/\s+/).filter(Boolean).length
+    setWordCount(titleWords + excerptWords + bodyWords)
+    setCharCount(text.length)
+
+    const selection = window.getSelection()
+    if (selection && selection.rangeCount > 0) {
+      let node = selection.anchorNode
+      const tags = []
+      while (node && node !== editorRef.current) {
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          tags.unshift(node.nodeName)
+        }
+        node = node.parentNode
+      }
+      if (tags.length === 0) tags.push('P')
+      setActiveTags(tags)
+    }
+  }
+
+  const handleSaveBlog = async () => {
     if (!blogDraft.id) return
     if (!blogDraft.title.trim() || !blogDraft.category.trim() || !blogDraft.excerpt.trim()) {
       setMessage('Please complete the blog title, category, and excerpt before saving.')
@@ -247,43 +599,57 @@ const AccountManagementPage = () => {
     }
 
     setBlogSaving(true)
-    const updated = updateStoredBlog(blogDraft.id, {
+    const payload = {
       title: blogDraft.title.trim(),
       category: blogDraft.category.trim(),
-      readTime: blogDraft.readTime.trim() || selectedBlog?.readTime || '5 min read',
       excerpt: blogDraft.excerpt.trim(),
-      image: blogDraft.image.trim() || selectedBlog?.image || '',
-      author: blogDraft.author.trim() || 'QSphere Team',
-      body: blogDraft.body.trim(),
-    })
+      coverImage: blogDraft.image.trim() || selectedBlog?.coverImage || '',
+      blogData: blogDraft.body.trim(),
+    }
 
-    setBlogs(getStoredBlogs())
-    if (updated) {
-      setSelectedBlogId(updated.id)
-      setMessage('Blog updated successfully.')
-    } else {
-      setMessage('Blog update failed.')
+    try {
+      const res = await fetch(`/api/blogs/${blogDraft.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      if (res.ok) {
+        const updated = await res.json()
+        setBlogs(prev => prev.map(b => b.id === updated.id ? updated : b))
+        setSelectedBlogId(updated.id)
+        setMessage('Blog updated successfully.')
+      } else {
+        setMessage('Blog update failed.')
+      }
+    } catch (e) {
+      setMessage('Network error during blog update.')
     }
     setBlogSaving(false)
   }
 
-  const handleDeleteBlog = () => {
+  const handleDeleteBlog = async () => {
     if (!selectedBlog || !window.confirm(`Delete "${selectedBlog.title}"? This cannot be undone.`)) {
       return
     }
 
-    const success = deleteStoredBlog(selectedBlog.id)
-    if (success) {
-      const refreshed = getStoredBlogs()
-      setBlogs(refreshed)
-      setSelectedBlogId(refreshed[0]?.id ?? null)
-      setMessage('Blog deleted successfully.')
-    } else {
-      setMessage('Blog delete failed.')
+    try {
+      const res = await fetch(`/api/blogs/${selectedBlog.id}`, { method: 'DELETE' })
+      if (res.ok) {
+        setBlogs(prev => {
+          const refreshed = prev.filter(b => b.id !== selectedBlog.id)
+          setSelectedBlogId(refreshed[0]?.id ?? null)
+          return refreshed
+        })
+        setMessage('Blog deleted successfully.')
+      } else {
+        setMessage('Blog delete failed.')
+      }
+    } catch (e) {
+      setMessage('Network error during blog delete.')
     }
   }
 
-  const handleSaveGroup = () => {
+  const handleSaveGroup = async () => {
     if (!groupDraft.id) return
     if (!groupDraft.title.trim() || !groupDraft.description.trim()) {
       setMessage('Please complete the group title and description before saving.')
@@ -291,36 +657,59 @@ const AccountManagementPage = () => {
     }
 
     setGroupSaving(true)
-    const updated = updateStoredGroup(groupDraft.id, {
-      title: groupDraft.title.trim(),
-      description: groupDraft.description.trim(),
-      owner: groupDraft.owner.trim() || 'QSphere Member',
-      avatar: groupDraft.avatar.trim(),
-    })
+    const payload = {
+      groupTitle: groupDraft.title.trim(),
+      groupScope: groupDraft.description.trim()
+    }
 
-    setGroups(getStoredGroups())
-    if (updated) {
-      setSelectedGroupId(updated.id)
-      setMessage('Group updated successfully.')
-    } else {
-      setMessage('Group update failed.')
+    try {
+      const res = await fetch(`/api/groups/${groupDraft.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      if (res.ok) {
+        const updated = await res.json()
+        
+        // We only receive the updated row from PUT, which lacks the joined owner/avatar. 
+        // We can manually map it back to the existing group state preserving owner/avatar.
+        setGroups(prev => prev.map(g => {
+          if (g.id === updated.id) {
+            return { ...g, groupTitle: updated.groupTitle, groupScope: updated.groupScope }
+          }
+          return g
+        }))
+        
+        setSelectedGroupId(updated.id)
+        setMessage('Group updated successfully.')
+      } else {
+        setMessage('Group update failed.')
+      }
+    } catch (e) {
+      setMessage('Network error during group update.')
     }
     setGroupSaving(false)
   }
 
-  const handleDeleteGroup = () => {
-    if (!selectedGroup || !window.confirm(`Delete "${selectedGroup.title}"? This cannot be undone.`)) {
+  const handleDeleteGroup = async () => {
+    if (!selectedGroup || !window.confirm(`Delete "${selectedGroup.groupTitle || selectedGroup.title}"? This cannot be undone.`)) {
       return
     }
 
-    const success = deleteStoredGroup(selectedGroup.id)
-    if (success) {
-      const refreshed = getStoredGroups()
-      setGroups(refreshed)
-      setSelectedGroupId(refreshed[0]?.id ?? null)
-      setMessage('Group deleted successfully.')
-    } else {
-      setMessage('Group delete failed.')
+    try {
+      const res = await fetch(`/api/groups/${selectedGroup.id}`, { method: 'DELETE' })
+      if (res.ok) {
+        setGroups(prev => {
+          const refreshed = prev.filter(g => g.id !== selectedGroup.id)
+          setSelectedGroupId(refreshed[0]?.id ?? null)
+          return refreshed
+        })
+        setMessage('Group deleted successfully.')
+      } else {
+        setMessage('Group delete failed.')
+      }
+    } catch (e) {
+      setMessage('Network error during group delete.')
     }
   }
 
@@ -350,7 +739,15 @@ const AccountManagementPage = () => {
     }
   }
 
-  if (!profile) {
+  if (profileLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-[#030705]">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent" />
+      </div>
+    )
+  }
+
+  if (!profile || Object.keys(profile).length === 0) {
     return (
       <div className="relative min-h-screen bg-[#08120d] text-white">
         <Navbar currentPage="dashboard" />
@@ -490,7 +887,7 @@ const AccountManagementPage = () => {
               },
               {
                 label: 'Joined',
-                value: profile.submittedAt ? new Date(profile.submittedAt).toLocaleDateString() : 'N/A',
+                value: profile.created_at ? new Date(profile.created_at).toLocaleDateString() : profile.submittedAt ? new Date(profile.submittedAt).toLocaleDateString() : 'N/A',
                 icon: ShieldCheck,
               },
               { label: 'Status', value: 'Active', icon: Bell },
@@ -520,7 +917,7 @@ const AccountManagementPage = () => {
                 {[
                   { key: 'fullName', type: 'text', required: true },
                   { key: 'gender', type: 'select', options: ['Male', 'Female', 'Prefer not to say'] },
-                  { key: 'dob', type: 'date' },
+                  { key: 'dateOfBirth', type: 'date' },
                   { key: 'city', type: 'text' },
                 ].map((field) => (
                   <div key={field.key} className={field.key === 'address' ? 'sm:col-span-2' : ''}>
@@ -590,16 +987,16 @@ const AccountManagementPage = () => {
             <div className={cardClassName}>
               <div className="text-[10px] uppercase tracking-[0.28em] text-emerald-300/70">Contact information</div>
               <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                {['email', 'cellMain', 'cellAlt', 'cnic', 'passportNo'].map((key) => {
-                  const field = onboardingCommonFields.find((f) => f.name === key)
+                {['emailAddress', 'cellMain', 'cellAlternative', 'cnic', 'passportNo'].map((key) => {
+                  const field = onboardingCommonFields.find((f) => f.name === key || (key === 'emailAddress' && f.name === 'email') || (key === 'cellAlternative' && f.name === 'cellAlt') || (key === 'dateOfBirth' && f.name === 'dob'))
                   return (
                     <div key={key}>
-                      <label className="text-sm text-white/70">{field?.label || key}</label>
+                      <label className="text-sm text-white/70">{fieldLabelMap[key] || field?.label || key}</label>
                       <input
                         type={field?.type || 'text'}
                         value={profile[key] ?? ''}
                         onChange={(event) => handleProfileFieldChange(key, event.target.value)}
-                        disabled={!editing}
+                        disabled={!editing || key === 'emailAddress'}
                         className={inputClassName}
                       />
                     </div>
@@ -679,34 +1076,6 @@ const AccountManagementPage = () => {
               </div>
 
               <div className="mt-4 space-y-3">
-                <ToggleRow
-                  label="Email updates"
-                  description="Receive updates about account activity and platform changes."
-                  checked={prefs.emailUpdates}
-                  onChange={() => editing && setPrefs((prev) => ({ ...prev, emailUpdates: !prev.emailUpdates }))}
-                  disabled={!editing}
-                />
-                <ToggleRow
-                  label="Group invitations"
-                  description="Get notified when someone invites you to a group."
-                  checked={prefs.groupInvites}
-                  onChange={() => editing && setPrefs((prev) => ({ ...prev, groupInvites: !prev.groupInvites }))}
-                  disabled={!editing}
-                />
-                <ToggleRow
-                  label="Product announcements"
-                  description="Receive occasional release notes and improvements."
-                  checked={prefs.marketingEmails}
-                  onChange={() => editing && setPrefs((prev) => ({ ...prev, marketingEmails: !prev.marketingEmails }))}
-                  disabled={!editing}
-                />
-                <ToggleRow
-                  label="Qubi assistant tips"
-                  description="Show proactive hints from Qubi while browsing dashboard pages."
-                  checked={prefs.assistantTips}
-                  onChange={() => editing && setPrefs((prev) => ({ ...prev, assistantTips: !prev.assistantTips }))}
-                  disabled={!editing}
-                />
               </div>
             </div>
           </section>
@@ -741,7 +1110,7 @@ const AccountManagementPage = () => {
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <div className="text-sm font-semibold text-white">{blog.title}</div>
-                        <div className="mt-1 text-xs text-white/45">{blog.category} · {blog.readTime || 'No read time'}</div>
+                        <div className="mt-1 text-xs text-white/45">{blog.category}</div>
                       </div>
                       <Pencil size={14} className="mt-0.5 text-emerald-300/70" />
                     </div>
@@ -791,31 +1160,82 @@ const AccountManagementPage = () => {
                   </div>
                   <div>
                     <label className="text-sm text-white/70">Category</label>
-                    <input
-                      type="text"
-                      value={blogDraft.category}
-                      onChange={(event) => setBlogDraft((prev) => ({ ...prev, category: event.target.value }))}
-                      className={inputClassName}
-                    />
+                    <div className="relative mt-2" ref={categoryRef}>
+                      <button
+                        type="button"
+                        onClick={() => setCategoryOpen(!categoryOpen)}
+                        className="flex w-full items-center justify-between rounded-xl border border-white/10 bg-white/[0.05] px-4 py-3 text-sm text-white outline-none transition focus:border-emerald-400/40 focus:bg-white/[0.08] focus:shadow-[0_0_0_4px_rgba(16,185,129,0.12)]"
+                      >
+                        <span className={categories.some(c => c.name === blogDraft.category) && blogDraft.category ? 'text-white' : 'text-white/60'}>
+                          {categories.some(c => c.name === blogDraft.category) && blogDraft.category
+                            ? blogDraft.category
+                            : blogDraft.category || 'Select a category'}
+                        </span>
+                        <svg
+                          className={`text-white/40 transition-transform ${categoryOpen ? 'rotate-180' : ''}`}
+                          width="14"
+                          height="14"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <polyline points="6 9 12 15 18 9" />
+                        </svg>
+                      </button>
+                      {categoryOpen && (
+                        <div                        className="absolute left-0 right-0 z-50 mt-1.5 max-h-56 overflow-y-auto rounded-xl border border-white/[0.08] bg-[#08120d]/95 p-1.5 shadow-[0_15px_50px_-15px_rgba(0,0,0,0.9)] backdrop-blur-2xl">
+                          {categories.length === 0 && (
+                            <div className="px-3 py-2 text-sm text-white/40">Loading categories…</div>
+                          )}
+                          {categories.map((cat) => (
+                            <button
+                              key={cat.id || cat.name}
+                              type="button"
+                              onClick={() => {
+                                setBlogDraft((prev) => ({ ...prev, category: cat.name }))
+                                setCategoryOpen(false)
+                              }}
+                              className={`w-full rounded-lg px-3 py-2.5 text-left text-sm transition ${
+                                blogDraft.category === cat.name
+                                  ? 'bg-emerald-500/15 text-emerald-200'
+                                  : 'text-white/70 hover:bg-white/[0.06] hover:text-white'
+                              }`}
+                            >
+                              {cat.name}
+                            </button>
+                          ))}
+                          <div className="my-1 border-t border-white/[0.06]" />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setBlogDraft((prev) => ({ ...prev, category: '' }))
+                              setCategoryOpen(false)
+                            }}
+                            className={`w-full rounded-lg px-3 py-2.5 text-left text-sm transition ${
+                              !categories.some(c => c.name === blogDraft.category) && blogDraft.category
+                                ? 'bg-emerald-500/15 text-emerald-200'
+                                : 'text-white/50 hover:bg-white/[0.06] hover:text-white'
+                            }`}
+                          >
+                            Other…
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    {!categories.some(c => c.name === blogDraft.category) && (
+                      <input
+                        type="text"
+                        value={blogDraft.category}
+                        onChange={(e) => setBlogDraft((prev) => ({ ...prev, category: e.target.value }))}
+                        className={`${inputClassName} mt-2`}
+                        placeholder="Type a new category name"
+                      />
+                    )}
                   </div>
-                  <div>
-                    <label className="text-sm text-white/70">Read time</label>
-                    <input
-                      type="text"
-                      value={blogDraft.readTime}
-                      onChange={(event) => setBlogDraft((prev) => ({ ...prev, readTime: event.target.value }))}
-                      className={inputClassName}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm text-white/70">Author</label>
-                    <input
-                      type="text"
-                      value={blogDraft.author}
-                      onChange={(event) => setBlogDraft((prev) => ({ ...prev, author: event.target.value }))}
-                      className={inputClassName}
-                    />
-                  </div>
+
                   <div className="sm:col-span-2">
                     <label className="text-sm text-white/70">Excerpt</label>
                     <textarea
@@ -855,13 +1275,58 @@ const AccountManagementPage = () => {
                   </div>
                   <div className="sm:col-span-2">
                     <label className="text-sm text-white/70">Body</label>
-                    <div className="mt-2">
-                      <RichTextEditor
-                        value={blogDraft.body}
-                        onChange={(nextBody) => setBlogDraft((prev) => ({ ...prev, body: nextBody }))}
-                        placeholder="Edit the article body with the same rich editor used on the add blog page..."
-                        minHeight={420}
+                    <div className="mt-2 rounded-2xl border border-white/10 bg-white/[0.02] backdrop-blur-xl overflow-hidden flex flex-col">
+                      {/* TOOLBAR */}
+                      <div className="flex flex-wrap items-center gap-1 bg-white/[0.06] border-b border-white/10 p-2 text-white/85">
+                        <button type="button" onClick={() => execCmd('bold')} className="p-2 rounded hover:bg-white/5 transition-colors font-bold" title="Bold"><Bold size={15} /></button>
+                        <button type="button" onClick={() => execCmd('italic')} className="p-2 rounded hover:bg-white/5 transition-colors" title="Italic"><Italic size={15} /></button>
+                        <button type="button" onClick={() => execCmd('underline')} className="p-2 rounded hover:bg-white/5 transition-colors" title="Underline"><Underline size={15} /></button>
+                        <span className="w-[1px] h-5 bg-white/10 mx-1" />
+                        <button type="button" onClick={() => execCmd('insertUnorderedList')} className="p-2 rounded hover:bg-white/5 transition-colors" title="Bullet List"><List size={15} /></button>
+                        <button type="button" onClick={() => execCmd('insertOrderedList')} className="p-2 rounded hover:bg-white/5 transition-colors" title="Numbered List"><ListOrdered size={15} /></button>
+                        <span className="w-[1px] h-5 bg-white/10 mx-1" />
+                        <button type="button" onClick={() => execCmd('formatBlock', '<h1>')} className="p-2 rounded hover:bg-white/5 transition-colors font-bold text-xs" title="Heading 1"><Heading1 size={15} /></button>
+                        <button type="button" onClick={() => execCmd('formatBlock', '<h2>')} className="p-2 rounded hover:bg-white/5 transition-colors font-bold text-xs" title="Heading 2"><Heading2 size={15} /></button>
+                        <button type="button" onClick={() => execCmd('formatBlock', '<h3>')} className="p-2 rounded hover:bg-white/5 transition-colors font-bold text-xs" title="Heading 3"><Heading3 size={15} /></button>
+                        <button type="button" onClick={() => execCmd('formatBlock', '<p>')} className="p-2 rounded hover:bg-white/5 transition-colors" title="Paragraph"><Text size={15} /></button>
+                        <button type="button" onClick={() => execCmd('formatBlock', '<blockquote>')} className="p-2 rounded hover:bg-white/5 transition-colors" title="Quote"><Quote size={15} /></button>
+                        <span className="w-[1px] h-5 bg-white/10 mx-1" />
+                        <button type="button" onClick={() => execCmd('justifyLeft')} className="p-2 rounded hover:bg-white/5 transition-colors" title="Align Left"><AlignLeft size={15} /></button>
+                        <button type="button" onClick={() => execCmd('justifyCenter')} className="p-2 rounded hover:bg-white/5 transition-colors" title="Align Center"><AlignCenter size={15} /></button>
+                        <button type="button" onClick={() => execCmd('justifyRight')} className="p-2 rounded hover:bg-white/5 transition-colors" title="Align Right"><AlignRight size={15} /></button>
+                        <button type="button" onClick={() => execCmd('justifyFull')} className="p-2 rounded hover:bg-white/5 transition-colors" title="Align Justify"><AlignJustify size={15} /></button>
+                        <span className="w-[1px] h-5 bg-white/10 mx-1" />
+                        <button type="button" onClick={insertLink} className="p-2 rounded hover:bg-white/5 transition-colors" title="Insert Link"><LinkIcon size={15} /></button>
+                        <span className="w-[1px] h-5 bg-white/10 mx-1" />
+                        <button type="button" onClick={() => execCmd('undo')} className="p-2 rounded hover:bg-white/5 transition-colors" title="Undo"><RotateCcw size={15} /></button>
+                        <button type="button" onClick={() => execCmd('redo')} className="p-2 rounded hover:bg-white/5 transition-colors" title="Redo"><RotateCw size={15} /></button>
+                        <button type="button" onClick={() => execCmd('removeFormat')} className="p-2 rounded hover:bg-white/5 text-red-300 transition-colors" title="Clear Formatting"><Eraser size={15} /></button>
+                      </div>
+
+                      {/* EDITABLE BODY */}
+                      <div
+                        ref={editorRef}
+                        contentEditable="true"
+                        onInput={handleEditorChange}
+                        onKeyUp={handleEditorChange}
+                        onClick={handleEditorChange}
+                        className="w-full min-h-[420px] bg-white/[0.03] text-white p-6 leading-relaxed outline-none focus:bg-white/[0.05] transition-all prose prose-invert max-w-none"
+                        style={{ overflowY: 'auto', fontFamily: "'Inter', sans-serif" }}
+                        data-placeholder="Edit the article body..."
                       />
+
+                      {/* EDITOR FOOTER */}
+                      <div className="flex justify-between items-center bg-white/[0.06] border-t border-white/10 px-4 py-2 text-[10px] text-white/60 font-mono select-none">
+                        <div className="flex items-center gap-1">
+                          <FileText size={10} className="text-emerald-400" />
+                          <span>{activeTags.join(' › ')}</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span>CHARS: {charCount}</span>
+                          <span>WORDS: {wordCount}</span>
+                          <span className="text-emerald-400/60">POWERED BY QSPHERE EDITOR</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -902,7 +1367,7 @@ const AccountManagementPage = () => {
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <div className="text-sm font-semibold text-white">{group.title}</div>
+                        <div className="text-sm font-semibold text-white">{group.groupTitle || group.title}</div>
                         <div className="mt-1 text-xs text-white/45">{group.owner}</div>
                       </div>
                       <Pencil size={14} className="mt-0.5 text-emerald-300/70" />
@@ -916,7 +1381,7 @@ const AccountManagementPage = () => {
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <div className="text-[10px] uppercase tracking-[0.28em] text-emerald-300/70">Selected group</div>
-                  <h2 className="mt-2 text-2xl font-black tracking-tight">{selectedGroup?.title || 'No group selected'}</h2>
+                  <h2 className="mt-2 text-2xl font-black tracking-tight">{selectedGroup?.groupTitle || selectedGroup?.title || 'No group selected'}</h2>
                 </div>
                 <div className="flex gap-2">
                   <button
@@ -956,6 +1421,7 @@ const AccountManagementPage = () => {
                     <input
                       type="text"
                       value={groupDraft.owner}
+                      disabled
                       onChange={(event) => setGroupDraft((prev) => ({ ...prev, owner: event.target.value }))}
                       className={inputClassName}
                     />
@@ -1007,6 +1473,53 @@ const AccountManagementPage = () => {
           </section>
         ) : null}
       </main>
+
+      {/* Link insertion modal */}
+      {linkModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/55" onClick={cancelLink} />
+          <div className="relative z-60 w-full max-w-xl rounded-xl border border-white/10 bg-[#0b1510] p-6 shadow-[0_30px_100px_-40px_rgba(0,0,0,0.9)]">
+            <h3 className="text-sm font-bold text-white mb-3">Insert Link</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs text-white/50 mb-1">URL</label>
+                <div className="flex items-center w-full bg-white/[0.04] border border-white/10 rounded-xl px-3.5 py-2">
+                  <span className="text-emerald-300 text-xs mr-1 select-none">https://</span>
+                  <input
+                    type="text"
+                    value={linkUrl.replace(/^https:\/\//, '')}
+                    onChange={(e) => setLinkUrl('https://' + e.target.value.replace(/^https?:\/\//, ''))}
+                    placeholder="example.com"
+                    className="flex-1 bg-transparent text-xs text-white placeholder-white/35 outline-none"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs text-white/50 mb-1">Link type</label>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => setLinkRel('dofollow')} className={`px-3 py-1.5 rounded-xl text-xs ${linkRel === 'dofollow' ? 'bg-emerald-400 text-black' : 'bg-white/[0.06] text-white/70'}`}>Dofollow</button>
+                  <button type="button" onClick={() => setLinkRel('nofollow')} className={`px-3 py-1.5 rounded-xl text-xs ${linkRel === 'nofollow' ? 'bg-emerald-400 text-black' : 'bg-white/[0.06] text-white/70'}`}>Nofollow</button>
+                </div>
+              </div>
+
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={linkOpenInNewTab}
+                  onChange={(e) => setLinkOpenInNewTab(e.target.checked)}
+                  className="w-3.5 h-3.5 rounded border-white/20 bg-white/[0.06] text-emerald-400 focus:ring-emerald-400/30"
+                />
+                <span className="text-xs text-white/60">Open in new tab</span>
+              </label>
+
+              <div className="flex justify-end gap-2 pt-4">
+                <button type="button" onClick={cancelLink} className="px-4 py-2 rounded-xl bg-white/[0.06] text-white/70">Cancel</button>
+                <button type="button" onClick={applyLink} className="px-4 py-2 rounded-xl bg-emerald-400 text-black">Insert</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <Footer />
     </div>
