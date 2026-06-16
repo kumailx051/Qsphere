@@ -53,21 +53,14 @@ const buildShell = (count, radius, jitter) => {
     home[i * 3 + 2] = hz
 
     // Random scattered position for entry
-    const dropAngle1 = Math.random() * Math.PI * 2
-    const dropAngle2 = Math.random() * Math.PI * 2
-    const scatterDist = 15 + Math.random() * 20  // Much farther out - from whole screen
-    const scatterDistOut = 12 + Math.random() * 18  // Exit far away too
-
-    scatterIn[i * 3] = Math.cos(dropAngle1) * Math.sin(dropAngle2) * scatterDist
-    scatterIn[i * 3 + 1] = Math.sin(dropAngle1) * Math.sin(dropAngle2) * scatterDist
-    scatterIn[i * 3 + 2] = Math.cos(dropAngle2) * scatterDist
+    scatterIn[i * 3] = (Math.random() - 0.5) * 120
+    scatterIn[i * 3 + 1] = (Math.random() - 0.5) * 120
+    scatterIn[i * 3 + 2] = (Math.random() - 0.5) * 60
 
     // Random scattered position for exit
-    const exitAngle1 = dropAngle1 + 1.5 + Math.random() * 1.5
-    const exitAngle2 = Math.random() * Math.PI * 2
-    scatterOut[i * 3] = Math.cos(exitAngle1) * Math.sin(exitAngle2) * scatterDistOut
-    scatterOut[i * 3 + 1] = Math.sin(exitAngle1) * Math.sin(exitAngle2) * scatterDistOut
-    scatterOut[i * 3 + 2] = Math.cos(exitAngle2) * scatterDistOut
+    scatterOut[i * 3] = (Math.random() - 0.5) * 120
+    scatterOut[i * 3 + 1] = (Math.random() - 0.5) * 120
+    scatterOut[i * 3 + 2] = (Math.random() - 0.5) * 60
 
     const angle = Math.atan2(y, x)
     const t = (angle + Math.PI) / (Math.PI * 2)
@@ -103,19 +96,13 @@ const buildAmbient = (count, minRadius, maxRadius) => {
     home[i * 3 + 1] = hy
     home[i * 3 + 2] = hz
 
-    const inAngle1 = Math.random() * Math.PI * 2
-    const inAngle2 = Math.random() * Math.PI * 2
-    const inDist = 16 + Math.random() * 22  // Far from whole screen
-    scatterIn[i * 3] = Math.cos(inAngle1) * Math.sin(inAngle2) * inDist
-    scatterIn[i * 3 + 1] = Math.sin(inAngle1) * Math.sin(inAngle2) * inDist
-    scatterIn[i * 3 + 2] = Math.cos(inAngle2) * inDist
+    scatterIn[i * 3] = (Math.random() - 0.5) * 120
+    scatterIn[i * 3 + 1] = (Math.random() - 0.5) * 120
+    scatterIn[i * 3 + 2] = (Math.random() - 0.5) * 60
 
-    const outAngle1 = inAngle1 + 1.2 + Math.random() * 2.0
-    const outAngle2 = Math.random() * Math.PI * 2
-    const outDist = 14 + Math.random() * 20  // Exit far away
-    scatterOut[i * 3] = Math.cos(outAngle1) * Math.sin(outAngle2) * outDist
-    scatterOut[i * 3 + 1] = Math.sin(outAngle1) * Math.sin(outAngle2) * outDist
-    scatterOut[i * 3 + 2] = Math.cos(outAngle2) * outDist
+    scatterOut[i * 3] = (Math.random() - 0.5) * 120
+    scatterOut[i * 3 + 1] = (Math.random() - 0.5) * 120
+    scatterOut[i * 3 + 2] = (Math.random() - 0.5) * 60
 
     const color = sampleGradient(Math.random()).lerp(new THREE.Color('#ffffff'), 0.55)
     colors[i * 3] = color.r

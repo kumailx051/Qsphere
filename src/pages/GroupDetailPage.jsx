@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useRef } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import {
   ArrowLeft,
   CheckCircle2,
@@ -74,9 +74,17 @@ const statusBadgeClass = (status) => {
   return 'border-white/10 bg-white/[0.04] text-white/70'
 }
 
+const formatDisplayDate = (value, fallback = 'N/A') => {
+  if (!value) return fallback
+  if (typeof value === 'string') return value.includes('T') ? value.split('T')[0] : value
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime()) ? String(value) : parsed.toISOString().split('T')[0]
+}
+
 const GroupDetailPage = () => {
   const navigate = useNavigate()
   const { id } = useParams()
+  const location = useLocation()
   const groupId = Number(id)
   const [groups, setGroups] = useState(() => getStoredGroups())
   const profile = useMemo(() => readStoredProfile(), [])
@@ -96,6 +104,7 @@ const GroupDetailPage = () => {
 
   const group = useMemo(() => groups.find((item) => item.id === groupId) ?? null, [groups, groupId])
   const isAdmin = Boolean(group && profile && String(profile.fullName || '').trim().toLowerCase() === String(group.owner || '').trim().toLowerCase())
+  const currentUserEmail = String(profile?.emailAddress || localStorage.getItem('qsphere_email') || '').trim().toLowerCase()
 
   const [activeTab, setActiveTab] = useState('details')
   const [managementTab, setManagementTab] = useState('members')
@@ -114,15 +123,49 @@ const GroupDetailPage = () => {
       const res = await fetch(`/api/groups/${group.id}/members`)
       if (res.ok) {
         const data = await res.json()
-        const ownerEmail = group.ownerEmail?.toLowerCase()
+        const ownerEmail = String(group.ownerEmail || '').trim().toLowerCase()
         const mappedMembers = data.map(m => ({
           ...m,
           name: m.name || m.email,
-          isAdmin: m.email?.toLowerCase() === ownerEmail
+          isAdmin: m.email?.toLowerCase() === ownerEmail,
+          isCurrentUser: String(m.email || '').trim().toLowerCase() === currentUserEmail,
         }))
-        setMembers(mappedMembers)
+
+        const hasOwnerInMembers = ownerEmail
+          ? mappedMembers.some((member) => String(member.email || '').trim().toLowerCase() === ownerEmail)
+          : false
+
+        let ownerProfile = null
+        if (!hasOwnerInMembers && ownerEmail) {
+          try {
+            const ownerRes = await fetch(`/api/users/profile/${encodeURIComponent(group.ownerEmail)}`)
+            if (ownerRes.ok) {
+              ownerProfile = await ownerRes.json()
+            }
+          } catch {
+            ownerProfile = null
+          }
+        }
+
+        const membersWithOwner = !hasOwnerInMembers && ownerEmail
+          ? [
+              {
+                id: `owner-${group.id}`,
+                email: group.ownerEmail,
+                name: ownerProfile?.fullName || group.owner || group.ownerEmail,
+                avatar: ownerProfile?.profileImage || ownerProfile?.avatarPreview || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(group.owner || 'Owner')}`,
+                status: 'Active',
+                position: 'Owner',
+                isAdmin: true,
+                isCurrentUser: ownerEmail === currentUserEmail,
+              },
+              ...mappedMembers,
+            ]
+          : mappedMembers
+
+        setMembers(membersWithOwner)
         setMemberPositions(
-          mappedMembers.reduce((accumulator, member) => {
+          membersWithOwner.reduce((accumulator, member) => {
             accumulator[member.email] = member.position || 'Member'
             return accumulator
           }, {}),
@@ -151,9 +194,25 @@ const GroupDetailPage = () => {
     fetchProjects()
   }, [group])
 
+  useEffect(() => {
+    const scrollParam = new URLSearchParams(location.search).get('scroll')
+    if (scrollParam === 'members' || scrollParam === 'projects') {
+      const timer = setTimeout(() => {
+        const el = document.getElementById(`group-${scrollParam}-section`)
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 400)
+      return () => clearTimeout(timer)
+    }
+  }, [location.search, members])
+
   const totalMembers = members.length
   const activeUsers = members.filter((member) => member.status === 'Active').length
   const totalProjects = projects.length
+  const currentMember = useMemo(
+    () => members.find((member) => String(member.email || '').trim().toLowerCase() === currentUserEmail) ?? null,
+    [members, currentUserEmail],
+  )
+  const canViewWorkspace = isAdmin || currentMember?.status === 'Active'
 
   const updateMemberPosition = async (memberEmail, position) => {
     try {
@@ -357,13 +416,13 @@ const GroupDetailPage = () => {
                   </p>
 
                   <div className="mt-6 grid gap-4 sm:grid-cols-3">
-                    {[
-                      { label: 'Group Type', value: 'Research' },
-                      { label: 'Visibility', value: 'Private workspace' },
-                      { label: 'Access', value: isAdmin ? 'Admin controls enabled' : 'Member view only' },
-                    ].map((item) => (
-                      <div key={item.label} className="rounded-2xl border border-white/[0.06] bg-black/20 p-4">
-                        <div className="text-[10px] uppercase tracking-[0.28em] text-white/35">{item.label}</div>
+                     {[
+                       { label: 'Group Type', value: 'Research' },
+                       { label: 'Visibility', value: 'Private workspace' },
+                       { label: 'Access', value: isAdmin ? 'Admin controls enabled' : canViewWorkspace ? 'Workspace member access' : 'Overview only' },
+                     ].map((item) => (
+                       <div key={item.label} className="rounded-2xl border border-white/[0.06] bg-black/20 p-4">
+                         <div className="text-[10px] uppercase tracking-[0.28em] text-white/35">{item.label}</div>
                         <div className="mt-2 text-sm font-semibold text-white">{item.value}</div>
                       </div>
                     ))}
@@ -382,6 +441,108 @@ const GroupDetailPage = () => {
                     <MiniRow label="Projects" value={String(totalProjects)} />
                   </div>
                 </div>
+
+                {!isAdmin && canViewWorkspace ? (
+                  <div className="lg:col-span-2 space-y-6">
+                    <div id="group-members-section" className="rounded-[28px] border border-white/[0.06] bg-white/[0.03] p-6">
+                      <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
+                        <div>
+                          <div className="text-[10px] font-semibold uppercase tracking-[0.28em] text-emerald-300/70">Workspace Members</div>
+                          <h2 className="mt-2 text-2xl font-bold text-white">Members</h2>
+                          <p className="mt-1 text-sm text-white/50">View who is active inside this research group.</p>
+                        </div>
+                        <div className="rounded-full border border-emerald-400/20 bg-emerald-500/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">
+                          {members.length} members
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        {members.map((member) => (
+                          <div key={member.email} className="rounded-3xl border border-white/[0.06] bg-black/20 p-5">
+                            <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+                              <div className="flex items-center gap-4">
+                                <div className="h-14 w-14 overflow-hidden rounded-2xl border border-emerald-400/20 bg-white/5 p-0.5">
+                                  <img src={member.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(member.name || 'U')}`} alt={member.name} className="h-full w-full rounded-[14px] object-cover" />
+                                </div>
+                                <div>
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <div className="text-lg font-bold text-white">{member.name}</div>
+                                    {member.isAdmin ? (
+                                      <span className="rounded-full border border-amber-400/20 bg-amber-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-amber-300">
+                                        Owner
+                                      </span>
+                                    ) : null}
+                                    {member.isCurrentUser ? (
+                                      <span className="rounded-full border border-cyan-400/20 bg-cyan-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-cyan-200">
+                                        Me
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                  <div className="mt-1 text-sm text-white/50">{member.email}</div>
+                                </div>
+                              </div>
+
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${statusBadgeClass(member.status)}`}>
+                                  {member.status}
+                                </span>
+                                <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-xs font-semibold text-white/80">
+                                  {member.position}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div id="group-projects-section" className="rounded-[28px] border border-white/[0.06] bg-white/[0.03] p-6">
+                      <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
+                        <div>
+                          <div className="text-[10px] font-semibold uppercase tracking-[0.28em] text-emerald-300/70">Shared Work</div>
+                          <h2 className="mt-2 text-2xl font-bold text-white">Projects</h2>
+                          <p className="mt-1 text-sm text-white/50">Browse the current initiatives inside this group workspace.</p>
+                        </div>
+                        <div className="rounded-full border border-cyan-400/20 bg-cyan-500/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-cyan-200">
+                          {projects.length} projects
+                        </div>
+                      </div>
+
+                      {projects.length > 0 ? (
+                        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+                          {projects.map((project) => (
+                            <article
+                              key={project.id}
+                              className="rounded-[26px] border border-white/[0.06] bg-black/20 p-5 transition hover:border-emerald-400/20 hover:bg-white/[0.05] cursor-pointer"
+                              onClick={() => navigate(`/projects/${project.id}`)}
+                            >
+                              <div className="flex items-start justify-between gap-4">
+                                <div>
+                                  <div className="text-[10px] uppercase tracking-[0.24em] text-emerald-300/70">Project</div>
+                                  <h3 className="mt-2 text-xl font-bold text-white transition hover:text-emerald-300">{project.title}</h3>
+                                </div>
+                                <span className={`rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] ${statusBadgeClass(project.status)}`}>
+                                  {project.status}
+                                </span>
+                              </div>
+                              <p className="mt-4 text-sm leading-6 text-white/55">{project.description}</p>
+                              <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
+                                <MiniValue label="Owner" value={project.ownerName || project.owner || 'Admin'} />
+                                <MiniValue label="Due" value={formatDisplayDate(project.dueDate, 'TBD')} />
+                                <MiniValue label="Start" value={formatDisplayDate(project.startDate, 'N/A')} />
+                                <MiniValue label="Access" value="Shared" />
+                              </div>
+                            </article>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="rounded-3xl border border-white/[0.06] bg-black/20 px-5 py-10 text-center text-white/50">
+                          No projects have been added to this workspace yet.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : null}
               </div>
             ) : null}
 
@@ -393,7 +554,7 @@ const GroupDetailPage = () => {
                 </div>
 
                 {managementTab === 'members' ? (
-                  <div className="mt-6 rounded-[28px] border border-white/[0.06] bg-white/[0.03] p-6">
+                  <div id="group-members-section" className="mt-6 rounded-[28px] border border-white/[0.06] bg-white/[0.03] p-6">
                     <div className="mb-5 flex items-center justify-between gap-4">
                       <div>
                         <h2 className="text-2xl font-bold text-white">Members</h2>
@@ -413,14 +574,19 @@ const GroupDetailPage = () => {
                                 <img src={member.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(member.name || 'U')}`} alt={member.name} className="h-full w-full rounded-[14px] object-cover" />
                               </div>
                               <div>
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <div className="text-lg font-bold text-white">{member.name}</div>
-                                  {member.isAdmin ? (
-                                    <span className="rounded-full border border-amber-400/20 bg-amber-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-amber-300">
-                                      Admin
-                                    </span>
-                                  ) : null}
-                                </div>
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <div className="text-lg font-bold text-white">{member.name}</div>
+                                    {member.isAdmin ? (
+                                      <span className="rounded-full border border-amber-400/20 bg-amber-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-amber-300">
+                                        Owner
+                                      </span>
+                                    ) : null}
+                                    {member.isCurrentUser ? (
+                                      <span className="rounded-full border border-cyan-400/20 bg-cyan-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-cyan-200">
+                                        Me
+                                      </span>
+                                    ) : null}
+                                  </div>
                                 <div className="mt-1 text-sm text-white/50">{member.email}</div>
                                 <div className="mt-3 flex flex-wrap items-center gap-2">
                                   <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${statusBadgeClass(member.status)}`}>
@@ -445,17 +611,18 @@ const GroupDetailPage = () => {
                                 </button>
                               ) : null}
                               <select
-                                value={memberPositions[member.email] || member.position || 'Member'}
-                                onChange={(event) => updateMemberPosition(member.email, event.target.value)}
-                                disabled={member.isAdmin}
-                                className="rounded-xl border border-white/10 bg-white/[0.05] px-4 py-3 text-sm text-white outline-none transition focus:border-emerald-400/40 disabled:cursor-not-allowed disabled:opacity-70"
-                              >
-                                {['Project Admin', 'Research Lead', 'Developer', 'Analyst', 'Member', 'Designer', 'Researcher'].map((position) => (
-                                  <option key={position} value={position}>
-                                    {position}
-                                  </option>
-                                ))}
-                              </select>
+                                 value={memberPositions[member.email] || member.position || 'Member'}
+                                 onChange={(event) => updateMemberPosition(member.email, event.target.value)}
+                                 disabled={member.isAdmin}
+                                 className="rounded-xl border border-emerald-400/20 bg-[#13211b] px-4 py-3 text-sm text-white outline-none transition focus:border-emerald-400/45 focus:bg-[#162820] disabled:cursor-not-allowed disabled:opacity-70"
+                                 style={{ colorScheme: 'dark' }}
+                               >
+                                 {['Project Admin', 'Research Lead', 'Developer', 'Analyst', 'Member', 'Designer', 'Researcher'].map((position) => (
+                                   <option key={position} value={position} className="bg-[#13211b] text-white">
+                                     {position}
+                                   </option>
+                                 ))}
+                               </select>
                               <button
                                 type="button"
                                 onClick={() => removeMember(member.email)}
@@ -474,7 +641,7 @@ const GroupDetailPage = () => {
                 ) : null}
 
                 {managementTab === 'projects' ? (
-                  <div className="mt-6 rounded-[28px] border border-white/[0.06] bg-white/[0.03] p-6">
+                  <div id="group-projects-section" className="mt-6 rounded-[28px] border border-white/[0.06] bg-white/[0.03] p-6">
                     <div className="mb-5 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                       <div>
                         <h2 className="text-2xl font-bold text-white">Projects</h2>
@@ -517,8 +684,8 @@ const GroupDetailPage = () => {
                           <p className="mt-4 text-sm leading-6 text-white/55">{project.description}</p>
                           <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
                             <MiniValue label="Owner" value={project.ownerName || project.owner || 'Admin'} />
-                            <MiniValue label="Due" value={project.dueDate || 'TBD'} />
-                            <MiniValue label="Start" value={project.startDate || 'N/A'} />
+                            <MiniValue label="Due" value={formatDisplayDate(project.dueDate, 'TBD')} />
+                            <MiniValue label="Start" value={formatDisplayDate(project.startDate, 'N/A')} />
                             <MiniValue label="Access" value="Shared" />
                           </div>
                         </article>
@@ -620,16 +787,16 @@ const GroupDetailPage = () => {
               <FormField label="Due date" type="date" value={projectForm.dueDate} onChange={(value) => setProjectForm((current) => ({ ...current, dueDate: value }))} placeholder="" />
               <div>
                 <label className="mb-2 block text-sm text-white/80">Status</label>
-                <select
-                  value={projectForm.status}
-                  onChange={(event) => setProjectForm((current) => ({ ...current, status: event.target.value }))}
-                  className="w-full rounded-2xl border border-white/10 bg-[#1a2a22] px-4 py-3 text-sm text-white outline-none transition focus:border-emerald-400/40"
-                  style={{ colorScheme: 'dark' }}
-                >
-                  {['Planning', 'In Progress', 'Review', 'Completed'].map((status) => (
-                    <option key={status} value={status} className="bg-[#1a2a22] text-white">{status}</option>
-                  ))}
-                </select>
+                 <select
+                   value={projectForm.status}
+                   onChange={(event) => setProjectForm((current) => ({ ...current, status: event.target.value }))}
+                   className="w-full rounded-2xl border border-emerald-400/20 bg-[#13211b] px-4 py-3 text-sm text-white outline-none transition focus:border-emerald-400/45 focus:bg-[#162820]"
+                   style={{ colorScheme: 'dark' }}
+                 >
+                   {['Planning', 'In Progress', 'Review', 'Completed'].map((status) => (
+                     <option key={status} value={status} className="bg-[#13211b] text-white">{status}</option>
+                   ))}
+                 </select>
               </div>
               <div className="md:col-span-2">
                 <label className="mb-2 block text-sm text-white/80">Reference Material (PDF, Word, Images)</label>

@@ -160,10 +160,12 @@ const DashboardPage = () => {
   }
 
   /* ── Data ────────────────────────────────────────────────────── */
-  const submittedAt = profile.submittedAt ? new Date(profile.submittedAt) : null
-  const submittedLabel = submittedAt
-    ? submittedAt.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
-    : 'Just now'
+  const joinedDate = profile.created_at
+    ? new Date(profile.created_at)
+    : profile.submittedAt
+      ? new Date(profile.submittedAt)
+      : null
+  const submittedLabel = joinedDate ? joinedDate.toLocaleDateString() : 'N/A'
 
   /* ── Render ─────────────────────────────────────────────────── */
   return (

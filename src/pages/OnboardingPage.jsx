@@ -64,14 +64,15 @@ const readStoredProfile = () => {
   }
 }
 
-const fieldWrapperClass = 'rounded-2xl border border-white/10 bg-white/[0.03] p-4 shadow-[0_0_0_1px_rgba(255,255,255,0.02)_inset]'
+const fieldWrapperClass = 'rounded-2xl border border-emerald-500/20 bg-[#06100c] p-6 shadow-[0_0_0_1px_rgba(16,185,129,0.05)_inset]'
 
 const InputControl = ({ field, value, onChange, hasError }) => {
-  const commonClassName = `mt-2 w-full rounded-xl border bg-black/25 px-4 py-3 text-sm text-white placeholder:text-white/30 outline-none transition ${
+  const isReadOnly = field.name === 'email'
+  const commonClassName = `mt-2 w-full rounded-xl border bg-[#0a1a14] px-4 py-3 text-sm text-white placeholder:text-emerald-100/40 outline-none transition ${
     hasError
-      ? 'border-rose-500/40 focus:border-rose-500/60 focus:bg-black/35 focus:shadow-[0_0_0_4px_rgba(244,63,94,0.12)]'
-      : 'border-white/10 focus:border-emerald-400/40 focus:bg-black/35 focus:shadow-[0_0_0_4px_rgba(16,185,129,0.12)]'
-  }`
+      ? 'border-rose-500/50 focus:border-rose-500 focus:bg-[#120a0a] focus:shadow-[0_0_0_4px_rgba(244,63,94,0.15)]'
+      : 'border-emerald-500/30 hover:border-emerald-500/50 focus:border-emerald-400 focus:bg-[#0d221a] focus:shadow-[0_0_0_4px_rgba(16,185,129,0.15)]'
+  } ${isReadOnly ? 'opacity-60 bg-[#060e0a] border-emerald-500/10 cursor-not-allowed' : ''}`
 
   if (field.type === 'select') {
     return (
@@ -110,10 +111,11 @@ const InputControl = ({ field, value, onChange, hasError }) => {
       id={field.name}
       name={field.name}
       value={value}
-      onChange={(event) => onChange(field.name, event.target.value)}
+      onChange={(event) => !isReadOnly && onChange(field.name, event.target.value)}
       type={field.type || 'text'}
       placeholder={field.placeholder}
       className={commonClassName}
+      readOnly={isReadOnly}
     />
   )
 }
@@ -312,6 +314,7 @@ const OnboardingPage = () => {
         localStorage.setItem(storageKey, JSON.stringify(profile))
         localStorage.removeItem('qsphere_email_to_verify')
         localStorage.setItem('qsphere_logged_in', '1')
+        localStorage.setItem('qsphere_login_time', Date.now().toString())
       } catch (_) {
         // localStorage restriction fallback
       }
@@ -332,7 +335,7 @@ const OnboardingPage = () => {
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.22),transparent_35%),radial-gradient(circle_at_80%_20%,rgba(0,229,160,0.12),transparent_30%),radial-gradient(circle_at_50%_100%,rgba(0,110,70,0.2),transparent_45%)]" />
       <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),transparent_30%,rgba(0,0,0,0.4))]" />
 
-      <main className="relative mx-auto flex min-h-screen max-w-7xl items-center px-4 py-6 sm:px-6 lg:px-8">
+      <main className="relative mx-auto flex min-h-screen w-full 2xl:max-w-[1600px] items-center px-4 py-6 sm:px-6 lg:px-8">
         <div className="grid w-full gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
           <aside className="rounded-[28px] border border-emerald-400/15 bg-white/[0.04] p-6 shadow-[0_30px_90px_-30px_rgba(0,0,0,0.9)] backdrop-blur-2xl">
             <div className="inline-flex items-center gap-3 rounded-full border border-emerald-400/20 bg-emerald-500/10 px-4 py-2 text-[11px] tracking-[0.3em] text-emerald-100">

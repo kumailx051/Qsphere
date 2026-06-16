@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import qubiImg from '../assets/Qubi.png'
 import qubiWaveVideo from '../assets/QubiWave.webm'
+import notificationSound from '../assets/notification.mp3'
 
 const storageKey = 'qsphere_onboarding_profile'
 
@@ -14,9 +15,60 @@ const readStoredProfile = () => {
   }
 }
 
+const getProfileAvatar = (profile) => profile?.profileImage || profile?.avatarPreview || ''
+const getProfileEmail = (profile) => profile?.emailAddress || profile?.email || ''
+
+const mapNotificationItem = (item) => ({
+  id: item.id,
+  title: item.title,
+  description: item.message,
+  time: formatNotificationTime(item.created_at),
+  unread: !item.isRead,
+  linkUrl: item.linkUrl || item.linkurl || '',
+  type: item.type || 'general',
+  blogId: item.blogId || item.blogid || null,
+  commentId: item.commentId || item.commentid || null,
+  groupId: item.groupId || item.groupid || null,
+})
+
+const resolveNotificationLink = (notification) => {
+  if (notification.type === 'blog_comment' && notification.blogId && notification.commentId) {
+    return `/blogs/${notification.blogId}?commentId=${notification.commentId}`
+  }
+
+  return notification.linkUrl || ''
+}
+
+const formatNotificationTime = (dateValue) => {
+  if (!dateValue) return ''
+
+  const timestamp = new Date(dateValue).getTime()
+  if (Number.isNaN(timestamp)) return ''
+
+  const diffMs = Date.now() - timestamp
+  const diffMinutes = Math.max(0, Math.floor(diffMs / 60000))
+
+  if (diffMinutes < 1) return 'Just now'
+  if (diffMinutes < 60) return `${diffMinutes} min ago`
+
+  const diffHours = Math.floor(diffMinutes / 60)
+  if (diffHours < 24) return `${diffHours} hr ago`
+
+  const diffDays = Math.floor(diffHours / 24)
+  if (diffDays === 1) return 'Yesterday'
+  if (diffDays < 7) return `${diffDays} days ago`
+
+  return new Date(dateValue).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+  })
+}
+
 const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = null }) => {
   const [menuOpen, setMenuOpen] = useState(false)
   const [profile, setProfile] = useState(readStoredProfile)
+  const [notifications, setNotifications] = useState([])
+  const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [blogsMenuOpen, setBlogsMenuOpen] = useState(false)
   const [groupsMenuOpen, setGroupsMenuOpen] = useState(false)
@@ -31,9 +83,13 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
   const [typedGreeting, setTypedGreeting] = useState('')
   const typingTimerRef = useRef(null)
   const dropdownRef = useRef(null)
+  const notificationsRef = useRef(null)
   const blogsMenuRef = useRef(null)
   const groupsMenuRef = useRef(null)
   const hoverCloseTimerRef = useRef(null)
+  const notificationAudioRef = useRef(null)
+  const hasLoadedNotificationsRef = useRef(false)
+  const previousUnreadIdsRef = useRef([])
   const navigate = useNavigate()
 
   // Draggable Qubi avatar state
@@ -73,6 +129,9 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
   const isGroupsPage = currentPage === 'groups'
 
   const isLoggedIn = !!profile
+  const profileAvatar = getProfileAvatar(profile)
+  const profileEmail = getProfileEmail(profile)
+  const unreadNotifications = notifications.filter((item) => item.unread).length
 
   // Qubi avatar drag handlers
   const handleDragStart = (e) => {
@@ -191,6 +250,157 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
   }, [])
 
   useEffect(() => {
+    const email = getProfileEmail(profile)
+    if (!email) return
+
+    let isCancelled = false
+
+    const syncProfile = async () => {
+      try {
+        const res = await fetch(`/api/users/profile/${encodeURIComponent(email)}`)
+        if (!res.ok) return
+
+        const user = await res.json()
+        if (isCancelled) return
+
+        const mergedProfile = {
+          ...profile,
+          ...user,
+          avatarPreview: user.avatarPreview || user.profileImage || profile?.avatarPreview || '',
+          profileImage: user.profileImage || profile?.profileImage || '',
+        }
+
+        setProfile((current) => {
+          const currentProfile = current || {}
+          const nextProfile = {
+            ...currentProfile,
+            ...mergedProfile,
+          }
+
+          const currentStr = JSON.stringify(currentProfile)
+          const nextStr = JSON.stringify(nextProfile)
+          return currentStr === nextStr ? current : nextProfile
+        })
+
+        try {
+          localStorage.setItem(storageKey, JSON.stringify(mergedProfile))
+        } catch {
+          // ignore storage update failures
+        }
+      } catch {
+        // ignore profile refresh failures in navbar
+      }
+    }
+
+    syncProfile()
+
+    return () => {
+      isCancelled = true
+    }
+  }, [profile])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const audio = new Audio(notificationSound)
+    audio.preload = 'auto'
+    notificationAudioRef.current = audio
+
+    const unlock = () => {
+      if (notificationAudioRef.current) {
+        notificationAudioRef.current.play().then(() => {
+          notificationAudioRef.current.pause()
+          notificationAudioRef.current.currentTime = 0
+        }).catch(() => {})
+      }
+      document.removeEventListener('pointerdown', unlock)
+    }
+    document.addEventListener('pointerdown', unlock)
+
+    return () => {
+      document.removeEventListener('pointerdown', unlock)
+      notificationAudioRef.current = null
+    }
+  }, [])
+
+  useEffect(() => {
+    const email = String(profileEmail || '').trim().toLowerCase()
+    if (!email) {
+      setNotifications([])
+      hasLoadedNotificationsRef.current = false
+      previousUnreadIdsRef.current = []
+      return undefined
+    }
+
+    let isCancelled = false
+
+    const loadNotifications = async () => {
+      try {
+        const res = await fetch(`/api/notifications/${encodeURIComponent(email)}`)
+        if (!res.ok) return
+
+        const data = await res.json()
+        if (isCancelled) return
+
+        setNotifications(Array.isArray(data) ? data.map(mapNotificationItem) : [])
+      } catch {
+        if (!isCancelled) {
+          setNotifications([])
+        }
+      }
+    }
+
+    loadNotifications()
+    const interval = window.setInterval(loadNotifications, 30000)
+
+    return () => {
+      isCancelled = true
+      window.clearInterval(interval)
+    }
+  }, [profileEmail])
+
+  useEffect(() => {
+    const unreadIds = notifications
+      .filter((item) => item.unread)
+      .map((item) => String(item.id))
+
+    if (!hasLoadedNotificationsRef.current) {
+      hasLoadedNotificationsRef.current = true
+      previousUnreadIdsRef.current = unreadIds
+      return
+    }
+
+    const previousUnreadSet = new Set(previousUnreadIdsRef.current)
+    const hasNewUnread = unreadIds.some((id) => !previousUnreadSet.has(id))
+
+    if (hasNewUnread && notificationAudioRef.current) {
+      notificationAudioRef.current.currentTime = 0
+      notificationAudioRef.current.play().catch(() => {})
+    }
+
+    previousUnreadIdsRef.current = unreadIds
+  }, [notifications])
+
+  useEffect(() => {
+    if (!notificationsOpen || !profileEmail) return undefined
+
+    const refreshOnFocus = () => {
+      const email = String(profileEmail || '').trim().toLowerCase()
+      if (!email) return
+
+      fetch(`/api/notifications/${encodeURIComponent(email)}`)
+        .then((res) => (res.ok ? res.json() : []))
+        .then((data) => {
+          setNotifications(Array.isArray(data) ? data.map(mapNotificationItem) : [])
+        })
+        .catch(() => {})
+    }
+
+    window.addEventListener('focus', refreshOnFocus)
+    return () => window.removeEventListener('focus', refreshOnFocus)
+  }, [notificationsOpen, profileEmail])
+
+  useEffect(() => {
     if (!profile) {
       setAssistantVisible(false)
       setAssistantOpen(false)
@@ -246,6 +456,10 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
         setDropdownOpen(false)
       }
+
+      if (notificationsRef.current && !notificationsRef.current.contains(e.target)) {
+        setNotificationsOpen(false)
+      }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
@@ -268,6 +482,42 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
     setDropdownOpen(false)
     setMenuOpen(false)
     navigate('/account', { state: { profile } })
+  }
+
+  const handleClearAllNotifications = async () => {
+    const email = String(profileEmail || '').trim().toLowerCase()
+    if (!email) return
+
+    try {
+      const res = await fetch(`/api/notifications/${encodeURIComponent(email)}/read-all`, {
+        method: 'PATCH',
+      })
+      if (res.ok) {
+        setNotifications((current) => current.map((item) => ({ ...item, unread: false })))
+      }
+    } catch {
+      // Best effort
+    }
+  }
+
+  const handleNotificationRead = async (notification) => {
+    setNotifications((currentNotifications) => currentNotifications.map((item) => (
+      item.id === notification.id ? { ...item, unread: false } : item
+    )))
+
+    try {
+      await fetch(`/api/notifications/${notification.id}/read`, {
+        method: 'PATCH',
+      })
+    } catch {
+      // Keep optimistic UI state even if read sync fails.
+    }
+
+    setNotificationsOpen(false)
+    const destination = resolveNotificationLink(notification)
+    if (destination) {
+      navigate(destination)
+    }
   }
 
   const handleAssistantSend = async (event) => {
@@ -437,105 +687,215 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
             <div className="flex items-center gap-3">
               {isLoggedIn ? (
                 /* ── Logged-in: Profile Avatar with hover dropdown ── */
-                <div
-                  ref={dropdownRef}
-                  className="relative"
-                  onMouseEnter={() => {
-                    clearHoverCloseTimer()
-                    setDropdownOpen(true)
-                  }}
-                  onMouseLeave={() => scheduleHoverClose(setDropdownOpen)}
-                >
-                  <button
-                    type="button"
-                    className="flex items-center gap-2.5 rounded-full border border-emerald-400/40 bg-emerald-500/15 pl-1.5 pr-4 py-1.5 transition-all duration-300 hover:bg-emerald-500/25 hover:shadow-[0_0_22px_rgba(16,185,129,0.35)]"
-                    onClick={() => setDropdownOpen(prev => !prev)}
-                    aria-haspopup="true"
-                    aria-expanded={dropdownOpen}
-                  >
-                    <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-emerald-400/30 bg-emerald-500/20 shadow-[0_0_12px_rgba(16,185,129,0.3)]">
-                      {profile.avatarPreview ? (
-                        <img
-                          src={profile.avatarPreview}
-                          alt={`${profile.fullName || 'User'} avatar`}
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <span className="text-[11px] font-bold text-emerald-200 leading-none">{initials}</span>
-                      )}
-                    </div>
-                    <span className="hidden sm:block text-[11px] tracking-[0.12em] font-semibold text-emerald-100 max-w-[100px] truncate">
-                      {profile.fullName || 'Profile'}
-                    </span>
-                    <svg
-                      width="10"
-                      height="10"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className={`text-emerald-300/70 transition-transform duration-200 ${dropdownOpen ? 'rotate-180' : ''}`}
+                <div className="flex items-center gap-2">
+                  <div ref={notificationsRef} className="relative">
+                    <button
+                      type="button"
+                      className="relative inline-flex h-11 w-11 items-center justify-center rounded-full border border-emerald-400/30 bg-black/45 text-emerald-200 transition-all duration-300 hover:border-emerald-300/50 hover:bg-emerald-500/12 hover:shadow-[0_0_18px_rgba(16,185,129,0.2)]"
+                      aria-label="Notifications"
+                      title="Notifications"
+                      aria-haspopup="dialog"
+                      aria-expanded={notificationsOpen}
+                      onClick={async () => {
+                        const nextOpen = !notificationsOpen
+                        if (nextOpen && profileEmail) {
+                          try {
+                            const res = await fetch(`/api/notifications/${encodeURIComponent(String(profileEmail).trim().toLowerCase())}`)
+                            if (res.ok) {
+                              const data = await res.json()
+                              setNotifications(Array.isArray(data) ? data.map(mapNotificationItem) : [])
+                            }
+                          } catch {
+                            // ignore notification refresh failures on open
+                          }
+                        }
+                        setNotificationsOpen(nextOpen)
+                        setDropdownOpen(false)
+                      }}
                     >
-                      <path d="M6 9l6 6 6-6" />
-                    </svg>
-                  </button>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5" />
+                        <path d="M10 21a2 2 0 0 0 4 0" />
+                      </svg>
+                      {unreadNotifications > 0 ? (
+                        <>
+                          <span className="absolute right-3 top-3 h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.9)]" />
+                          <span className="absolute -right-1 -top-1 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full border border-emerald-300/35 bg-emerald-400 px-1 text-[10px] font-bold text-black shadow-[0_0_12px_rgba(16,185,129,0.4)]">
+                            {unreadNotifications}
+                          </span>
+                        </>
+                      ) : null}
+                    </button>
 
-                  {/* Dropdown */}
+                    <div
+                      className={`absolute right-0 top-full mt-2 w-[min(92vw,360px)] overflow-hidden rounded-[26px] border border-emerald-400/20 bg-[#07120e] shadow-[0_24px_80px_-24px_rgba(0,0,0,0.95),0_0_30px_rgba(16,185,129,0.12)] transition-all duration-200 origin-top-right ${
+                        notificationsOpen
+                          ? 'opacity-100 scale-100 pointer-events-auto'
+                          : 'opacity-0 scale-95 pointer-events-none'
+                      }`}
+                      style={{ zIndex: 999 }}
+                    >
+                      <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-3.5">
+                        <div>
+                          <div className="text-[10px] uppercase tracking-[0.28em] text-emerald-300/70">Notifications</div>
+                          <div className="mt-1 text-sm font-semibold text-white">Recent activity</div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {unreadNotifications > 0 ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={handleClearAllNotifications}
+                                className="text-[11px] font-medium tracking-[0.04em] text-emerald-300/70 transition hover:text-emerald-200"
+                              >
+                                Clear all
+                              </button>
+                              <span className="rounded-full border border-emerald-400/20 bg-emerald-500/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-emerald-200">
+                                {unreadNotifications} new
+                              </span>
+                            </>
+                          ) : (
+                            <span className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-white/65">
+                              All caught up
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="max-h-[320px] overflow-y-auto bg-[#07120e] p-2">
+                        {notifications.length === 0 ? (
+                          <div className="rounded-2xl border border-white/[0.05] bg-white/[0.03] px-4 py-5 text-sm text-white/60">
+                            No notifications yet.
+                          </div>
+                        ) : notifications.map((item) => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => handleNotificationRead(item)}
+                            className="flex w-full items-start gap-3 rounded-2xl border border-white/[0.05] bg-white/[0.03] px-3 py-3 text-left transition hover:border-emerald-400/20 hover:bg-emerald-500/12"
+                          >
+                            <span className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border ${item.unread ? 'border-emerald-400/25 bg-emerald-500/15 text-emerald-200' : 'border-white/10 bg-white/[0.06] text-white/70'}`}>
+                              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M12 3a6 6 0 0 0-6 6v3.2a2 2 0 0 1-.6 1.4L4 15h16l-1.4-1.4a2 2 0 0 1-.6-1.4V9a6 6 0 0 0-6-6Z" />
+                              </svg>
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="flex items-center gap-2">
+                                <span className="truncate text-sm font-semibold text-white">{item.title}</span>
+                                {item.unread ? <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" /> : null}
+                              </span>
+                              <span className="mt-1 block text-sm leading-5 text-white/55">{item.description}</span>
+                              <span className="mt-2 block text-[11px] uppercase tracking-[0.18em] text-emerald-300/55">{item.time}</span>
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
                   <div
-                    className={`absolute right-0 top-full mt-2 w-56 rounded-2xl border border-emerald-400/20 bg-black/90 backdrop-blur-2xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.9),0_0_30px_rgba(16,185,129,0.12)] overflow-hidden transition-all duration-200 origin-top-right ${
-                      dropdownOpen
-                        ? 'opacity-100 scale-100 pointer-events-auto'
-                        : 'opacity-0 scale-95 pointer-events-none'
-                    }`}
-                    style={{ zIndex: 999 }}
-                    onMouseEnter={() => clearHoverCloseTimer()}
+                    ref={dropdownRef}
+                    className="relative"
+                    onMouseEnter={() => {
+                      clearHoverCloseTimer()
+                      setDropdownOpen(true)
+                    }}
                     onMouseLeave={() => scheduleHoverClose(setDropdownOpen)}
                   >
-                    {/* User info header */}
-                    <div className="px-4 py-3.5 border-b border-white/[0.06]">
-                      <div className="text-sm font-semibold text-white truncate">{profile.fullName || 'Explorer'}</div>
-                      <div className="text-[11px] text-emerald-300/60 mt-0.5 truncate">{profile.email || 'Community member'}</div>
-                    </div>
+                    <button
+                      type="button"
+                      className="flex items-center gap-2.5 rounded-full border border-emerald-400/40 bg-emerald-500/15 pl-1.5 pr-4 py-1.5 transition-all duration-300 hover:bg-emerald-500/25 hover:shadow-[0_0_22px_rgba(16,185,129,0.35)]"
+                      onClick={() => {
+                        setNotificationsOpen(false)
+                        setDropdownOpen(prev => !prev)
+                      }}
+                      aria-haspopup="true"
+                      aria-expanded={dropdownOpen}
+                    >
+                      <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-emerald-400/30 bg-emerald-500/20 shadow-[0_0_12px_rgba(16,185,129,0.3)]">
+                        {profileAvatar ? (
+                          <img
+                            src={profileAvatar}
+                            alt={`${profile.fullName || 'User'} avatar`}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <span className="text-[11px] font-bold text-emerald-200 leading-none">{initials}</span>
+                        )}
+                      </div>
+                      <span className="hidden sm:block text-[11px] tracking-[0.12em] font-semibold text-emerald-100 max-w-[100px] truncate">
+                        {profile.fullName || 'Profile'}
+                      </span>
+                      <svg
+                        width="10"
+                        height="10"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className={`text-emerald-300/70 transition-transform duration-200 ${dropdownOpen ? 'rotate-180' : ''}`}
+                      >
+                        <path d="M6 9l6 6 6-6" />
+                      </svg>
+                    </button>
 
-                    {/* Menu items */}
-                    <div className="py-1.5">
-                      <button
-                        type="button"
-                        onClick={() => { setDropdownOpen(false); navigate('/dashboard') }}
-                        className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-white/80 hover:bg-emerald-500/10 hover:text-emerald-300 transition-colors"
-                      >
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
-                          <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" />
-                        </svg>
-                        Dashboard
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleAccountManagement}
-                        className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-white/80 hover:bg-emerald-500/10 hover:text-emerald-300 transition-colors"
-                      >
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
-                          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
-                          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                        </svg>
-                        Account Management
-                      </button>
-                    </div>
+                    {/* Dropdown */}
+                    <div
+                      className={`absolute right-0 top-full mt-2 w-56 rounded-2xl border border-emerald-400/20 bg-black/90 backdrop-blur-2xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.9),0_0_30px_rgba(16,185,129,0.12)] overflow-hidden transition-all duration-200 origin-top-right ${
+                        dropdownOpen
+                          ? 'opacity-100 scale-100 pointer-events-auto'
+                          : 'opacity-0 scale-95 pointer-events-none'
+                      }`}
+                      style={{ zIndex: 999 }}
+                      onMouseEnter={() => clearHoverCloseTimer()}
+                      onMouseLeave={() => scheduleHoverClose(setDropdownOpen)}
+                    >
+                      {/* User info header */}
+                      <div className="px-4 py-3.5 border-b border-white/[0.06]">
+                        <div className="text-sm font-semibold text-white truncate">{profile.fullName || 'Explorer'}</div>
+                        <div className="text-[11px] text-emerald-300/60 mt-0.5 truncate">{getProfileEmail(profile) || 'Community member'}</div>
+                      </div>
 
-                    {/* Logout */}
-                    <div className="border-t border-white/[0.06] py-1.5">
-                      <button
-                        type="button"
-                        onClick={handleLogout}
-                        className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-red-400/80 hover:bg-red-500/10 hover:text-red-400 transition-colors"
-                      >
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
-                          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
-                        </svg>
-                        Log Out
-                      </button>
+                      {/* Menu items */}
+                      <div className="py-1.5">
+                        <button
+                          type="button"
+                          onClick={() => { setDropdownOpen(false); navigate('/dashboard') }}
+                          className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-white/80 hover:bg-emerald-500/10 hover:text-emerald-300 transition-colors"
+                        >
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+                            <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" />
+                          </svg>
+                          Dashboard
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleAccountManagement}
+                          className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-white/80 hover:bg-emerald-500/10 hover:text-emerald-300 transition-colors"
+                        >
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                          </svg>
+                          Account Management
+                        </button>
+                      </div>
+
+                      {/* Logout */}
+                      <div className="border-t border-white/[0.06] py-1.5">
+                        <button
+                          type="button"
+                          onClick={handleLogout}
+                          className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-red-400/80 hover:bg-red-500/10 hover:text-red-400 transition-colors"
+                        >
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
+                          </svg>
+                          Log Out
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -747,15 +1107,15 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
             {isLoggedIn && (
               <div className="mt-6 flex items-center gap-3 rounded-2xl border border-emerald-400/15 bg-emerald-500/[0.06] px-4 py-3">
                 <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border border-emerald-400/30 bg-emerald-500/20 shadow-[0_0_12px_rgba(16,185,129,0.2)]">
-                  {profile.avatarPreview ? (
-                    <img src={profile.avatarPreview} alt="avatar" className="h-full w-full object-cover" />
+                  {profileAvatar ? (
+                    <img src={profileAvatar} alt="avatar" className="h-full w-full object-cover" />
                   ) : (
                     <span className="text-xs font-bold text-emerald-200">{initials}</span>
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="text-sm font-semibold text-white truncate">{profile.fullName || 'Explorer'}</div>
-                  <div className="text-[11px] text-emerald-300/60 truncate">{profile.email || 'Member'}</div>
+                  <div className="text-[11px] text-emerald-300/60 truncate">{getProfileEmail(profile) || 'Member'}</div>
                 </div>
               </div>
             )}

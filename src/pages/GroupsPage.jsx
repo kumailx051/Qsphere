@@ -12,6 +12,14 @@ const GroupsPage = () => {
 
   const navigate = useNavigate()
   const [groups, setGroups] = useState([])
+  const [requestingGroupIds, setRequestingGroupIds] = useState({})
+  const [membershipStatusByGroupId, setMembershipStatusByGroupId] = useState({})
+
+  const currentUserEmail = typeof window !== 'undefined' ? (
+    (JSON.parse(localStorage.getItem('qsphere_onboarding_profile') || '{}')).emailAddress ||
+    localStorage.getItem('qsphere_email') ||
+    ''
+  ) : ''
 
   useEffect(() => {
     fetch('/api/groups')
@@ -22,14 +30,70 @@ const GroupsPage = () => {
       .catch(err => console.error('Error fetching groups:', err))
   }, [])
 
-  const currentUserEmail = typeof window !== 'undefined' ? (
-    (JSON.parse(localStorage.getItem('qsphere_onboarding_profile') || '{}')).emailAddress || 
-    localStorage.getItem('qsphere_email') || 
-    ''
-  ) : ''
+  useEffect(() => {
+    if (!currentUserEmail || groups.length === 0) return
+
+    let isCancelled = false
+
+    const loadMembershipStatuses = async () => {
+      try {
+        const statuses = await Promise.all(
+          groups.map(async (group) => {
+            const status = await fetchMembershipStatus(group.id)
+            return [group.id, status]
+          })
+        )
+
+        if (isCancelled) return
+
+        setMembershipStatusByGroupId(
+          statuses.reduce((acc, [groupId, status]) => {
+            if (status) acc[groupId] = status
+            return acc
+          }, {})
+        )
+      } catch (_error) {
+        if (!isCancelled) {
+          setMembershipStatusByGroupId({})
+        }
+      }
+    }
+
+    loadMembershipStatuses()
+
+    return () => {
+      isCancelled = true
+    }
+  }, [groups, currentUserEmail])
 
   const toggleFilter = (key) => {
     setFilters(prev => ({ ...prev, [key]: !prev[key] }))
+  }
+
+  const showSnackbar = (message, type = 'success') => {
+    if (typeof window === 'undefined') return
+
+    window.dispatchEvent(
+      new CustomEvent('qsphere-snackbar', {
+        detail: { message, type }
+      })
+    )
+  }
+
+  const fetchMembershipStatus = async (groupId) => {
+    try {
+      const res = await fetch(`/api/groups/${groupId}/members`)
+      if (!res.ok) return null
+
+      const members = await res.json()
+      const currentMember = Array.isArray(members)
+        ? members.find((member) => member.email === currentUserEmail)
+        : null
+
+      return currentMember?.status || null
+    } catch (_error) {
+      return null
+    }
   }
 
   const filterConfig = [
@@ -124,86 +188,145 @@ const GroupsPage = () => {
 
           {/* Groups List */}
           <div className="space-y-5" style={{ perspective: '1000px' }}>
-            {groups.map((group, index) => (
-              <div 
-                key={group.id}
-                className="group relative flex flex-col sm:flex-row sm:items-center justify-between gap-6 p-6 md:p-8 rounded-3xl border border-white/[0.05] bg-white/[0.02] backdrop-blur-md transition-all duration-300 hover:bg-white/[0.04] hover:border-emerald-400/20 hover:-translate-y-1"
-                style={{ animation: `fadeUp 0.6s ease-out ${0.2 + index * 0.1}s both` }}
-              >
-                {/* Hover Glow */}
-                <div 
-                  className="absolute inset-0 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
-                  style={{ boxShadow: 'inset 0 0 30px rgba(16,185,129,0.05)' }}
-                />
+            {groups.filter((group) => {
+              if (filters.all) return true
+              const status = membershipStatusByGroupId[group.id]
+              if (filters.my && status === 'Active') return true
+              if (filters.requested && status === 'Pending') return true
+              return false
+            }).map((group, index) => {
+              const isRequesting = Boolean(requestingGroupIds[group.id])
+              const membershipStatus = membershipStatusByGroupId[group.id]
+              const isRequestSent = membershipStatus === 'Pending'
+              const isJoined = membershipStatus === 'Active'
 
-                {/* Left: Info & Buttons */}
-                <div className="relative z-10 flex-1">
-                  <h3 className="text-white font-bold text-xl md:text-2xl mb-1 group-hover:text-emerald-300 transition-colors" style={{ fontFamily: "'Inter', sans-serif" }}>
-                    {group.groupTitle}
-                  </h3>
-                  {group.groupDescription && (
-                    <p className="text-white/70 text-sm md:text-base mb-2">
-                      {group.groupDescription}
+              return (
+                <div
+                  key={group.id}
+                  className="group relative flex flex-col sm:flex-row sm:items-center justify-between gap-6 p-6 md:p-8 rounded-3xl border border-white/[0.05] bg-white/[0.02] backdrop-blur-md transition-all duration-300 hover:bg-white/[0.04] hover:border-emerald-400/20 hover:-translate-y-1"
+                  style={{ animation: `fadeUp 0.6s ease-out ${0.2 + index * 0.1}s both` }}
+                >
+                  {/* Hover Glow */}
+                  <div
+                    className="absolute inset-0 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
+                    style={{ boxShadow: 'inset 0 0 30px rgba(16,185,129,0.05)' }}
+                  />
+
+                  {/* Left: Info & Buttons */}
+                  <div className="relative z-10 flex-1">
+                    <h3 className="text-white font-bold text-xl md:text-2xl mb-1 group-hover:text-emerald-300 transition-colors" style={{ fontFamily: "'Inter', sans-serif" }}>
+                      {group.groupTitle}
+                    </h3>
+                    {group.groupDescription && (
+                      <p className="text-white/70 text-sm md:text-base mb-2">
+                        {group.groupDescription}
+                      </p>
+                    )}
+                    <p className="text-white/40 text-sm italic mb-6">
+                      Scope: {group.groupScope}
                     </p>
-                  )}
-                  <p className="text-white/40 text-sm italic mb-6">
-                    Scope: {group.groupScope}
-                  </p>
-                  
-                  <div className="flex flex-wrap items-center gap-4">
-                    <button onClick={() => {
-                      const logged = typeof window !== 'undefined' && localStorage.getItem('qsphere_logged_in') === '1'
-                      if (!logged) {
-                        navigate('/auth', { state: { redirectTo: `/groups/${group.id}` } })
-                        return
-                      }
-                      navigate(`/groups/${group.id}`)
-                    }} className="px-6 py-2.5 rounded-xl border border-white/10 bg-white/[0.03] text-white/80 text-sm font-semibold hover:bg-white/[0.08] hover:text-white transition-all">
-                      Details...
-                    </button>
-                    {currentUserEmail !== group.ownerEmail && (
-                      <button onClick={async () => {
+
+                    <div className="flex flex-wrap items-center gap-4">
+                      <button onClick={() => {
                         const logged = typeof window !== 'undefined' && localStorage.getItem('qsphere_logged_in') === '1'
                         if (!logged) {
-                          navigate('/auth', { state: { redirectTo: '/groups' } })
+                          navigate('/auth', { state: { redirectTo: `/groups/${group.id}` } })
                           return
                         }
-                        try {
-                          const res = await fetch(`/api/groups/${group.id}/members`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ userEmail: currentUserEmail })
-                          })
-                          if (!res.ok) {
-                            const errData = await res.json()
-                            alert(errData.error || 'Failed to send request')
-                            return
-                          }
-                          alert('Request to join sent!')
-                        } catch (err) {
-                          alert('Network error')
-                        }
-                      }} className="px-6 py-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 text-sm font-semibold hover:bg-emerald-500/20 hover:border-emerald-400/50 hover:shadow-[0_0_15px_rgba(16,185,129,0.2)] transition-all">
-                        Request to Join
+                        navigate(`/groups/${group.id}`)
+                      }} className="px-6 py-2.5 rounded-xl border border-white/10 bg-white/[0.03] text-white/80 text-sm font-semibold hover:bg-white/[0.08] hover:text-white transition-all">
+                        Details...
                       </button>
-                    )}
-                  </div>
-                </div>
+                      {currentUserEmail !== group.ownerEmail && (
+                        isJoined ? (
+                          <span className="px-6 py-2.5 rounded-xl border border-cyan-400/20 bg-cyan-400/10 text-cyan-200 text-sm font-semibold cursor-default select-none">
+                            Joined
+                          </span>
+                        ) : (
+                          <button
+                            disabled={isRequesting || isRequestSent}
+                            onClick={async () => {
+                              const logged = typeof window !== 'undefined' && localStorage.getItem('qsphere_logged_in') === '1'
+                              if (!logged) {
+                                navigate('/auth', { state: { redirectTo: '/groups' } })
+                                return
+                              }
 
-                {/* Right: Owner Avatar */}
-                <div className="relative z-10 flex sm:flex-col items-center gap-4 sm:gap-3 sm:min-w-[140px] pt-5 sm:pt-0 border-t border-white/5 sm:border-t-0 mt-2 sm:mt-0">
-                  <div className="w-14 h-14 rounded-full border border-emerald-400/30 p-0.5 bg-black/50 shadow-[0_0_15px_rgba(16,185,129,0.15)] group-hover:border-emerald-400/60 group-hover:shadow-[0_0_20px_rgba(16,185,129,0.3)] transition-all">
-                    <div className="w-full h-full rounded-full bg-white/10 overflow-hidden flex items-center justify-center">
-                      <img src={group.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(group.owner || 'U')}`} alt={group.owner} className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity" />
+                              if (!currentUserEmail) {
+                                showSnackbar('Unable to identify your account', 'error')
+                                return
+                              }
+
+                              if (isRequesting || isRequestSent) return
+
+                              setRequestingGroupIds(prev => ({ ...prev, [group.id]: true }))
+
+                              try {
+                                const res = await fetch(`/api/groups/${group.id}/members`, {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ userEmail: currentUserEmail })
+                                })
+                                const data = await res.json().catch(() => null)
+
+                                if (!res.ok) {
+                                  const errorMessage = data?.error || 'Failed to send request'
+                                  const alreadyRequested = /already exists|already in group/i.test(errorMessage)
+
+                                  if (alreadyRequested) {
+                                    const latestStatus = await fetchMembershipStatus(group.id)
+                                    setMembershipStatusByGroupId(prev => ({
+                                      ...prev,
+                                      [group.id]: latestStatus || 'Pending'
+                                    }))
+                                    showSnackbar('Request is sent successfully', 'success')
+                                    return
+                                  }
+
+                                  showSnackbar(errorMessage, 'error')
+                                  return
+                                }
+
+                                setMembershipStatusByGroupId(prev => ({ ...prev, [group.id]: 'Pending' }))
+                                showSnackbar('Request is sent successfully', 'success')
+                              } catch (_err) {
+                                showSnackbar('Network error', 'error')
+                              } finally {
+                                setRequestingGroupIds(prev => {
+                                  const next = { ...prev }
+                                  delete next[group.id]
+                                  return next
+                                })
+                              }
+                            }}
+                            className={`px-6 py-2.5 rounded-xl border text-sm font-semibold transition-all ${
+                              isRequestSent
+                                ? 'border-white/10 bg-white/10 text-white/45 cursor-not-allowed hover:bg-white/10 hover:border-white/10'
+                                : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-400/50 hover:shadow-[0_0_15px_rgba(16,185,129,0.2)]'
+                            } ${isRequesting ? 'opacity-80 cursor-wait' : ''}`}
+                          >
+                            {isRequestSent ? 'Request Sent' : isRequesting ? 'Sending...' : 'Request to Join'}
+                          </button>
+                        )
+                      )}
                     </div>
                   </div>
-                  <div className="text-center">
-                    <div className="text-white/90 text-sm font-bold">{group.owner}</div>
-                  </div>
-                </div>
 
-              </div>
-            ))}
+                  {/* Right: Owner Avatar */}
+                  <div className="relative z-10 flex sm:flex-col items-center gap-4 sm:gap-3 sm:min-w-[140px] pt-5 sm:pt-0 border-t border-white/5 sm:border-t-0 mt-2 sm:mt-0">
+                    <div className="w-14 h-14 rounded-full border border-emerald-400/30 p-0.5 bg-black/50 shadow-[0_0_15px_rgba(16,185,129,0.15)] group-hover:border-emerald-400/60 group-hover:shadow-[0_0_20px_rgba(16,185,129,0.3)] transition-all">
+                      <div className="w-full h-full rounded-full bg-white/10 overflow-hidden flex items-center justify-center">
+                        <img src={group.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(group.owner || 'U')}`} alt={group.owner} className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity" />
+                      </div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-white/90 text-sm font-bold">{group.owner}</div>
+                    </div>
+                  </div>
+
+                </div>
+              )
+            })}
           </div>
 
         </div>

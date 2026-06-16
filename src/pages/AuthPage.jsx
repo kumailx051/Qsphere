@@ -24,6 +24,10 @@ const EYE_CLOSED = (
   </>
 )
 
+const OTP_FLOW_KEY = 'qsphere_otp_flow'
+const OTP_FLOW_VERIFY_EMAIL = 'verify-email'
+const OTP_FLOW_RESET_PASSWORD = 'reset-password'
+
 const AuthPage = () => {
   const navigate = useNavigate()
   const location = useLocation()
@@ -35,17 +39,19 @@ const AuthPage = () => {
   const sceneRefs = useRef({})
 
   const [mode, setMode] = useState('login')
+  const [loginView, setLoginView] = useState('sign-in')
   const [showLoginPassword, setShowLoginPassword] = useState(false)
   const [showRegisterPassword, setShowRegisterPassword] = useState(false)
   const [loginBusy, setLoginBusy] = useState(false)
   const [registerBusy, setRegisterBusy] = useState(false)
-  const [pageMessage, setPageMessage] = useState('')
-  const [pageMessageType, setPageMessageType] = useState('info')
+  const [pageMessage, setPageMessage] = useState(() => location.state?.authMessage || '')
+  const [pageMessageType, setPageMessageType] = useState(() => location.state?.authMessageType || 'info')
   const [loginErrors, setLoginErrors] = useState({})
   const [registerErrors, setRegisterErrors] = useState({})
+  const [loginFormError, setLoginFormError] = useState('')
 
   // Input States
-  const [lEmail, setLEmail] = useState('')
+  const [lEmail, setLEmail] = useState(() => location.state?.emailAddress || '')
   const [lPass, setLPass] = useState('')
   const [rName, setRName] = useState('')
   const [rEmail, setREmail] = useState('')
@@ -306,6 +312,15 @@ const AuthPage = () => {
     setPageMessageType(type)
   }
 
+  const setOtpFlow = (flow, emailAddress) => {
+    localStorage.setItem('qsphere_email_to_verify', emailAddress)
+    localStorage.setItem(OTP_FLOW_KEY, flow)
+  }
+
+  const clearOtpFlow = () => {
+    localStorage.removeItem(OTP_FLOW_KEY)
+  }
+
   const getMissingFieldMessage = () => 'Fill this field'
 
   const applyRequiredFieldErrors = (fields, message) => {
@@ -317,11 +332,11 @@ const AuthPage = () => {
 
     if (mode === 'login') {
       setLoginErrors(nextErrors)
+      setLoginFormError(message || 'Please fill in the highlighted fields.')
     } else {
       setRegisterErrors(nextErrors)
+      showInlineMessage(message || 'Please fill in the highlighted fields.', 'error')
     }
-
-    showInlineMessage(message || 'Please fill in the highlighted fields.', 'error')
   }
 
   const handleLogin = async () => {
@@ -335,14 +350,14 @@ const AuthPage = () => {
 
     setLoginErrors(nextErrors)
     setRegisterErrors({})
+    setLoginFormError('')
 
     if (nextErrors.email || nextErrors.password) {
-      showInlineMessage('Please fill in the highlighted fields.', 'error')
+      setLoginFormError('Please fill in the highlighted fields.')
       return
     }
 
     setLoginBusy(true)
-    showInlineMessage('Signing you in...', 'info')
     try {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
@@ -353,7 +368,7 @@ const AuthPage = () => {
       const result = await response.json()
       if (!response.ok) {
         if (response.status === 403 && result.needsVerification) {
-          localStorage.setItem('qsphere_email_to_verify', result.emailAddress || emailAddress)
+          setOtpFlow(OTP_FLOW_VERIFY_EMAIL, result.emailAddress || emailAddress)
           showInlineMessage(result.error || 'Your email is not verified yet. Redirecting to OTP verification.', 'error')
           navigate('/otp')
           return
@@ -364,18 +379,19 @@ const AuthPage = () => {
           return
         }
 
-        throw new Error(result.error || 'Login failed')
+        throw new Error(result.error || 'Invalid email address or password.')
       }
 
       const { user } = result
       if (!user.isVerified) {
-        localStorage.setItem('qsphere_email_to_verify', user.emailAddress)
+        setOtpFlow(OTP_FLOW_VERIFY_EMAIL, user.emailAddress)
         showInlineMessage('Your email is not verified yet. Redirecting to OTP verification.', 'success')
         navigate('/otp')
         return
       }
 
       if (!user.isOnboarded) {
+        clearOtpFlow()
         localStorage.setItem('qsphere_email_to_verify', user.emailAddress)
         showInlineMessage('You have not completed onboarding yet. Redirecting to onboarding.', 'success')
         navigate('/onboarding', { state: { verified: true } })
@@ -384,16 +400,25 @@ const AuthPage = () => {
 
       // Fully logged in and onboarded!
       try {
+        clearOtpFlow()
         localStorage.setItem('qsphere_logged_in', '1')
         localStorage.setItem('qsphere_onboarding_profile', JSON.stringify(user))
-      } catch (e) {}
+        localStorage.setItem('qsphere_login_time', Date.now().toString())
+        if (rememberMe) {
+          localStorage.setItem('qsphere_remember_me', '1')
+        } else {
+          localStorage.removeItem('qsphere_remember_me')
+        }
+      } catch {
+        void 0
+      }
 
       showInlineMessage(`Welcome back to the Quantum Community, ${user.fullName}!`, 'success')
       window.dispatchEvent(new CustomEvent('qsphere-snackbar', { detail: { message: 'Logged in successfully', type: 'success' } }))
       const redirectTo = location?.state?.redirectTo || '/dashboard'
       setTimeout(() => navigate(redirectTo), 500)
     } catch (error) {
-      showInlineMessage(error.message || 'An error occurred during login. Please try again.', 'error')
+      setLoginFormError(error.message || 'An error occurred during login. Please try again.')
     } finally {
       setLoginBusy(false)
     }
@@ -442,7 +467,7 @@ const AuthPage = () => {
       const result = await response.json()
       if (!response.ok) {
         if (response.status === 409 && result.pendingRegistration) {
-          localStorage.setItem('qsphere_email_to_verify', result.emailAddress || emailAddress)
+          setOtpFlow(OTP_FLOW_VERIFY_EMAIL, result.emailAddress || emailAddress)
           showInlineMessage(result.message || 'You already have a pending verification. Redirecting to OTP.', 'success')
           navigate('/otp')
           return
@@ -462,7 +487,7 @@ const AuthPage = () => {
         throw new Error(result.error || 'Registration failed')
       }
 
-      localStorage.setItem('qsphere_email_to_verify', emailAddress)
+      setOtpFlow(OTP_FLOW_VERIFY_EMAIL, emailAddress)
       showInlineMessage('Registration successful! Verification code sent to your email.', 'success')
       navigate('/otp')
     } catch (error) {
@@ -472,8 +497,56 @@ const AuthPage = () => {
     }
   }
 
+  const handleForgotPassword = async () => {
+    const emailAddress = lEmail.trim()
 
-  const statusText = mode === 'login' ? 'QSPHERE · Entry Node Active' : 'QSPHERE · Genesis Chamber Active'
+    const nextErrors = {
+      email: emailAddress ? '' : getMissingFieldMessage(),
+      password: '',
+    }
+
+    setLoginErrors(nextErrors)
+    setLoginFormError('')
+
+    if (nextErrors.email) {
+      setLoginFormError('Please enter the email address linked to your account.')
+      return
+    }
+
+    setLoginBusy(true)
+    try {
+      const response = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ emailAddress })
+      })
+
+      const result = await response.json()
+      if (!response.ok) {
+        throw new Error(result.error || 'Unable to start password reset.')
+      }
+
+      setOtpFlow(OTP_FLOW_RESET_PASSWORD, result.emailAddress || emailAddress)
+      showInlineMessage(result.message || 'Reset code sent. Redirecting to OTP verification.', 'success')
+      navigate('/otp')
+    } catch (error) {
+      setLoginFormError(error.message || 'Unable to start password reset.')
+    } finally {
+      setLoginBusy(false)
+    }
+  }
+
+  const isForgotPasswordView = mode === 'login' && loginView === 'forgot'
+  const loginSectionLabel = isForgotPasswordView ? 'Password Recovery Node' : 'Secure Access Portal'
+  const loginTitle = isForgotPasswordView
+    ? <>Reset your <span>Quantum</span><br />password.</>
+    : <>Sign In to the <span>Quantum</span><br />Community.</>
+  const loginSubtitle = isForgotPasswordView
+    ? 'Enter your email address and we will send a secure 6-digit reset code.'
+    : 'Access your dimension of cutting-edge quantum science and collaboration.'
+  const statusText = mode === 'login'
+    ? (isForgotPasswordView ? 'QSPHERE · Recovery Node Active' : 'QSPHERE · Entry Node Active')
+    : 'QSPHERE · Genesis Chamber Active'
 
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-[#030705] text-white">
@@ -1060,12 +1133,22 @@ const AuthPage = () => {
                 </div>
               </div>
 
-              <div className="section-label"><span className="dot" />Secure Access Portal</div>
+              <div className="section-label"><span className="dot" />{loginSectionLabel}</div>
 
-              <div className="h1">Sign In to the <span>Quantum</span><br />Community.</div>
-              <p className="sub">Access your dimension of cutting-edge quantum science and collaboration.</p>
+              <div className="h1">{loginTitle}</div>
+              <p className="sub">{loginSubtitle}</p>
 
               <div className="fstack">
+                {loginFormError && (
+                  <div style={{ color: '#ff6b6b', fontSize: '13px', padding: '12px 16px', background: 'rgba(255,60,60,0.1)', border: '1px solid rgba(255,60,60,0.2)', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <line x1="12" y1="8" x2="12" y2="12"></line>
+                      <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                    </svg>
+                    {loginFormError}
+                  </div>
+                )}
                 <div className={`fi ${loginErrors.email ? 'err' : ''}`}>
                   <input
                     type="email"
@@ -1085,41 +1168,66 @@ const AuthPage = () => {
                   <div className="fi-msg">{loginErrors.email || '\u00A0'}</div>
                 </div>
 
-                <div className={`fi ${loginErrors.password ? 'err' : ''}`}>
-                  <input
-                    type={showLoginPassword ? 'text' : 'password'}
-                    id="lPass"
-                    placeholder=" "
-                    autoComplete="current-password"
-                    value={lPass}
-                    onChange={(e) => setLPass(e.target.value)}
-                  />
-                  <label htmlFor="lPass">Password</label>
-                  <button className="eye" id="lEyeBtn" type="button" onClick={() => setShowLoginPassword((value) => !value)}>
-                    <svg id="lEyeSvg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                      {showLoginPassword ? EYE_CLOSED : EYE_OPEN}
-                    </svg>
-                  </button>
-                  <div className="fi-msg">{loginErrors.password || '\u00A0'}</div>
-                </div>
+                {!isForgotPasswordView ? (
+                  <>
+                    <div className={`fi ${loginErrors.password ? 'err' : ''}`}>
+                      <input
+                        type={showLoginPassword ? 'text' : 'password'}
+                        id="lPass"
+                        placeholder=" "
+                        autoComplete="current-password"
+                        value={lPass}
+                        onChange={(e) => setLPass(e.target.value)}
+                      />
+                      <label htmlFor="lPass">Password</label>
+                      <button className="eye" id="lEyeBtn" type="button" onClick={() => setShowLoginPassword((value) => !value)}>
+                        <svg id="lEyeSvg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                          {showLoginPassword ? EYE_CLOSED : EYE_OPEN}
+                        </svg>
+                      </button>
+                      <div className="fi-msg">{loginErrors.password || '\u00A0'}</div>
+                    </div>
 
-                <div className="row-sb" style={{ fontSize: '13px' }}>
-                  <label className="row" style={{ gap: 8, cursor: 'pointer', color: 'rgba(255,255,255,.55)' }}>
-                    <input 
-                      type="checkbox" 
-                      className="cb" 
-                      checked={rememberMe} 
-                      onChange={(e) => setRememberMe(e.target.checked)} 
-                      id="lRem" 
-                    />
-                    Remember me
-                  </label>
-                  <button className="ghost" style={{ fontSize: '11px' }} type="button">Forgot password?</button>
-                </div>
+                    <div className="row-sb" style={{ fontSize: '13px' }}>
+                      <label className="row" style={{ gap: 8, cursor: 'pointer', color: 'rgba(255,255,255,.55)' }}>
+                        <input
+                          type="checkbox"
+                          className="cb"
+                          checked={rememberMe}
+                          onChange={(e) => setRememberMe(e.target.checked)}
+                          id="lRem"
+                        />
+                        Remember me
+                      </label>
+                      <button
+                        className="ghost"
+                        style={{ fontSize: '11px' }}
+                        type="button"
+                        onClick={() => {
+                          setLoginView('forgot')
+                          setLoginErrors({})
+                          setLoginFormError('')
+                        }}
+                      >
+                        Forgot password?
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ fontSize: '12px', color: 'rgba(255,255,255,.52)', lineHeight: 1.6, marginTop: '-2px' }}>
+                    We will email a one-time code to this address. Use it to create a new password on the next screen.
+                  </div>
+                )}
 
-                <button className="btn" id="lSub" type="button" disabled={loginBusy} onClick={handleLogin}>
+                <button
+                  className="btn"
+                  id="lSub"
+                  type="button"
+                  disabled={loginBusy}
+                  onClick={isForgotPasswordView ? handleForgotPassword : handleLogin}
+                >
                   <span className="row" style={{ gap: 8 }}>
-                    {loginBusy ? <span className="spin" /> : 'Sign In'}
+                    {loginBusy ? <span className="spin" /> : isForgotPasswordView ? 'Send Reset Code' : 'Sign In'}
                     {!loginBusy && ARR}
                   </span>
                 </button>
@@ -1128,10 +1236,39 @@ const AuthPage = () => {
               <div className="divr"><div className="divr-l" /><span className="divr-t">or</span><div className="divr-l" /></div>
 
               <div style={{ textAlign: 'center', fontSize: '13px', color: 'rgba(255,255,255,.5)' }}>
-                New to QSPHERE?{' '}
-                <button className="ghost" type="button" onClick={() => setMode('register')} style={{ fontWeight: 600 }}>
-                  Join the Community →
-                </button>
+                {isForgotPasswordView ? (
+                  <>
+                    Remembered your password?{' '}
+                    <button
+                      className="ghost"
+                      type="button"
+                      onClick={() => {
+                        setLoginView('sign-in')
+                        setLoginErrors({})
+                        setLoginFormError('')
+                      }}
+                      style={{ fontWeight: 600 }}
+                    >
+                      ← Back to Sign In
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    New to QSPHERE?{' '}
+                    <button
+                      className="ghost"
+                      type="button"
+                      onClick={() => {
+                        setMode('register')
+                        setLoginView('sign-in')
+                        setLoginFormError('')
+                      }}
+                      style={{ fontWeight: 600 }}
+                    >
+                      Join the Community →
+                    </button>
+                  </>
+                )}
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'center' }}>
@@ -1259,7 +1396,7 @@ const AuthPage = () => {
 
               <div style={{ textAlign: 'center', fontSize: '13px', color: 'rgba(255,255,255,.5)' }}>
                 Already a member?{' '}
-                <button className="ghost" type="button" onClick={() => setMode('login')} style={{ fontWeight: 600 }}>
+                <button className="ghost" type="button" onClick={() => { setMode('login'); setLoginView('sign-in'); setLoginFormError('') }} style={{ fontWeight: 600 }}>
                   ← Sign In
                 </button>
               </div>

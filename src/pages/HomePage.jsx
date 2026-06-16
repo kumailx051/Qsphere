@@ -25,6 +25,20 @@ const CYCLE_DURATION = 12
 const TITLE_START_SCALE = 1.23
 const TITLE_MAX_SCALE = 2.1
 const TITLE_END_SCALE = 0.16
+const SPLIT_START = 0.1
+const SPLIT_DURATION = 0.1
+const ORBIT_REVEAL_START = SPLIT_START
+const ORBIT_REVEAL_DURATION = 0.12
+const HERO_ENTER_START = 0.4
+const HERO_ENTER_DURATION = 0.2
+const Q_HANDOFF_START = HERO_ENTER_START
+const Q_HANDOFF_DURATION = 0.18
+const ORBIT_FADE_START = Q_HANDOFF_START
+const ORBIT_FADE_DURATION = Q_HANDOFF_DURATION
+const BRAND_REVEAL_START = 0.5
+const BRAND_REVEAL_DURATION = 0.12
+const Q_FADE_START = 0.54
+const Q_FADE_DURATION = 0.1
 
 function lerpColor(a, b, t) {
   return [
@@ -106,6 +120,8 @@ const HomePage = () => {
 
   useEffect(() => {
     let raf
+    const navbarBrandNode = navbarBrandRef.current
+    const navbarFrameNode = navbarFrameRef.current
 
     const tick = (timestamp) => {
       if (!startTimeRef.current) startTimeRef.current = timestamp
@@ -116,14 +132,13 @@ const HomePage = () => {
       const progress = currentProgressRef.current
 
       const growProgress = smoothstep(clamp01(progress / 0.14))
-      const splitProgress = smoothstep(clamp01((progress - 0.1) / 0.1))
+      const splitProgress = smoothstep(clamp01((progress - SPLIT_START) / SPLIT_DURATION))
       const qCenterProgress = smoothstep(clamp01((progress - 0.14) / 0.12))
-      const orbitProgress = smoothstep(clamp01((progress - 0.24) / 0.1))
-      const orbitRevealProgress = smoothstep(clamp01((progress - 0.2) / 0.08))
-      const orbitFadeProgress = smoothstep(clamp01((progress - 0.5) / 0.08))
-      const handoffProgress = smoothstep(clamp01((progress - 0.62) / 0.14))
-      const brandRevealProgress = smoothstep(clamp01((progress - 0.72) / 0.1))
-      const qFadeProgress = smoothstep(clamp01((progress - 0.7) / 0.1))
+      const orbitRevealProgress = smoothstep(clamp01((progress - ORBIT_REVEAL_START) / ORBIT_REVEAL_DURATION))
+      const orbitFadeProgress = smoothstep(clamp01((progress - ORBIT_FADE_START) / ORBIT_FADE_DURATION))
+      const handoffProgress = smoothstep(clamp01((progress - Q_HANDOFF_START) / Q_HANDOFF_DURATION))
+      const brandRevealProgress = smoothstep(clamp01((progress - BRAND_REVEAL_START) / BRAND_REVEAL_DURATION))
+      const qFadeProgress = smoothstep(clamp01((progress - Q_FADE_START) / Q_FADE_DURATION))
 
       const stageScale = handoffProgress > 0
         ? lerp(TITLE_MAX_SCALE, TITLE_END_SCALE, handoffProgress)
@@ -131,7 +146,7 @@ const HomePage = () => {
 
       const galleryFade = Math.max(0, 1 - Math.max(0, progress - 0.3) / 0.2)
 
-      const heroIn = Math.min(1, Math.max(0, (progress - 0.4) / 0.2))
+      const heroIn = Math.min(1, Math.max(0, (progress - HERO_ENTER_START) / HERO_ENTER_DURATION))
       const heroOut = Math.min(1, Math.max(0, (1 - progress) / 0.15))
       const heroOpacity = Math.min(heroIn, heroOut)
 
@@ -176,7 +191,6 @@ const HomePage = () => {
       const sphereX = sphereBaseX - sphereDriftDistance * splitProgress
       const sphereY = centerY - 6 * splitProgress
       const orbitOpacity = orbitRevealProgress * (1 - orbitFadeProgress)
-      const orbitScale = lerp(0.9, 1.16, orbitProgress)
       const sphereProgress = orbitFadeProgress > 0
         ? 0.5 + orbitFadeProgress * 0.5
         : orbitRevealProgress * 0.5
@@ -242,16 +256,16 @@ const HomePage = () => {
     return () => {
       cancelAnimationFrame(raf)
 
-      if (navbarBrandRef.current) {
-        navbarBrandRef.current.style.opacity = ''
-        navbarBrandRef.current.style.visibility = ''
-        navbarBrandRef.current.style.transform = ''
-        navbarBrandRef.current.style.filter = ''
+      if (navbarBrandNode) {
+        navbarBrandNode.style.opacity = ''
+        navbarBrandNode.style.visibility = ''
+        navbarBrandNode.style.transform = ''
+        navbarBrandNode.style.filter = ''
       }
 
-      if (navbarFrameRef.current) {
-        navbarFrameRef.current.style.transform = ''
-        navbarFrameRef.current.style.willChange = ''
+      if (navbarFrameNode) {
+        navbarFrameNode.style.transform = ''
+        navbarFrameNode.style.willChange = ''
       }
     }
   }, [getProgress])

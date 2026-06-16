@@ -86,6 +86,26 @@ CREATE TABLE IF NOT EXISTS blog_comments (
   "blogId" INTEGER NOT NULL REFERENCES blogs(id) ON DELETE CASCADE,
   name VARCHAR(255),
   text TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  "updated_at" TIMESTAMPTZ,
+  "parentId" INTEGER REFERENCES blog_comments(id) ON DELETE CASCADE,
+  "commenterEmail" VARCHAR(255),
+  "heartedBy" JSONB DEFAULT '[]'::jsonb
+);
+
+CREATE TABLE IF NOT EXISTS notifications (
+  id SERIAL PRIMARY KEY,
+  type VARCHAR(100) NOT NULL,
+  title TEXT NOT NULL,
+  message TEXT NOT NULL,
+  "recipientEmail" VARCHAR(255) NOT NULL,
+  "linkUrl" TEXT,
+  "blogId" INTEGER REFERENCES blogs(id) ON DELETE CASCADE,
+  "commentId" INTEGER REFERENCES blog_comments(id) ON DELETE CASCADE,
+  "groupId" INTEGER REFERENCES groups(id) ON DELETE CASCADE,
+  "memberEmail" VARCHAR(255),
+  "projectId" INTEGER REFERENCES projects(id) ON DELETE CASCADE,
+  "isRead" BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -159,5 +179,26 @@ CREATE TABLE IF NOT EXISTS project_chat (
   "projectId" INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   "senderEmail" VARCHAR(255) REFERENCES users("emailAddress") ON DELETE CASCADE,
   message TEXT NOT NULL,
+  "editedAt" TIMESTAMPTZ,
+  "editedByEmail" VARCHAR(255) REFERENCES users("emailAddress") ON DELETE SET NULL,
+  "deletedAt" TIMESTAMPTZ,
+  "deletedByEmail" VARCHAR(255) REFERENCES users("emailAddress") ON DELETE SET NULL,
+  "deletedForEveryone" BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS project_chat_hidden (
+  id SERIAL PRIMARY KEY,
+  "messageId" INTEGER NOT NULL REFERENCES project_chat(id) ON DELETE CASCADE,
+  "userEmail" VARCHAR(255) NOT NULL REFERENCES users("emailAddress") ON DELETE CASCADE,
+  "hiddenAt" TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE("messageId", "userEmail")
+);
+
+CREATE TABLE IF NOT EXISTS project_chat_reads (
+  id SERIAL PRIMARY KEY,
+  "messageId" INTEGER NOT NULL REFERENCES project_chat(id) ON DELETE CASCADE,
+  "userEmail" VARCHAR(255) NOT NULL REFERENCES users("emailAddress") ON DELETE CASCADE,
+  "readAt" TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE("messageId", "userEmail")
 );

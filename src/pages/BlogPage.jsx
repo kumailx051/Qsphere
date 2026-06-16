@@ -22,6 +22,17 @@ const BlogPage = () => {
   const [loading, setLoading] = useState(true)
   const [visibleCount, setVisibleCount] = useState(PER_PAGE)
   const [loadingMore, setLoadingMore] = useState(false)
+  const [currentUserEmail, setCurrentUserEmail] = useState('')
+
+  useEffect(() => {
+    try {
+      const profileRaw = localStorage.getItem('qsphere_onboarding_profile')
+      if (profileRaw) {
+        const profile = JSON.parse(profileRaw)
+        setCurrentUserEmail(String(profile.emailAddress || '').trim().toLowerCase())
+      }
+    } catch {}
+  }, [])
 
   useEffect(() => {
     const loadBlogs = async () => {
@@ -178,6 +189,13 @@ const BlogPage = () => {
                       {post.category}
                     </span>
                   </div>
+                  {currentUserEmail && String(post.authorEmail || '').trim().toLowerCase() === currentUserEmail && (
+                    <div className="absolute top-4 right-4 z-20">
+                      <span className="px-3 py-1.5 text-[10px] font-bold tracking-[0.15em] text-white bg-emerald-500/80 backdrop-blur-md rounded-full border border-emerald-300/30 shadow-[0_0_12px_rgba(16,185,129,0.3)]">
+                        MY BLOG
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="p-8 flex flex-col flex-grow">

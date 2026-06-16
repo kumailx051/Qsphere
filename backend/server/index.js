@@ -11,6 +11,9 @@ dotenv.config()
 
 const app = express()
 const port = Number(process.env.PORT || 3001)
+const sessionSecret = process.env.SESSION_SECRET || 'qsphere-dev-session-secret'
+const authCookieName = 'qsphere_auth'
+const verifyCookieName = 'qsphere_verify_email'
 
 const pool = new Pool({
   host: process.env.DB_HOST,
@@ -34,6 +37,76 @@ const storage = multer.diskStorage({
   }
 })
 const upload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } }) // 50MB max
+
+const baseCookieOptions = [
+  'Path=/',
+  'HttpOnly',
+  'SameSite=Lax',
+]
+
+if (process.env.NODE_ENV === 'production') {
+  baseCookieOptions.push('Secure')
+}
+
+const signCookieValue = (value) => {
+  const payload = Buffer.from(String(value || ''), 'utf8').toString('base64url')
+  const signature = crypto.createHmac('sha256', sessionSecret).update(payload).digest('base64url')
+  return `${payload}.${signature}`
+}
+
+const verifyCookieValue = (value) => {
+  if (!value || !value.includes('.')) return null
+  const [payload, signature] = value.split('.')
+  const expected = crypto.createHmac('sha256', sessionSecret).update(payload).digest('base64url')
+  if (signature !== expected) return null
+
+  try {
+    return Buffer.from(payload, 'base64url').toString('utf8')
+  } catch {
+    return null
+  }
+}
+
+const parseCookies = (request) => {
+  const header = request.headers.cookie || ''
+  return header.split(';').reduce((accumulator, pair) => {
+    const [key, ...rest] = pair.trim().split('=')
+    if (!key) return accumulator
+    accumulator[key] = decodeURIComponent(rest.join('='))
+    return accumulator
+  }, {})
+}
+
+const appendCookie = (response, cookieString) => {
+  const current = response.getHeader('Set-Cookie')
+  if (!current) {
+    response.setHeader('Set-Cookie', [cookieString])
+    return
+  }
+
+  const next = Array.isArray(current) ? [...current, cookieString] : [current, cookieString]
+  response.setHeader('Set-Cookie', next)
+}
+
+const setSignedCookie = (response, name, value, maxAgeSeconds = null) => {
+  const parts = [`${name}=${encodeURIComponent(signCookieValue(value))}`, ...baseCookieOptions]
+  if (maxAgeSeconds !== null) parts.push(`Max-Age=${maxAgeSeconds}`)
+  appendCookie(response, parts.join('; '))
+}
+
+const clearCookie = (response, name) => {
+  appendCookie(response, `${name}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${process.env.NODE_ENV === 'production' ? '; Secure' : ''}`)
+}
+
+const getSignedCookie = (request, name) => verifyCookieValue(parseCookies(request)[name])
+
+const sanitizeUser = (user) => {
+  if (!user) return null
+  const cleaned = { ...user }
+  cleaned.avatarPreview = cleaned.profileImage
+  delete cleaned.password
+  return cleaned
+}
 
 const ensureSchema = async () => {
 
@@ -135,7 +208,11 @@ const ensureSchema = async () => {
     )
   `)
 
-  // Create group_types table
+  await pool.query('ALTER TABLE blog_comments ADD COLUMN IF NOT EXISTS "parentId" INTEGER REFERENCES blog_comments(id) ON DELETE CASCADE')
+  await pool.query('ALTER TABLE blog_comments ADD COLUMN IF NOT EXISTS "commenterEmail" VARCHAR(255)')
+  await pool.query('ALTER TABLE blog_comments ADD COLUMN IF NOT EXISTS "heartedBy" JSONB DEFAULT \'[]\'::jsonb')
+  await pool.query('ALTER TABLE blog_comments ADD COLUMN IF NOT EXISTS "updated_at" TIMESTAMPTZ')
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS group_types (
       id SERIAL PRIMARY KEY,
@@ -143,17 +220,6 @@ const ensureSchema = async () => {
       created_at TIMESTAMPTZ DEFAULT NOW()
     )
   `)
-
-  // Create groups table — migrate from old schema if needed
-  // Check if old schema exists (has 'title' column instead of 'groupTitle')
-  const oldSchemaCheck = await pool.query(`
-    SELECT column_name FROM information_schema.columns 
-    WHERE table_name = 'groups' AND column_name = 'title'
-  `)
-  if (oldSchemaCheck.rows.length > 0) {
-    console.log('Migrating groups table from old schema...')
-    await pool.query('DROP TABLE IF EXISTS groups CASCADE')
-  }
 
   // Ensure groups table exists without strict foreign key constraints
   await pool.query(`
@@ -227,6 +293,31 @@ const ensureSchema = async () => {
     )
   `)
 
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS notifications (
+      id SERIAL PRIMARY KEY,
+      type VARCHAR(100) NOT NULL,
+      title TEXT NOT NULL,
+      message TEXT NOT NULL,
+      "recipientEmail" VARCHAR(255) NOT NULL,
+      "linkUrl" TEXT,
+      "blogId" INTEGER REFERENCES blogs(id) ON DELETE CASCADE,
+      "commentId" INTEGER REFERENCES blog_comments(id) ON DELETE CASCADE,
+      "groupId" INTEGER REFERENCES groups(id) ON DELETE CASCADE,
+      "memberEmail" VARCHAR(255),
+      "isRead" BOOLEAN DEFAULT FALSE,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `)
+
+  await pool.query('ALTER TABLE notifications ADD COLUMN IF NOT EXISTS "linkUrl" TEXT')
+  await pool.query('ALTER TABLE notifications ADD COLUMN IF NOT EXISTS "blogId" INTEGER REFERENCES blogs(id) ON DELETE CASCADE')
+  await pool.query('ALTER TABLE notifications ADD COLUMN IF NOT EXISTS "commentId" INTEGER REFERENCES blog_comments(id) ON DELETE CASCADE')
+  await pool.query('ALTER TABLE notifications ADD COLUMN IF NOT EXISTS "groupId" INTEGER REFERENCES groups(id) ON DELETE CASCADE')
+  await pool.query('ALTER TABLE notifications ADD COLUMN IF NOT EXISTS "memberEmail" VARCHAR(255)')
+  await pool.query('ALTER TABLE notifications ADD COLUMN IF NOT EXISTS "isRead" BOOLEAN DEFAULT FALSE')
+  await pool.query('ALTER TABLE notifications ADD COLUMN IF NOT EXISTS "projectId" INTEGER REFERENCES projects(id) ON DELETE CASCADE')
+
   // project chat table
   await pool.query(`
     CREATE TABLE IF NOT EXISTS project_chat (
@@ -235,6 +326,32 @@ const ensureSchema = async () => {
       "senderEmail" VARCHAR(255),
       message TEXT NOT NULL,
       created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `)
+
+  await pool.query('ALTER TABLE project_chat ADD COLUMN IF NOT EXISTS "editedAt" TIMESTAMPTZ')
+  await pool.query('ALTER TABLE project_chat ADD COLUMN IF NOT EXISTS "editedByEmail" VARCHAR(255)')
+  await pool.query('ALTER TABLE project_chat ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMPTZ')
+  await pool.query('ALTER TABLE project_chat ADD COLUMN IF NOT EXISTS "deletedByEmail" VARCHAR(255)')
+  await pool.query('ALTER TABLE project_chat ADD COLUMN IF NOT EXISTS "deletedForEveryone" BOOLEAN DEFAULT FALSE')
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS project_chat_hidden (
+      id SERIAL PRIMARY KEY,
+      "messageId" INTEGER NOT NULL REFERENCES project_chat(id) ON DELETE CASCADE,
+      "userEmail" VARCHAR(255) NOT NULL REFERENCES users("emailAddress") ON DELETE CASCADE,
+      "hiddenAt" TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE("messageId", "userEmail")
+    )
+  `)
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS project_chat_reads (
+      id SERIAL PRIMARY KEY,
+      "messageId" INTEGER NOT NULL REFERENCES project_chat(id) ON DELETE CASCADE,
+      "userEmail" VARCHAR(255) NOT NULL REFERENCES users("emailAddress") ON DELETE CASCADE,
+      "readAt" TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE("messageId", "userEmail")
     )
   `)
 
@@ -295,6 +412,21 @@ const sendOTPEmail = async (emailAddress, otp) => {
   }
 }
 
+const issueOtpForEmail = async (emailAddress) => {
+  const otp = crypto.randomInt(100000, 1000000).toString()
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000)
+
+  await pool.query('DELETE FROM otps WHERE "emailAddress" = $1', [emailAddress])
+  await pool.query(
+    `INSERT INTO otps ("emailAddress", otp, "expiresAt")
+     VALUES ($1, $2, $3)`,
+    [emailAddress, otp, expiresAt]
+  )
+
+  await sendOTPEmail(emailAddress, otp)
+  return otp
+}
+
 const uploadImageToImgBB = async (base64DataUrl) => {
   const apiKey = process.env.IMGBB_API_KEY
   if (!apiKey) {
@@ -352,17 +484,8 @@ app.post('/api/auth/register', async (request, response) => {
       )
     }
 
-    const otp = crypto.randomInt(100000, 1000000).toString()
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000)
-
-    await pool.query('DELETE FROM otps WHERE "emailAddress" = $1', [emailAddress])
-    await pool.query(
-      `INSERT INTO otps ("emailAddress", otp, "expiresAt")
-       VALUES ($1, $2, $3)`,
-      [emailAddress, otp, expiresAt]
-    )
-
-    await sendOTPEmail(emailAddress, otp)
+    await issueOtpForEmail(emailAddress)
+    setSignedCookie(response, verifyCookieName, emailAddress, 60 * 60)
 
     response.status(pendingExisting.rowCount > 0 ? 409 : 201).json({
       success: true,
@@ -424,6 +547,7 @@ app.post('/api/auth/verify-otp', async (request, response) => {
     )
 
     await pool.query('DELETE FROM pending_registrations WHERE "emailAddress" = $1', [emailAddress])
+    setSignedCookie(response, verifyCookieName, emailAddress, 60 * 60)
 
     response.json({ success: true, message: 'OTP verified successfully.' })
   } catch (error) {
@@ -445,22 +569,92 @@ app.post('/api/auth/resend-otp', async (request, response) => {
       return response.status(404).json({ error: 'No pending registration found for this email address.' })
     }
 
-    const otp = crypto.randomInt(100000, 1000000).toString()
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000)
-
-    await pool.query('DELETE FROM otps WHERE "emailAddress" = $1', [emailAddress])
-    await pool.query(
-      `INSERT INTO otps ("emailAddress", otp, "expiresAt")
-       VALUES ($1, $2, $3)`,
-      [emailAddress, otp, expiresAt]
-    )
-
-    await sendOTPEmail(emailAddress, otp)
+    await issueOtpForEmail(emailAddress)
+    setSignedCookie(response, verifyCookieName, emailAddress, 60 * 60)
 
     response.json({ success: true, message: 'A new OTP has been sent to your email.' })
   } catch (error) {
     console.error('Resend OTP error:', error)
     response.status(500).json({ error: error.message || 'Failed to resend OTP' })
+  }
+})
+
+app.post('/api/auth/forgot-password', async (request, response) => {
+  const { emailAddress } = request.body ?? {}
+
+  if (!emailAddress) {
+    return response.status(400).json({ error: 'emailAddress is required' })
+  }
+
+  try {
+    const userRes = await pool.query('SELECT * FROM users WHERE "emailAddress" = $1', [emailAddress])
+    if (userRes.rowCount === 0) {
+      return response.status(404).json({ error: 'No account found for this email address.' })
+    }
+
+    const user = userRes.rows[0]
+    if (!user.isVerified) {
+      return response.status(403).json({ error: 'Please verify your email address before resetting your password.' })
+    }
+
+    await issueOtpForEmail(emailAddress)
+
+    response.json({
+      success: true,
+      message: 'A password reset code has been sent to your email.',
+      emailAddress,
+    })
+  } catch (error) {
+    console.error('Forgot password error:', error)
+    response.status(500).json({ error: error.message || 'Failed to start password reset' })
+  }
+})
+
+app.post('/api/auth/reset-password', async (request, response) => {
+  const { emailAddress, otp, password, confirmPassword } = request.body ?? {}
+
+  if (!emailAddress || !otp || !password || !confirmPassword) {
+    return response.status(400).json({ error: 'emailAddress, otp, password, and confirmPassword are required' })
+  }
+
+  if (String(password).length < 6) {
+    return response.status(400).json({ error: 'Password must be at least 6 characters long.' })
+  }
+
+  if (password !== confirmPassword) {
+    return response.status(400).json({ error: 'Passwords do not match.' })
+  }
+
+  try {
+    const userRes = await pool.query('SELECT * FROM users WHERE "emailAddress" = $1', [emailAddress])
+    if (userRes.rowCount === 0) {
+      return response.status(404).json({ error: 'No account found for this email address.' })
+    }
+
+    const otpRes = await pool.query(
+      'SELECT * FROM otps WHERE "emailAddress" = $1 AND otp = $2 ORDER BY created_at DESC LIMIT 1',
+      [emailAddress, otp]
+    )
+
+    if (otpRes.rowCount === 0) {
+      return response.status(400).json({ error: 'Invalid verification code.' })
+    }
+
+    const record = otpRes.rows[0]
+    const expiresAt = new Date(record.expiresAt)
+    if (expiresAt < new Date()) {
+      return response.status(400).json({ error: 'Verification code has expired.' })
+    }
+
+    await pool.query('UPDATE users SET password = $2 WHERE "emailAddress" = $1', [emailAddress, hashPassword(password)])
+    await pool.query('DELETE FROM otps WHERE "emailAddress" = $1', [emailAddress])
+    clearCookie(response, authCookieName)
+    clearCookie(response, verifyCookieName)
+
+    response.json({ success: true, message: 'Password updated successfully.' })
+  } catch (error) {
+    console.error('Reset password error:', error)
+    response.status(500).json({ error: error.message || 'Failed to reset password' })
   }
 })
 
@@ -474,8 +668,10 @@ app.post('/api/auth/login', async (request, response) => {
   try {
     const userRes = await pool.query('SELECT * FROM users WHERE "emailAddress" = $1', [emailAddress])
     if (userRes.rowCount === 0) {
+      clearCookie(response, authCookieName)
       const pendingRes = await pool.query('SELECT * FROM pending_registrations WHERE "emailAddress" = $1', [emailAddress])
       if (pendingRes.rowCount > 0) {
+        setSignedCookie(response, verifyCookieName, emailAddress, 60 * 60)
         return response.status(403).json({
           error: 'Your email is not verified yet. Please verify the OTP first.',
           needsVerification: true,
@@ -489,45 +685,21 @@ app.post('/api/auth/login', async (request, response) => {
     const user = userRes.rows[0]
     const hashedPassword = hashPassword(password)
     if (user.password !== hashedPassword) {
+      clearCookie(response, authCookieName)
       return response.status(401).json({ error: 'Invalid email address or password.' })
     }
 
+    if (!user.isOnboarded) {
+      setSignedCookie(response, verifyCookieName, emailAddress, 60 * 60)
+    } else {
+      clearCookie(response, verifyCookieName)
+    }
+
+    setSignedCookie(response, authCookieName, emailAddress, 60 * 60 * 24 * 7)
+
     response.json({
       success: true,
-      user: {
-        id: user.id,
-        fullName: user.fullName,
-        emailAddress: user.emailAddress,
-        role: user.role,
-        isVerified: user.isVerified,
-        isOnboarded: user.isOnboarded,
-        profileImage: user.profileImage,
-        gender: user.gender,
-        cellMain: user.cellMain,
-        cellAlternative: user.cellAlternative,
-        cnic: user.cnic,
-        passportNo: user.passportNo,
-        dateOfBirth: user.dateOfBirth,
-        city: user.city,
-        address: user.address,
-        institute: user.institute,
-        degree: user.degree,
-        semester: user.semester,
-        majors: user.majors,
-        interests: user.interests,
-        referralId: user.referralId,
-        discipline: user.discipline,
-        dateOfGraduation: user.dateOfGraduation,
-        organization: user.organization,
-        jobDescription: user.jobDescription,
-        roleTitle: user.roleTitle,
-        qualification: user.qualification,
-        experience: user.experience,
-        designation: user.designation,
-        post: user.post,
-        researchInterest: user.researchInterest,
-        researchFocus: user.researchFocus,
-      },
+      user: sanitizeUser(user),
     })
   } catch (error) {
     console.error('Login error:', error)
@@ -633,51 +805,51 @@ app.post('/api/users/onboarding', async (request, response) => {
 
     const res = await pool.query(updateQuery, values)
     if (res.rowCount === 0) {
+      clearCookie(response, authCookieName)
       return response.status(404).json({ error: 'User not found.' })
     }
 
     const updatedUser = res.rows[0]
+    clearCookie(response, verifyCookieName)
+    setSignedCookie(response, authCookieName, updatedUser.emailAddress, 60 * 60 * 24 * 7)
     response.json({
       success: true,
-      user: {
-        id: updatedUser.id,
-        fullName: updatedUser.fullName,
-        emailAddress: updatedUser.emailAddress,
-        role: updatedUser.role,
-        isVerified: updatedUser.isVerified,
-        isOnboarded: updatedUser.isOnboarded,
-        profileImage: updatedUser.profileImage,
-        gender: updatedUser.gender,
-        cellMain: updatedUser.cellMain,
-        cellAlternative: updatedUser.cellAlternative,
-        cnic: updatedUser.cnic,
-        passportNo: updatedUser.passportNo,
-        dateOfBirth: updatedUser.dateOfBirth,
-        city: updatedUser.city,
-        address: updatedUser.address,
-        institute: updatedUser.institute,
-        degree: updatedUser.degree,
-        semester: updatedUser.semester,
-        majors: updatedUser.majors,
-        interests: updatedUser.interests,
-        referralId: updatedUser.referralId,
-        discipline: updatedUser.discipline,
-        dateOfGraduation: updatedUser.dateOfGraduation,
-        organization: updatedUser.organization,
-        jobDescription: updatedUser.jobDescription,
-        roleTitle: updatedUser.roleTitle,
-        qualification: updatedUser.qualification,
-        experience: updatedUser.experience,
-        designation: updatedUser.designation,
-        post: updatedUser.post,
-        researchInterest: updatedUser.researchInterest,
-        researchFocus: updatedUser.researchFocus,
-      },
+      user: sanitizeUser(updatedUser),
     })
   } catch (error) {
     console.error('Onboarding submission error:', error)
     response.status(500).json({ error: 'Onboarding submission failed.' })
   }
+})
+
+app.get('/api/auth/verification-target', (request, response) => {
+  const emailAddress = getSignedCookie(request, verifyCookieName)
+  if (!emailAddress) return response.status(404).json({ error: 'No verification target found' })
+  response.json({ emailAddress })
+})
+
+app.get('/api/auth/me', async (request, response) => {
+  const emailAddress = getSignedCookie(request, authCookieName)
+  if (!emailAddress) return response.status(401).json({ error: 'Not authenticated' })
+
+  try {
+    const result = await pool.query('SELECT * FROM users WHERE "emailAddress" = $1', [emailAddress])
+    if (result.rowCount === 0) {
+      clearCookie(response, authCookieName)
+      return response.status(401).json({ error: 'Session expired' })
+    }
+
+    response.json({ success: true, user: sanitizeUser(result.rows[0]) })
+  } catch (error) {
+    console.error('Current user lookup error:', error)
+    response.status(500).json({ error: 'Failed to load current user' })
+  }
+})
+
+app.post('/api/auth/logout', (_request, response) => {
+  clearCookie(response, authCookieName)
+  clearCookie(response, verifyCookieName)
+  response.json({ success: true })
 })
 
 /* ─── Account Management Endpoints ──────────────────────────────── */
@@ -980,6 +1152,73 @@ app.post('/api/blog-categories', async (request, response) => {
 
 /* ─── Blog Comments Endpoints ───────────────────────────────────── */
 
+app.get('/api/notifications/:email', async (request, response) => {
+  const recipientEmail = String(request.params.email || '').trim().toLowerCase()
+  if (!recipientEmail) {
+    return response.status(400).json({ error: 'Email is required' })
+  }
+
+  try {
+    const result = await pool.query(
+      `SELECT *
+       FROM notifications
+       WHERE LOWER("recipientEmail") = $1
+       ORDER BY "isRead" ASC, created_at DESC`,
+      [recipientEmail]
+    )
+
+    response.json(result.rows)
+  } catch (error) {
+    console.error('Error fetching notifications:', error)
+    response.status(500).json({ error: 'Failed to load notifications' })
+  }
+})
+
+app.patch('/api/notifications/:email/read-all', async (request, response) => {
+  const email = String(request.params.email || '').trim().toLowerCase()
+  if (!email) return response.status(400).json({ error: 'Email is required' })
+
+  try {
+    const result = await pool.query(
+      `UPDATE notifications
+       SET "isRead" = TRUE
+       WHERE "recipientEmail" = $1 AND "isRead" = FALSE
+       RETURNING *`,
+      [email]
+    )
+    response.json({ success: true, count: result.rowCount })
+  } catch (error) {
+    console.error('Error marking all notifications as read:', error)
+    response.status(500).json({ error: 'Failed to mark notifications as read' })
+  }
+})
+
+app.patch('/api/notifications/:id/read', async (request, response) => {
+  const notificationId = Number(request.params.id)
+  if (!notificationId) {
+    return response.status(400).json({ error: 'Invalid notification id' })
+  }
+
+  try {
+    const result = await pool.query(
+      `UPDATE notifications
+       SET "isRead" = TRUE
+       WHERE id = $1
+       RETURNING *`,
+      [notificationId]
+    )
+
+    if (result.rowCount === 0) {
+      return response.status(404).json({ error: 'Notification not found' })
+    }
+
+    response.json(result.rows[0])
+  } catch (error) {
+    console.error('Error marking notification as read:', error)
+    response.status(500).json({ error: 'Failed to mark notification as read' })
+  }
+})
+
 // GET comments for a blog
 app.get('/api/blogs/:id/comments', async (request, response) => {
   const blogId = Number(request.params.id)
@@ -1002,20 +1241,124 @@ app.post('/api/blogs/:id/comments', async (request, response) => {
   const blogId = Number(request.params.id)
   if (!blogId) return response.status(400).json({ error: 'Invalid blog id' })
 
-  const { name, text } = request.body ?? {}
+  const { name, text, commenterEmail } = request.body ?? {}
   if (!text || !text.trim()) {
     return response.status(400).json({ error: 'Comment text is required' })
   }
 
   try {
-    const result = await pool.query(
-      `INSERT INTO blog_comments ("blogId", name, text) VALUES ($1, $2, $3) RETURNING *`,
-      [blogId, (name || 'Anonymous').trim(), text.trim()]
+    const blogResult = await pool.query(
+      'SELECT id, title, author, "authorEmail" FROM blogs WHERE id = $1',
+      [blogId]
     )
-    response.status(201).json(result.rows[0])
+
+    if (blogResult.rowCount === 0) {
+      return response.status(404).json({ error: 'Blog not found' })
+    }
+
+    const trimmedName = (name || 'Anonymous').trim()
+    const trimmedText = text.trim()
+    const normalizedCommenterEmail = String(commenterEmail || '').trim().toLowerCase() || null
+
+    const result = await pool.query(
+      `INSERT INTO blog_comments ("blogId", name, text, "commenterEmail")
+       VALUES ($1, $2, $3, $4)
+       RETURNING *`,
+      [blogId, trimmedName, trimmedText, normalizedCommenterEmail]
+    )
+
+    const newComment = result.rows[0]
+    const blog = blogResult.rows[0]
+    const normalizedAuthorEmail = String(blog.authorEmail || '').trim().toLowerCase()
+
+    if (normalizedAuthorEmail && normalizedAuthorEmail !== normalizedCommenterEmail) {
+      try {
+        await pool.query(
+          `INSERT INTO notifications (type, title, message, "recipientEmail", "linkUrl", "blogId", "commentId")
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [
+            'blog_comment',
+            'New comment on your blog',
+            `${trimmedName} commented on "${blog.title}".`,
+            normalizedAuthorEmail,
+            `/blogs/${blogId}?commentId=${newComment.id}`,
+            blogId,
+            newComment.id,
+          ]
+        )
+      } catch (notificationError) {
+        console.error('Error creating blog comment notification:', notificationError)
+      }
+    }
+
+    response.status(201).json(newComment)
   } catch (error) {
     console.error('Error creating comment:', error)
     response.status(500).json({ error: 'Failed to post comment' })
+  }
+})
+
+// PUT update a comment
+app.put('/api/blogs/:id/comments/:commentId', async (request, response) => {
+  const commentId = Number(request.params.commentId)
+  if (!commentId) return response.status(400).json({ error: 'Invalid comment id' })
+
+  const { text, commenterEmail } = request.body ?? {}
+  if (!text || !text.trim()) {
+    return response.status(400).json({ error: 'Comment text is required' })
+  }
+  if (!commenterEmail) {
+    return response.status(400).json({ error: 'commenterEmail is required' })
+  }
+
+  try {
+    const existing = await pool.query('SELECT * FROM blog_comments WHERE id = $1', [commentId])
+    if (existing.rowCount === 0) {
+      return response.status(404).json({ error: 'Comment not found' })
+    }
+
+    const comment = existing.rows[0]
+    if (String(comment.commenterEmail || '').toLowerCase() !== String(commenterEmail).toLowerCase()) {
+      return response.status(403).json({ error: 'You can only edit your own comments' })
+    }
+
+    const result = await pool.query(
+      'UPDATE blog_comments SET text = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
+      [text.trim(), commentId]
+    )
+    response.json(result.rows[0])
+  } catch (error) {
+    console.error('Error updating comment:', error)
+    response.status(500).json({ error: 'Failed to update comment' })
+  }
+})
+
+// DELETE a comment
+app.delete('/api/blogs/:id/comments/:commentId', async (request, response) => {
+  const commentId = Number(request.params.commentId)
+  if (!commentId) return response.status(400).json({ error: 'Invalid comment id' })
+
+  const { commenterEmail } = request.body ?? {}
+  if (!commenterEmail) {
+    return response.status(400).json({ error: 'commenterEmail is required' })
+  }
+
+  try {
+    const existing = await pool.query('SELECT * FROM blog_comments WHERE id = $1', [commentId])
+    if (existing.rowCount === 0) {
+      return response.status(404).json({ error: 'Comment not found' })
+    }
+
+    const comment = existing.rows[0]
+    if (String(comment.commenterEmail || '').toLowerCase() !== String(commenterEmail).toLowerCase()) {
+      return response.status(403).json({ error: 'You can only delete your own comments' })
+    }
+
+    await pool.query('DELETE FROM blog_comments WHERE id = $1', [commentId])
+    response.json({ success: true })
+  } catch (error) {
+    console.error('Error deleting comment:', error)
+    response.status(500).json({ error: 'Failed to delete comment' })
   }
 })
 
@@ -1184,16 +1527,56 @@ app.post('/api/groups/:id/members', async (request, response) => {
   if (!groupId || !userEmail) return response.status(400).json({ error: 'Missing required fields' })
 
   try {
+    const normalizedUserEmail = String(userEmail || '').trim().toLowerCase()
+    const groupResult = await pool.query(
+      'SELECT id, "groupTitle", "ownerEmail" FROM groups WHERE id = $1',
+      [groupId]
+    )
+
+    if (groupResult.rowCount === 0) {
+      return response.status(404).json({ error: 'Group not found' })
+    }
+
+    const requesterResult = await pool.query(
+      'SELECT "fullName" FROM users WHERE "emailAddress" = $1',
+      [normalizedUserEmail]
+    )
+
     const result = await pool.query(`
       INSERT INTO group_members ("groupId", "userEmail", status, position)
       VALUES ($1, $2, 'Pending', 'Member')
       ON CONFLICT ("groupId", "userEmail") DO NOTHING
       RETURNING *
-    `, [groupId, userEmail])
+    `, [groupId, normalizedUserEmail])
     
     if (result.rowCount === 0) {
       return response.status(400).json({ error: 'Request already exists or user already in group' })
     }
+
+    const group = groupResult.rows[0]
+    const normalizedOwnerEmail = String(group.ownerEmail || '').trim().toLowerCase()
+    const requesterName = requesterResult.rows[0]?.fullName || normalizedUserEmail
+
+    if (normalizedOwnerEmail && normalizedOwnerEmail !== normalizedUserEmail) {
+      try {
+        await pool.query(
+          `INSERT INTO notifications (type, title, message, "recipientEmail", "linkUrl", "groupId", "memberEmail")
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [
+            'group_join_request',
+            'New group join request',
+            `${requesterName} requested to join "${group.groupTitle}".`,
+            normalizedOwnerEmail,
+            `/groups/${groupId}?scroll=members`,
+            groupId,
+            normalizedUserEmail,
+          ]
+        )
+      } catch (notificationError) {
+        console.error('Error creating group join request notification:', notificationError)
+      }
+    }
+
     response.status(201).json(result.rows[0])
   } catch (error) {
     console.error('Error joining group:', error)
@@ -1208,8 +1591,23 @@ app.put('/api/groups/:id/members/:memberEmail', async (request, response) => {
   const { status, position } = request.body ?? {}
   
   try {
+    const normalizedMemberEmail = String(memberEmail || '').trim().toLowerCase()
+    const currentMemberResult = await pool.query(
+      `SELECT gm."groupId", gm."userEmail", gm.status, gm.position,
+              g."groupTitle", g."ownerEmail"
+       FROM group_members gm
+       JOIN groups g ON g.id = gm."groupId"
+       WHERE gm."groupId" = $1 AND LOWER(gm."userEmail") = $2`,
+      [groupId, normalizedMemberEmail]
+    )
+
+    if (currentMemberResult.rowCount === 0) {
+      return response.status(404).json({ error: 'Member not found' })
+    }
+
+    const currentMember = currentMemberResult.rows[0]
     const fields = []
-    const values = [groupId, memberEmail]
+    const values = [groupId, normalizedMemberEmail]
     let counter = 3
 
     if (status) {
@@ -1230,7 +1628,27 @@ app.put('/api/groups/:id/members/:memberEmail', async (request, response) => {
       RETURNING *
     `
     const result = await pool.query(query, values)
-    if (result.rowCount === 0) return response.status(404).json({ error: 'Member not found' })
+
+    if (status === 'Active' && currentMember.status !== 'Active') {
+      try {
+        await pool.query(
+          `INSERT INTO notifications (type, title, message, "recipientEmail", "linkUrl", "groupId", "memberEmail")
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [
+            'group_join_accepted',
+            'Your join request was accepted',
+            `Your request to join "${currentMember.groupTitle}" was accepted.`,
+            normalizedMemberEmail,
+            `/groups/${groupId}?scroll=members`,
+            groupId,
+            normalizedMemberEmail,
+          ]
+        )
+      } catch (notificationError) {
+        console.error('Error creating group join acceptance notification:', notificationError)
+      }
+    }
+
     response.json(result.rows[0])
   } catch (error) {
     console.error('Error updating member:', error)
@@ -1313,6 +1731,33 @@ app.post('/api/groups/:groupId/projects', upload.single('referenceFile'), async 
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       RETURNING *
     `, [groupId, title, description || '', ownerEmail || null, startDate || new Date().toISOString().split('T')[0], dueDate || null, status || 'Planning', fileUrl])
+    
+    // Create notification for all members
+    try {
+      const groupRes = await pool.query('SELECT "groupTitle" FROM groups WHERE id = $1', [groupId])
+      const groupName = groupRes.rows[0]?.groupTitle || 'a group'
+      const membersRes = await pool.query('SELECT "userEmail" FROM group_members WHERE "groupId" = $1 AND status = $2', [groupId, 'Active'])
+      
+      const normalizedOwnerEmail = String(ownerEmail || '').trim().toLowerCase()
+      for (const member of membersRes.rows) {
+        if (member.userEmail && member.userEmail.toLowerCase() !== normalizedOwnerEmail) {
+          await pool.query(`
+            INSERT INTO notifications (type, title, message, "recipientEmail", "linkUrl", "groupId")
+            VALUES ($1, $2, $3, $4, $5, $6)
+          `, [
+            'project_created', 
+            'New Project Created', 
+            `A new project "${title}" was created in "${groupName}".`, 
+            member.userEmail, 
+            `/groups/${groupId}?scroll=projects`,
+            groupId
+          ])
+        }
+      }
+    } catch (notifErr) {
+      console.error('Error creating notifications:', notifErr)
+    }
+
     response.status(201).json(result.rows[0])
   } catch (error) {
     console.error('Error creating project:', error)
@@ -1388,6 +1833,35 @@ app.put('/api/tasks/:id', async (request, response) => {
     if (assignedToEmail !== undefined) { fields.push(`"assignedToEmail" = $${c++}`); values.push(assignedToEmail) }
     if (status) { fields.push(`status = $${c++}`); values.push(status) }
     if (fields.length === 0) return response.status(400).json({ error: 'No fields to update' })
+
+    if (assignedToEmail !== undefined) {
+      try {
+        const taskRes = await pool.query(
+          `SELECT t.id, t."taskName", t."projectId", p.title AS "projectTitle"
+           FROM project_tasks t
+           JOIN projects p ON p.id = t."projectId"
+           WHERE t.id = $1`,
+          [id]
+        )
+        if (taskRes.rowCount > 0) {
+          const taskInfo = taskRes.rows[0]
+          await pool.query(
+            `INSERT INTO notifications (type, title, message, "recipientEmail", "linkUrl", "projectId")
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+            [
+              'task_assigned',
+              'New task assigned to you',
+              `You were assigned the task "${taskInfo.taskName}" in project "${taskInfo.projectTitle}".`,
+              String(assignedToEmail).trim().toLowerCase(),
+              `/projects/${taskInfo.projectId}`,
+              taskInfo.projectId,
+            ]
+          )
+        }
+      } catch (notifErr) {
+        console.error('Error creating task assignment notification:', notifErr)
+      }
+    }
 
     const result = await pool.query(`UPDATE project_tasks SET ${fields.join(', ')} WHERE id = $1 RETURNING *`, values)
     if (result.rowCount === 0) return response.status(404).json({ error: 'Task not found' })
@@ -1475,17 +1949,66 @@ app.put('/api/submissions/:id/review', async (request, response) => {
 
 /* ─── PROJECT CHAT ENDPOINTS ───────────────────────────────────── */
 
+const normalizeEmail = (value) => String(value || '').trim().toLowerCase()
+
+const fetchProjectChatAccess = async (projectId) => {
+  const result = await pool.query(
+    `SELECT p.id, p."ownerEmail", g."ownerEmail" AS "groupOwnerEmail"
+     FROM projects p
+     LEFT JOIN groups g ON p."groupId" = g.id
+     WHERE p.id = $1`,
+    [projectId]
+  )
+  return result.rows[0] || null
+}
+
+const canControlProjectChat = (project, email) => {
+  const normalizedEmail = normalizeEmail(email)
+  if (!normalizedEmail) return false
+  return [project?.ownerEmail, project?.groupOwnerEmail].some((ownerEmail) => normalizeEmail(ownerEmail) === normalizedEmail)
+}
+
 // GET chat messages for project
 app.get('/api/projects/:projectId/chat', async (request, response) => {
   const projectId = Number(request.params.projectId)
+  const userEmail = normalizeEmail(request.query.userEmail)
   try {
     const result = await pool.query(`
-      SELECT pc.*, u."fullName" AS "senderName", u."profileImage" AS "senderAvatar"
+      SELECT
+        pc.id,
+        pc."projectId",
+        pc."senderEmail",
+        pc.message,
+        pc.created_at,
+        pc."editedAt",
+        pc."editedByEmail",
+        pc."deletedAt",
+        pc."deletedByEmail",
+        pc."deletedForEveryone",
+        u."fullName" AS "senderName",
+        u."profileImage" AS "senderAvatar",
+        COALESCE(
+          json_agg(
+            json_build_object(
+              'emailAddress', ru."emailAddress",
+              'fullName', ru."fullName",
+              'profileImage', ru."profileImage",
+              'readAt', pr."readAt"
+            )
+            ORDER BY pr."readAt" ASC
+          ) FILTER (WHERE pr."userEmail" IS NOT NULL),
+          '[]'::json
+        ) AS "readBy"
       FROM project_chat pc
       LEFT JOIN users u ON pc."senderEmail" = u."emailAddress"
+      LEFT JOIN project_chat_reads pr ON pr."messageId" = pc.id
+      LEFT JOIN users ru ON pr."userEmail" = ru."emailAddress"
+      LEFT JOIN project_chat_hidden ph ON ph."messageId" = pc.id AND LOWER(ph."userEmail") = $2
       WHERE pc."projectId" = $1
+        AND ph."messageId" IS NULL
+      GROUP BY pc.id, u."fullName", u."profileImage"
       ORDER BY pc.created_at ASC
-    `, [projectId])
+    `, [projectId, userEmail])
     response.json(result.rows)
   } catch (error) {
     console.error('Error fetching chat:', error)
@@ -1500,21 +2023,204 @@ app.post('/api/projects/:projectId/chat', async (request, response) => {
   if (!message) return response.status(400).json({ error: 'Message required' })
   try {
     const result = await pool.query(`
-      INSERT INTO project_chat ("projectId", "senderEmail", message)
-      VALUES ($1, $2, $3)
+      INSERT INTO project_chat ("projectId", "senderEmail", message, "deletedForEveryone")
+      VALUES ($1, $2, $3, FALSE)
       RETURNING *
     `, [projectId, senderEmail || null, message])
     // Fetch with sender info
     const full = await pool.query(`
-      SELECT pc.*, u."fullName" AS "senderName", u."profileImage" AS "senderAvatar"
+      SELECT pc.*, u."fullName" AS "senderName", u."profileImage" AS "senderAvatar", '[]'::json AS "readBy"
       FROM project_chat pc
       LEFT JOIN users u ON pc."senderEmail" = u."emailAddress"
       WHERE pc.id = $1
     `, [result.rows[0].id])
+    // Notify all active group members except sender
+    try {
+      const projRes = await pool.query(
+        `SELECT p.id, p.title, p."groupId", g."groupTitle"
+         FROM projects p
+         JOIN groups g ON g.id = p."groupId"
+         WHERE p.id = $1`,
+        [projectId]
+      )
+      if (projRes.rowCount > 0) {
+        const proj = projRes.rows[0]
+        const groupId = proj.groupId
+        const projectTitle = proj.title || proj.groupTitle
+        const membersRes = await pool.query(
+          'SELECT "userEmail" FROM group_members WHERE "groupId" = $1 AND status = $2',
+          [groupId, 'Active']
+        )
+        const normalizedSender = String(senderEmail || '').trim().toLowerCase()
+        for (const member of membersRes.rows) {
+          const memberEmail = String(member.userEmail || '').trim().toLowerCase()
+          if (memberEmail && memberEmail !== normalizedSender) {
+            await pool.query(
+              `INSERT INTO notifications (type, title, message, "recipientEmail", "linkUrl", "projectId", "groupId")
+               VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+              [
+                'chat_message',
+                'New message in project chat',
+                `${senderEmail || 'Someone'} sent a message in "${projectTitle}".`,
+                memberEmail,
+                `/projects/${projectId}?scroll=discussion`,
+                projectId,
+                groupId,
+              ]
+            )
+          }
+        }
+      }
+    } catch (notifErr) {
+      console.error('Error creating chat notification:', notifErr)
+    }
+
     response.status(201).json(full.rows[0])
   } catch (error) {
     console.error('Error sending chat:', error)
     response.status(500).json({ error: 'Failed to send message' })
+  }
+})
+
+// POST mark project chat messages as read
+app.post('/api/projects/:projectId/chat/read', async (request, response) => {
+  const projectId = Number(request.params.projectId)
+  const readerEmail = normalizeEmail(request.body?.readerEmail)
+
+  if (!projectId || !readerEmail) {
+    return response.status(400).json({ error: 'Project and reader email are required' })
+  }
+
+  try {
+    const result = await pool.query(
+      `WITH inserted AS (
+         INSERT INTO project_chat_reads ("messageId", "userEmail")
+         SELECT pc.id, $2
+         FROM project_chat pc
+         WHERE pc."projectId" = $1
+           AND LOWER(COALESCE(pc."senderEmail", '')) <> $2
+           AND COALESCE(pc."deletedForEveryone", FALSE) = FALSE
+         ON CONFLICT ("messageId", "userEmail") DO NOTHING
+         RETURNING "messageId"
+       )
+       SELECT COUNT(*)::int AS updated FROM inserted`,
+      [projectId, readerEmail]
+    )
+
+    response.json({ success: true, updated: result.rows[0]?.updated || 0 })
+  } catch (error) {
+    console.error('Error marking chat read:', error)
+    response.status(500).json({ error: 'Failed to mark chat as read' })
+  }
+})
+
+// PUT edit project chat message
+app.put('/api/projects/:projectId/chat/:messageId', async (request, response) => {
+  const projectId = Number(request.params.projectId)
+  const messageId = Number(request.params.messageId)
+  const { userEmail, message } = request.body ?? {}
+  const normalizedUserEmail = normalizeEmail(userEmail)
+  const trimmedMessage = String(message || '').trim()
+
+  if (!projectId || !messageId || !normalizedUserEmail || !trimmedMessage) {
+    return response.status(400).json({ error: 'Project, message, and user are required' })
+  }
+
+  try {
+    const project = await fetchProjectChatAccess(projectId)
+    if (!project) return response.status(404).json({ error: 'Project not found' })
+
+    const current = await pool.query(
+      `SELECT id, "senderEmail", "deletedForEveryone"
+       FROM project_chat
+       WHERE id = $1 AND "projectId" = $2`,
+      [messageId, projectId]
+    )
+
+    if (current.rowCount === 0) return response.status(404).json({ error: 'Message not found' })
+
+    const messageRow = current.rows[0]
+    const canEdit = normalizeEmail(messageRow.senderEmail) === normalizedUserEmail
+    if (!canEdit) return response.status(403).json({ error: 'You cannot edit this message' })
+    if (messageRow.deletedForEveryone) return response.status(409).json({ error: 'Deleted messages cannot be edited' })
+
+    const updated = await pool.query(
+      `UPDATE project_chat
+       SET message = $1,
+           "editedAt" = NOW(),
+           "editedByEmail" = $2
+       WHERE id = $3 AND "projectId" = $4
+       RETURNING *`,
+      [trimmedMessage, normalizedUserEmail, messageId, projectId]
+    )
+
+    response.json(updated.rows[0])
+  } catch (error) {
+    console.error('Error editing chat message:', error)
+    response.status(500).json({ error: 'Failed to edit message' })
+  }
+})
+
+// DELETE project chat message (for me or everyone)
+app.delete('/api/projects/:projectId/chat/:messageId', async (request, response) => {
+  const projectId = Number(request.params.projectId)
+  const messageId = Number(request.params.messageId)
+  const { userEmail, scope } = request.body ?? {}
+  const normalizedUserEmail = normalizeEmail(userEmail)
+  const normalizedScope = String(scope || 'me').toLowerCase()
+
+  if (!projectId || !messageId || !normalizedUserEmail) {
+    return response.status(400).json({ error: 'Project, message, and user are required' })
+  }
+
+  try {
+    const project = await fetchProjectChatAccess(projectId)
+    if (!project) return response.status(404).json({ error: 'Project not found' })
+
+    const current = await pool.query(
+      `SELECT id, "senderEmail", "deletedForEveryone"
+       FROM project_chat
+       WHERE id = $1 AND "projectId" = $2`,
+      [messageId, projectId]
+    )
+
+    if (current.rowCount === 0) return response.status(404).json({ error: 'Message not found' })
+
+    const messageRow = current.rows[0]
+    const isSender = normalizeEmail(messageRow.senderEmail) === normalizedUserEmail
+    const canDeleteForEveryone = isSender || canControlProjectChat(project, normalizedUserEmail)
+
+    if (normalizedScope === 'everyone') {
+      if (!canDeleteForEveryone) {
+        return response.status(403).json({ error: 'You cannot delete this message for everyone' })
+      }
+
+      const deleted = await pool.query(
+        `UPDATE project_chat
+         SET message = 'This message was deleted.',
+             "deletedAt" = NOW(),
+             "deletedByEmail" = $1,
+             "deletedForEveryone" = TRUE
+         WHERE id = $2 AND "projectId" = $3
+         RETURNING *`,
+        [normalizedUserEmail, messageId, projectId]
+      )
+
+      return response.json(deleted.rows[0])
+    }
+
+    await pool.query(
+      `INSERT INTO project_chat_hidden ("messageId", "userEmail")
+       VALUES ($1, $2)
+       ON CONFLICT ("messageId", "userEmail") DO UPDATE
+         SET "hiddenAt" = NOW()`,
+      [messageId, normalizedUserEmail]
+    )
+
+    response.json({ success: true, scope: 'me' })
+  } catch (error) {
+    console.error('Error deleting chat message:', error)
+    response.status(500).json({ error: 'Failed to delete message' })
   }
 })
 

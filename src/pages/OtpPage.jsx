@@ -3,11 +3,29 @@ import { useNavigate } from 'react-router-dom'
 import * as THREE from 'three'
 import Navbar from '../components/Navbar'
 
+const OTP_FLOW_KEY = 'qsphere_otp_flow'
+const OTP_FLOW_VERIFY_EMAIL = 'verify-email'
+const OTP_FLOW_RESET_PASSWORD = 'reset-password'
+
 const ARR = (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
     <line x1="5" y1="12" x2="19" y2="12" />
     <polyline points="12 5 19 12 12 19" />
   </svg>
+)
+
+const EYE_OPEN = (
+  <>
+    <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z" />
+    <circle cx="12" cy="12" r="3" />
+  </>
+)
+
+const EYE_CLOSED = (
+  <>
+    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+    <line x1="1" y1="1" x2="23" y2="23" />
+  </>
 )
 
 
@@ -21,21 +39,26 @@ const OtpPage = () => {
   const [otp, setOtp] = useState(() => Array(otpLength).fill(''))
   const [busy, setBusy] = useState(false)
   const [cooldown, setCooldown] = useState(0)
-  const [emailToVerify, setEmailToVerify] = useState('')
+  const [emailToVerify] = useState(() => localStorage.getItem('qsphere_email_to_verify') || '')
+  const [otpFlow] = useState(() => localStorage.getItem(OTP_FLOW_KEY) || OTP_FLOW_VERIFY_EMAIL)
   const [errorMessage, setErrorMessage] = useState('')
   const [statusMessage, setStatusMessage] = useState('')
   const [statusType, setStatusType] = useState('info')
+  const [resetPassword, setResetPassword] = useState('')
+  const [confirmResetPassword, setConfirmResetPassword] = useState('')
+  const [showResetPassword, setShowResetPassword] = useState(false)
+  const [passwordErrors, setPasswordErrors] = useState({ password: '', confirm: '' })
 
   useEffect(() => {
-    const email = localStorage.getItem('qsphere_email_to_verify')
-    if (!email) {
-      setStatusMessage('No verification target found. Redirecting to Sign In.')
-      setStatusType('error')
-      navigate('/auth')
-    } else {
-      setEmailToVerify(email)
+    if (!emailToVerify) {
+      navigate('/auth', {
+        state: {
+          authMessage: 'No verification target found. Please start again from Sign In.',
+          authMessageType: 'error',
+        }
+      })
     }
-  }, [navigate])
+  }, [emailToVerify, navigate])
 
   useEffect(() => {
     if (cooldown <= 0) return
@@ -47,10 +70,12 @@ const OtpPage = () => {
 
   const otpHelper = useMemo(
     () => ({
-      title: 'Secure Access Portal',
-      subtitle: 'Enter the verification code sent to your email.'
+      title: otpFlow === OTP_FLOW_RESET_PASSWORD ? 'Password Recovery Node' : 'Secure Access Portal',
+      subtitle: otpFlow === OTP_FLOW_RESET_PASSWORD
+        ? 'Enter the reset code and choose a new password for your account.'
+        : 'Enter the verification code sent to your email.'
     }),
-    []
+    [otpFlow]
   )
 
   const showPageMessage = (message, type = 'info') => {
@@ -298,21 +323,74 @@ const OtpPage = () => {
 
     setBusy(true)
     setErrorMessage('')
+    setPasswordErrors({ password: '', confirm: '' })
     showPageMessage('Verifying code...', 'info')
     try {
-      const response = await fetch('/api/auth/verify-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ emailAddress: emailToVerify, otp: normalized })
-      })
+      let response
+      if (otpFlow === OTP_FLOW_RESET_PASSWORD) {
+        const nextPasswordErrors = {
+          password: resetPassword.trim() ? '' : 'Enter a new password.',
+          confirm: confirmResetPassword.trim() ? '' : 'Confirm your new password.',
+        }
+
+        if (!nextPasswordErrors.password && resetPassword.trim().length < 6) {
+          nextPasswordErrors.password = 'Password must be at least 6 characters.'
+        }
+
+        if (!nextPasswordErrors.password && !nextPasswordErrors.confirm && resetPassword !== confirmResetPassword) {
+          nextPasswordErrors.password = 'Passwords do not match.'
+          nextPasswordErrors.confirm = 'Passwords do not match.'
+        }
+
+        setPasswordErrors(nextPasswordErrors)
+        if (nextPasswordErrors.password || nextPasswordErrors.confirm) {
+          setErrorMessage('Please fix the highlighted password fields.')
+          showPageMessage('Please fix the highlighted password fields.', 'error')
+          setBusy(false)
+          return
+        }
+
+        showPageMessage('Updating your password...', 'info')
+        response = await fetch('/api/auth/reset-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            emailAddress: emailToVerify,
+            otp: normalized,
+            password: resetPassword,
+            confirmPassword: confirmResetPassword,
+          })
+        })
+      } else {
+        response = await fetch('/api/auth/verify-otp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ emailAddress: emailToVerify, otp: normalized })
+        })
+      }
 
       const result = await response.json()
       if (!response.ok) {
         throw new Error(result.error || 'Verification failed')
       }
 
-      showPageMessage('Email verified successfully! Proceeding to Onboarding.', 'success')
-      navigate('/onboarding', { state: { verified: true } })
+      if (otpFlow === OTP_FLOW_RESET_PASSWORD) {
+        localStorage.removeItem('qsphere_email_to_verify')
+        localStorage.removeItem(OTP_FLOW_KEY)
+        showPageMessage('Password updated successfully! Redirecting to Sign In.', 'success')
+        window.dispatchEvent(new CustomEvent('qsphere-snackbar', { detail: { message: 'Password reset successfully.', type: 'success' } }))
+        navigate('/auth', {
+          state: {
+            emailAddress: emailToVerify,
+            authMessage: 'Password reset successfully. Sign in with your new password.',
+            authMessageType: 'success',
+          }
+        })
+      } else {
+        localStorage.setItem(OTP_FLOW_KEY, OTP_FLOW_VERIFY_EMAIL)
+        showPageMessage('Email verified successfully! Proceeding to Onboarding.', 'success')
+        navigate('/onboarding', { state: { verified: true } })
+      }
     } catch (error) {
       const message = error.message || 'OTP verification failed.'
       setErrorMessage(message)
@@ -327,9 +405,11 @@ const OtpPage = () => {
 
     setBusy(true)
     setErrorMessage('')
+    setPasswordErrors({ password: '', confirm: '' })
     showPageMessage('Resending code...', 'info')
     try {
-      const response = await fetch('/api/auth/resend-otp', {
+      const endpoint = otpFlow === OTP_FLOW_RESET_PASSWORD ? '/api/auth/forgot-password' : '/api/auth/resend-otp'
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ emailAddress: emailToVerify })
@@ -340,7 +420,12 @@ const OtpPage = () => {
         throw new Error(result.error || 'Failed to resend code')
       }
 
-      showPageMessage('A new 6-digit verification code has been sent to your email.', 'success')
+      showPageMessage(
+        otpFlow === OTP_FLOW_RESET_PASSWORD
+          ? 'A new password reset code has been sent to your email.'
+          : 'A new 6-digit verification code has been sent to your email.',
+        'success'
+      )
       setCooldown(60)
     } catch (error) {
       const message = error.message || 'Failed to resend OTP.'
@@ -351,7 +436,15 @@ const OtpPage = () => {
     }
   }
 
-  const statusText = 'QSPHERE · Verification Node Active'
+  const isResetFlow = otpFlow === OTP_FLOW_RESET_PASSWORD
+  const statusText = isResetFlow ? 'QSPHERE · Recovery Verification Active' : 'QSPHERE · Verification Node Active'
+  const heading = isResetFlow
+    ? <>Reset your <span>Quantum</span><br />password.</>
+    : <>Verify your <span>Quantum</span><br />access.</>
+  const submitLabel = isResetFlow ? 'Reset Password' : 'Verify'
+  const canSubmit = isResetFlow
+    ? otp.join('').length === otpLength && resetPassword.trim().length >= 6 && confirmResetPassword.trim().length >= 6
+    : otp.join('').length === otpLength
 
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-[#030705] text-white">
@@ -512,40 +605,42 @@ const OtpPage = () => {
           line-height: 1.1;
           color: #fff;
           margin-bottom: 6px;
-          .banner {
-            margin-bottom: 18px;
-            padding: 12px 14px;
-            border-radius: 12px;
-            border: 1px solid rgba(0,229,160,0.14);
-            background: rgba(0,229,160,0.06);
-            color: rgba(220,252,231,0.95);
-            font-size: 13px;
-            line-height: 1.5;
-          }
-
-          .banner.error {
-            border-color: rgba(239,68,68,0.22);
-            background: rgba(127,29,29,0.2);
-            color: rgba(254,202,202,0.98);
-          }
-
-          .banner.success {
-            border-color: rgba(34,197,94,0.24);
-            background: rgba(20,83,45,0.24);
-            color: rgba(220,252,231,0.98);
-          }
-
-          .otp-error {
-            margin-top: 12px;
-            font-size: 12px;
-            color: rgba(248,113,113,0.98);
-            min-height: 16px;
-          }
           text-shadow: 0 0 40px rgba(0,229,160,0.2);
           pointer-events: auto;
         }
 
         .h1 span { color: var(--g); }
+
+        .banner {
+          margin-bottom: 18px;
+          padding: 12px 14px;
+          border-radius: 12px;
+          border: 1px solid rgba(0,229,160,0.14);
+          background: rgba(0,229,160,0.06);
+          color: rgba(220,252,231,0.95);
+          font-size: 13px;
+          line-height: 1.5;
+          pointer-events: auto;
+        }
+
+        .banner.error {
+          border-color: rgba(239,68,68,0.22);
+          background: rgba(127,29,29,0.2);
+          color: rgba(254,202,202,0.98);
+        }
+
+        .banner.success {
+          border-color: rgba(34,197,94,0.24);
+          background: rgba(20,83,45,0.24);
+          color: rgba(220,252,231,0.98);
+        }
+
+        .otp-error {
+          margin-top: 12px;
+          font-size: 12px;
+          color: rgba(248,113,113,0.98);
+          min-height: 16px;
+        }
 
         .sub {
           font-size: 13px;
@@ -572,13 +667,40 @@ const OtpPage = () => {
           font-family: 'DM Sans', sans-serif;
           transition: border-color .25s, box-shadow .25s, background .25s;
           box-shadow: inset 0 1px 0 rgba(0,229,160,0.04), inset 0 0 20px rgba(0,0,0,0.3);
-          }
+        }
 
-          .otp-input.error {
-            border-color: rgba(239,68,68,0.65);
-            background: rgba(127,29,29,0.2);
-            box-shadow: 0 0 0 3px rgba(239,68,68,0.12), inset 0 0 24px rgba(127,29,29,0.14);
-          }
+        .fi.err input {
+          border-color: rgba(239,68,68,0.65);
+          background: rgba(127,29,29,0.18);
+          box-shadow: 0 0 0 3px rgba(239,68,68,0.12), inset 0 0 24px rgba(127,29,29,0.12);
+        }
+
+        .fi.err input:focus {
+          border-color: rgba(248,113,113,0.9);
+          box-shadow: 0 0 0 3px rgba(239,68,68,0.18), inset 0 0 24px rgba(127,29,29,0.16);
+        }
+
+        .otp-input.error {
+          border-color: rgba(239,68,68,0.65);
+          background: rgba(127,29,29,0.2);
+          box-shadow: 0 0 0 3px rgba(239,68,68,0.12), inset 0 0 24px rgba(127,29,29,0.14);
+        }
+
+        .fi-msg {
+          margin-top: 6px;
+          font-size: 11px;
+          color: rgba(248,113,113,0.95);
+          letter-spacing: .01em;
+          min-height: 14px;
+        }
+
+        .field-note {
+          margin-top: 8px;
+          text-align: center;
+          color: rgba(255,255,255,.45);
+          font-size: 12px;
+          line-height: 1.5;
+          pointer-events: auto;
         }
 
         .otp-input {
@@ -769,12 +891,12 @@ const OtpPage = () => {
 
             <div className="section-label"><span className="dot" />{otpHelper.title}</div>
 
-            <div className="h1">Verify your <span>Quantum</span><br />access.</div>
+            <div className="h1">{heading}</div>
             <p className="sub">{otpHelper.subtitle}</p>
 
             {statusMessage ? <div className={`banner ${statusType}`}>{statusMessage}</div> : null}
 
-              <div className="fstack">
+            <div className="fstack">
               <div className="fi">
                 <div
                   style={{
@@ -879,8 +1001,8 @@ const OtpPage = () => {
                   })}
                 </div>
 
-                <div style={{ marginTop: 8, textAlign: 'center', color: 'rgba(255,255,255,.45)', fontSize: 12 }}>
-                  Enter {otpLength}-digit verification code
+                <div className="field-note">
+                  {isResetFlow ? `Enter the ${otpLength}-digit reset code from your inbox.` : `Enter ${otpLength}-digit verification code`}
                 </div>
                 {errorMessage && (
                   <div className="otp-error" style={{ textAlign: 'center' }}>
@@ -889,9 +1011,44 @@ const OtpPage = () => {
                 )}
               </div>
 
-              <button className="btn" type="button" disabled={busy || otp.join('').length !== otpLength} onClick={handleVerify}>
+              {isResetFlow ? (
+                <>
+                  <div className={`fi ${passwordErrors.password ? 'err' : ''}`}>
+                    <input
+                      type={showResetPassword ? 'text' : 'password'}
+                      id="resetPass"
+                      placeholder=" "
+                      autoComplete="new-password"
+                      value={resetPassword}
+                      onChange={(e) => setResetPassword(e.target.value)}
+                    />
+                    <label htmlFor="resetPass">New password</label>
+                    <button className="eye" type="button" onClick={() => setShowResetPassword((value) => !value)}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                        {showResetPassword ? EYE_CLOSED : EYE_OPEN}
+                      </svg>
+                    </button>
+                    <div className="fi-msg">{passwordErrors.password || '\u00A0'}</div>
+                  </div>
+
+                  <div className={`fi ${passwordErrors.confirm ? 'err' : ''}`}>
+                    <input
+                      type={showResetPassword ? 'text' : 'password'}
+                      id="confirmResetPass"
+                      placeholder=" "
+                      autoComplete="new-password"
+                      value={confirmResetPassword}
+                      onChange={(e) => setConfirmResetPassword(e.target.value)}
+                    />
+                    <label htmlFor="confirmResetPass">Confirm password</label>
+                    <div className="fi-msg">{passwordErrors.confirm || '\u00A0'}</div>
+                  </div>
+                </>
+              ) : null}
+
+              <button className="btn" type="button" disabled={busy || !canSubmit} onClick={handleVerify}>
                 <span className="row" style={{ gap: 8 }}>
-                  {busy ? <span className="spin" /> : 'Verify'}
+                  {busy ? <span className="spin" /> : submitLabel}
                   {!busy && ARR}
                 </span>
               </button>
@@ -913,7 +1070,7 @@ const OtpPage = () => {
                 <button
                   className="ghost"
                   type="button"
-                  onClick={() => navigate('/auth')}
+                  onClick={() => navigate('/auth', { state: { emailAddress: emailToVerify } })}
                   style={{ fontWeight: 600 }}
                 >
                   ← Back to Sign In
