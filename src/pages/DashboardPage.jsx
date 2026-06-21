@@ -1,107 +1,271 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { motion, useScroll, useTransform } from 'framer-motion'
 import {
   ArrowRight,
   BookPlus,
-  CheckCircle2,
+  Briefcase,
+  Building2,
+  CalendarPlus,
+  GraduationCap,
   LayoutDashboard,
+  Mail,
+  MapPin,
   PenLine,
-  Settings,
   Sparkles,
+  Telescope,
   UserCog,
   Users2,
 } from 'lucide-react'
-import { onboardingRoles } from '../data/onboarding'
+import { onboardingCommonFields, onboardingRoleFields, onboardingRoles } from '../data/onboarding'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
+import { useTheme } from '../contexts/ThemeContext'
+import { darkTheme, dayTheme } from '../themeColors'
 
 const storageKey = 'qsphere_onboarding_profile'
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: { opacity: 1, transition: { staggerChildren: 0.07, delayChildren: 0.06 } },
+}
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 24 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.55, ease: [0.25, 0.46, 0.45, 0.94] } },
+}
+
+const heroVariants = {
+  hidden: { opacity: 0, y: 30, scale: 0.98 },
+  visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.7, ease: [0.25, 0.46, 0.45, 0.94] } },
+}
+
+const profileKeyMap = {
+  email: 'emailAddress',
+  cellAlt: 'cellAlternative',
+  dob: 'dateOfBirth',
+  graduationDate: 'dateOfGraduation',
+}
 
 const readStoredProfile = () => {
   try {
     const raw = localStorage.getItem(storageKey)
     return raw ? JSON.parse(raw) : null
-  } catch (error) {
+  } catch {
     return null
   }
 }
 
-/* ─── Quick-stat helper ────────────────────────────────────────── */
-const StatCard = ({ icon: Icon, label, value, accent = false }) => (
-  <div className="group relative rounded-2xl border border-white/[0.06] bg-white/[0.025] p-5 transition-all duration-300 hover:border-emerald-400/20 hover:bg-white/[0.04]">
-    <div
-      className="absolute -inset-px rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
-      style={{ boxShadow: 'inset 0 0 24px rgba(16,185,129,0.06)' }}
-    />
-    <div className="relative z-10 flex items-center gap-4">
-      <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-emerald-400/15 bg-emerald-500/10 text-emerald-300">
-        <Icon size={18} />
-      </span>
-      <div>
-        <div className="text-[10px] uppercase tracking-[0.28em] text-white/35">{label}</div>
-        <div className={`mt-1 text-sm font-semibold ${accent ? 'text-emerald-300' : 'text-white'}`}>{value}</div>
-      </div>
-    </div>
-  </div>
+const readProfileValue = (profile, fieldName) => {
+  if (!profile) return ''
+
+  if (fieldName === 'email') {
+    return profile.emailAddress || profile.email || ''
+  }
+
+  return profile[profileKeyMap[fieldName] || fieldName] || ''
+}
+
+const getInitials = (name) => {
+  const words = String(name || '').trim().split(/\s+/).filter(Boolean)
+  if (words.length === 0) return 'QS'
+  return words.slice(0, 2).map((word) => word[0]?.toUpperCase() || '').join('')
+}
+
+const getCompletion = (profile, roleId) => {
+  const roleFields = onboardingRoleFields[roleId] || []
+  const requiredFields = [
+    'fullName',
+    ...onboardingCommonFields.filter((field) => field.required).map((field) => field.name),
+    ...roleFields.filter((field) => field.required).map((field) => field.name),
+  ]
+
+  const total = requiredFields.length
+  const completed = requiredFields.filter((fieldName) => String(readProfileValue(profile, fieldName)).trim()).length
+
+  return {
+    completed,
+    total,
+    percentage: total > 0 ? Math.round((completed / total) * 100) : 100,
+  }
+}
+
+const firstFilled = (...values) => values.find((value) => String(value || '').trim()) || ''
+
+const buildProfileSignal = (profile, roleConfig) => {
+  const base = {
+    baseLabel: 'Base',
+    baseValue: firstFilled(profile.institute, profile.organization, profile.city) || 'Add your base details',
+    trackLabel: 'Focus',
+    trackValue: firstFilled(profile.researchFocus, profile.researchInterest, profile.interests, profile.majors) || 'Define your direction',
+    note: roleConfig.description,
+  }
+
+  if (roleConfig.id === 'student') {
+    return {
+      ...base,
+      baseLabel: 'Institute',
+      baseValue: profile.institute || 'Add your institute',
+      trackLabel: 'Study track',
+      trackValue: [profile.degree, profile.semester].filter(Boolean).join(' - ') || 'Add your degree and semester',
+      note: profile.interests || profile.majors || roleConfig.description,
+    }
+  }
+
+  if (roleConfig.id === 'graduate') {
+    return {
+      ...base,
+      baseLabel: 'Institute',
+      baseValue: profile.institute || 'Add your institute',
+      trackLabel: 'Discipline',
+      trackValue: [profile.degree, profile.discipline].filter(Boolean).join(' - ') || 'Add your degree and discipline',
+      note: profile.interests || roleConfig.description,
+    }
+  }
+
+  if (roleConfig.id === 'industry') {
+    return {
+      ...base,
+      baseLabel: 'Organization',
+      baseValue: profile.organization || 'Add your organization',
+      trackLabel: 'Role',
+      trackValue: [profile.roleTitle, profile.jobDescription].filter(Boolean).join(' - ') || 'Add your professional role',
+      note: profile.degree || roleConfig.description,
+    }
+  }
+
+  if (roleConfig.id === 'faculty') {
+    return {
+      ...base,
+      baseLabel: 'Institute',
+      baseValue: profile.institute || 'Add your institute',
+      trackLabel: 'Academic post',
+      trackValue: [profile.designation, profile.post].filter(Boolean).join(' - ') || 'Add your designation',
+      note: profile.researchInterest || roleConfig.description,
+    }
+  }
+
+  if (roleConfig.id === 'researcher') {
+    return {
+      ...base,
+      baseLabel: 'Institute',
+      baseValue: profile.institute || 'Add your institute',
+      trackLabel: 'Research focus',
+      trackValue: profile.researchFocus || 'Add your research focus',
+      note: profile.interests || roleConfig.description,
+    }
+  }
+
+  return base
+}
+
+const formatDateLabel = (value) => {
+  if (!value) return 'Recently joined'
+
+  const timestamp = new Date(value).getTime()
+  if (Number.isNaN(timestamp)) return 'Recently joined'
+
+  return new Date(timestamp).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+}
+
+const StatCard = ({ label, value, tone, palette, isDayMode }) => (
+  <motion.div
+    variants={itemVariants}
+    className="rounded-[28px] p-5 backdrop-blur-xl"
+    style={{
+      border: `1px solid ${palette.borderPrimary}`,
+      backgroundColor: isDayMode ? 'rgba(255,255,255,0.76)' : 'rgba(0,0,0,0.2)',
+    }}
+  >
+    <div className="text-[10px] font-bold uppercase tracking-[0.24em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.8)' }}>{label}</div>
+    <div className="mt-4 text-4xl font-bold" style={{ fontFamily: "'Syne', sans-serif", color: tone || palette.textPrimary }}>{value}</div>
+  </motion.div>
 )
 
-/* ─── Action card (Add Blog / Add Group / Account) ─────────────── */
-const ActionCard = ({ icon: Icon, title, description, to, onClick, gradient, delay = 0 }) => {
-  const inner = (
+const ActionCard = ({ icon: Icon, title, description, to, onClick, accent, palette, isDayMode }) => {
+  const content = (
     <div
-      className="group relative flex flex-col justify-between rounded-3xl border border-white/[0.08] bg-white/[0.04] p-7 backdrop-blur-xl transition-all duration-500 hover:border-emerald-400/25 hover:bg-white/[0.07] hover:-translate-y-1 cursor-pointer overflow-hidden"
-      style={{ animation: `dashFadeUp 0.7s ease-out ${delay}s both`, minHeight: 220 }}
+      className="group relative flex h-full flex-col overflow-hidden rounded-[32px] p-6 backdrop-blur-xl transition-all duration-500 hover:-translate-y-2 md:p-7"
+      style={{
+        minHeight: 240,
+        border: `1px solid ${palette.borderPrimary}`,
+        background: isDayMode
+          ? 'linear-gradient(145deg, rgba(255,255,255,0.94), rgba(247,247,245,0.88))'
+          : 'linear-gradient(145deg, rgba(255,255,255,0.04), rgba(255,255,255,0.015))',
+        boxShadow: isDayMode ? '0 24px 90px rgba(15,23,42,0.06)' : 'none',
+      }}
     >
-      {/* Background gradient glow */}
-      <div
-          className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none rounded-3xl"
-          style={{
-            background: gradient || 'radial-gradient(circle at 30% 30%, rgba(16,185,129,0.16), transparent 70%)',
-          }}
-      />
-      {/* Hover border glow */}
-      <div
-          className="absolute -inset-px rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
-          style={{ boxShadow: 'inset 0 0 30px rgba(16,185,129,0.1)' }}
-      />
+      <div className="pointer-events-none absolute inset-0 rounded-[32px] opacity-0 transition-opacity duration-700 group-hover:opacity-100" style={{ background: `radial-gradient(ellipse at 50% 0%, ${accent} 0%, transparent 72%)` }} />
+      <div className="absolute inset-x-8 top-0 h-px" style={{ background: `linear-gradient(to right, transparent, ${isDayMode ? 'rgba(46,197,138,0.35)' : 'rgba(110,231,183,0.35)'}, transparent)` }} />
 
-      <div className="relative z-10">
-        <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl border border-emerald-400/20 bg-emerald-500/10 text-emerald-300 shadow-[0_0_20px_rgba(16,185,129,0.15)] group-hover:shadow-[0_0_30px_rgba(16,185,129,0.3)] transition-shadow duration-500">
+      <div className="relative z-10 flex h-full flex-col">
+        <div className="flex h-14 w-14 items-center justify-center rounded-2xl" style={{ border: `1px solid ${palette.accentBorder}`, backgroundColor: palette.accentSoft, color: palette.accentPrimary, boxShadow: isDayMode ? '0 0 20px rgba(46,197,138,0.08)' : '0 0 20px rgba(16,185,129,0.12)' }}>
           <Icon size={24} />
         </div>
-        <h3
-          className="text-xl font-bold text-white group-hover:text-emerald-300 transition-colors duration-300"
-          style={{ fontFamily: "'Inter', sans-serif" }}
-        >
+
+        <div className="mt-6 text-[10px] font-bold uppercase tracking-[0.24em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.78)' }}>Quick action</div>
+        <h3 className="mt-4 text-2xl font-bold leading-tight transition-colors duration-300" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
           {title}
         </h3>
-        <p className="mt-2 text-sm leading-relaxed text-white/45">{description}</p>
-      </div>
+        <p className="mt-4 text-sm leading-7" style={{ color: palette.textSecondary }}>{description}</p>
 
-      <div className="relative z-10 mt-6 flex items-center gap-2 text-sm font-semibold text-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300 translate-y-1 group-hover:translate-y-0">
-        Open
-        <ArrowRight size={14} className="transform group-hover:translate-x-1 transition-transform duration-300" />
+        <div className="mt-auto pt-8">
+          <span className="inline-flex items-center gap-2 text-sm font-semibold transition-all duration-300 group-hover:gap-3" style={{ color: isDayMode ? palette.accentDark : palette.accentLight }}>
+            Open
+            <ArrowRight size={15} />
+          </span>
+        </div>
       </div>
     </div>
   )
 
-  if (to) return <Link to={to} className="block no-underline">{inner}</Link>
-  return <button type="button" onClick={onClick} className="block w-full text-left">{inner}</button>
+  if (to) {
+    return <Link to={to} className="block no-underline">{content}</Link>
+  }
+
+  return <button type="button" onClick={onClick} className="block w-full border-0 bg-transparent p-0 text-left">{content}</button>
 }
 
-/* ═══════════════════════════════════════════════════════════════════
-   DashboardPage
-   ═══════════════════════════════════════════════════════════════════ */
+const RouteCard = ({ icon: Icon, label, description, to, palette, isDayMode }) => (
+  <Link
+    to={to}
+    className="group flex items-center gap-4 rounded-[24px] px-5 py-4 no-underline transition-all duration-300 hover:-translate-y-0.5"
+    style={{
+      border: `1px solid ${palette.borderPrimary}`,
+      backgroundColor: isDayMode ? 'rgba(255,255,255,0.82)' : 'rgba(255,255,255,0.03)',
+      color: palette.textSecondary,
+    }}
+  >
+    <span className="flex h-11 w-11 items-center justify-center rounded-2xl transition-colors" style={{ border: `1px solid ${palette.accentBorder}`, backgroundColor: palette.accentSoft, color: palette.accentPrimary }}>
+      <Icon size={18} />
+    </span>
+    <div className="min-w-0 flex-1">
+      <div className="text-sm font-semibold transition-colors" style={{ color: palette.textPrimary }}>{label}</div>
+      <div className="mt-1 text-xs leading-5" style={{ color: palette.textMuted }}>{description}</div>
+    </div>
+    <ArrowRight size={15} className="transition-all group-hover:translate-x-1" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.7)' }} />
+  </Link>
+)
+
 const DashboardPage = () => {
   const navigate = useNavigate()
   const location = useLocation()
   const [profile, setProfile] = useState(() => location.state?.profile ?? readStoredProfile())
+  const { theme } = useTheme()
+
+  const isDayMode = theme === 'light'
+  const palette = isDayMode ? dayTheme : darkTheme
 
   useEffect(() => {
     if (location.state?.profile) {
       setProfile(location.state.profile)
       return
     }
+
     setProfile(readStoredProfile())
   }, [location.state])
 
@@ -110,214 +274,419 @@ const DashboardPage = () => {
     return onboardingRoles.find((role) => role.id === profile.role) ?? onboardingRoles[0]
   }, [profile])
 
-  /* ── No-profile fallback ────────────────────────────────────── */
+  const completion = useMemo(() => getCompletion(profile, roleConfig.id), [profile, roleConfig.id])
+  const profileSignal = useMemo(() => buildProfileSignal(profile || {}, roleConfig), [profile, roleConfig])
+  const joinedLabel = useMemo(
+    () => formatDateLabel(profile?.created_at || profile?.submittedAt),
+    [profile],
+  )
+
+  const profileEmail = profile?.emailAddress || profile?.email || 'Email not available'
+  const profileAvatar = profile?.profileImage || profile?.avatarPreview || ''
+
+  const { scrollY } = useScroll()
+  const glowY1 = useTransform(scrollY, [0, 500], [0, -60])
+  const glowY2 = useTransform(scrollY, [0, 500], [0, -30])
+
   if (!profile) {
     return (
-      <div className="relative bg-[#08120d]" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+      <div className="relative overflow-hidden" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: palette.bgPrimary }}>
         <Navbar currentPage="dashboard" />
 
-        {/* Background */}
         <div className="fixed inset-0 pointer-events-none" style={{ zIndex: 0 }}>
-          <div className="absolute inset-0 bg-[#08120d]" />
-          <div className="absolute inset-0 opacity-45" style={{ background: 'radial-gradient(circle at 50% 0%, rgba(16,185,129,0.18) 0%, transparent 70%)' }} />
+          <div className="absolute inset-0" style={{ backgroundColor: palette.bgPrimary }} />
+          <div className="absolute inset-0" style={{ opacity: isDayMode ? 0.56 : 0.4, background: isDayMode ? 'radial-gradient(circle at 20% 0%, rgba(46,197,138,0.14) 0%, transparent 42%)' : 'radial-gradient(circle at 20% 0%, rgba(16,185,129,0.18) 0%, transparent 42%)' }} />
+          <div className="absolute inset-0" style={{ opacity: isDayMode ? 0.24 : 0.2, background: isDayMode ? 'radial-gradient(circle at 100% 0%, rgba(255,224,163,0.16) 0%, transparent 36%)' : 'radial-gradient(circle at 100% 0%, rgba(6,182,212,0.12) 0%, transparent 36%)' }} />
         </div>
 
-        <div className="relative z-10 flex flex-1 items-center justify-center px-6 pt-28 pb-20">
-          <div
-            className="w-full max-w-lg rounded-3xl border border-emerald-400/18 bg-white/[0.05] p-10 text-center backdrop-blur-2xl"
-            style={{ animation: 'dashFadeUp 0.7s ease-out both', boxShadow: '0 30px 90px -30px rgba(0,0,0,0.9)' }}
+        <main className="relative z-10 flex flex-1 items-center justify-center px-6 pb-24 pt-32">
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            className="w-full max-w-2xl rounded-[36px] p-8 text-center md:p-10"
+            style={{
+              border: `1px solid ${palette.borderPrimary}`,
+              background: isDayMode
+                ? 'linear-gradient(145deg, rgba(255,255,255,0.96), rgba(247,247,245,0.90))'
+                : 'linear-gradient(145deg, rgba(255,255,255,0.055), rgba(255,255,255,0.015))',
+              boxShadow: isDayMode ? '0 40px 120px rgba(15,23,42,0.08)' : '0 40px 120px rgba(0,0,0,0.45)',
+            }}
           >
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-emerald-400/20 bg-emerald-500/10 text-emerald-200">
-              <LayoutDashboard size={28} />
+            <div className="mx-auto flex h-18 w-18 items-center justify-center rounded-[24px]" style={{ border: `1px solid ${palette.accentBorder}`, backgroundColor: palette.accentSoft, color: palette.accentPrimary, boxShadow: isDayMode ? '0 0 30px rgba(46,197,138,0.08)' : '0 0 30px rgba(16,185,129,0.12)' }}>
+              <LayoutDashboard size={30} />
             </div>
-            <h1 className="mt-6 text-3xl text-white font-black tracking-tight" style={{ fontFamily: "'Archivo Black', 'Inter', sans-serif" }}>
-              Your dashboard is waiting.
+            <div className="mt-6 text-[10px] font-bold uppercase tracking-[0.3em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.78)' }}>Dashboard</div>
+            <h1 className="mt-4 text-4xl font-bold leading-[0.95] md:text-5xl" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
+              Your control room is ready,
+              <br />
+              <span style={{ color: palette.accentPrimary }}>but your profile comes first.</span>
             </h1>
-            <p className="mx-auto mt-4 max-w-sm text-sm leading-6 text-white/50">
-              Complete the onboarding form first so we can build your personalized dashboard.
+            <p className="mx-auto mt-6 max-w-xl text-sm leading-7 md:text-base" style={{ color: palette.textSecondary }}>
+              Complete onboarding so QSphere can shape the dashboard around your role, your work, and the rooms that matter most to you.
             </p>
             <button
               type="button"
               onClick={() => navigate('/onboarding')}
-              className="mt-8 inline-flex items-center gap-3 rounded-xl border border-emerald-500/40 bg-emerald-500/15 px-7 py-3.5 text-sm font-semibold text-emerald-300 shadow-[0_0_25px_rgba(16,185,129,0.3)] hover:bg-emerald-500/25 hover:shadow-[0_0_35px_rgba(16,185,129,0.4)] transition-all duration-300"
+              className="mt-8 inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold transition-all"
+              style={{ border: `1px solid ${palette.accentBorder}`, backgroundColor: palette.accentSoft, color: isDayMode ? palette.accentDark : palette.accentLight }}
             >
               Start onboarding
               <ArrowRight size={16} />
             </button>
-          </div>
-        </div>
+          </motion.div>
+        </main>
 
         <Footer />
-
-        <style>{`
-          @keyframes dashFadeUp {
-            from { opacity: 0; transform: translateY(24px); }
-            to { opacity: 1; transform: translateY(0); }
-          }
-        `}</style>
       </div>
     )
   }
 
-  /* ── Data ────────────────────────────────────────────────────── */
-  const joinedDate = profile.created_at
-    ? new Date(profile.created_at)
-    : profile.submittedAt
-      ? new Date(profile.submittedAt)
-      : null
-  const submittedLabel = joinedDate ? joinedDate.toLocaleDateString() : 'N/A'
-
-  /* ── Render ─────────────────────────────────────────────────── */
   return (
-    <div className="relative bg-[#08120d]" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div className="relative overflow-hidden" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: palette.bgPrimary }}>
       <Navbar currentPage="dashboard" />
 
-      {/* Background */}
       <div className="fixed inset-0 pointer-events-none" style={{ zIndex: 0 }}>
-        <div className="absolute inset-0 bg-[#08120d]" />
+        <div className="absolute inset-0" style={{ backgroundColor: palette.bgPrimary }} />
+        <motion.div className="absolute inset-0" style={{ opacity: isDayMode ? 0.56 : 0.4, background: isDayMode ? 'radial-gradient(circle at 18% 0%, rgba(46,197,138,0.14) 0%, transparent 42%)' : 'radial-gradient(circle at 18% 0%, rgba(16,185,129,0.18) 0%, transparent 42%)', y: glowY1 }} />
+        <motion.div className="absolute inset-0" style={{ opacity: isDayMode ? 0.24 : 0.2, background: isDayMode ? 'radial-gradient(circle at 100% 0%, rgba(255,224,163,0.16) 0%, transparent 36%)' : 'radial-gradient(circle at 100% 0%, rgba(6,182,212,0.12) 0%, transparent 36%)', y: glowY2 }} />
         <div
-          className="absolute inset-0 opacity-45"
-          style={{ background: 'radial-gradient(circle at 50% 0%, rgba(16,185,129,0.18) 0%, transparent 70%)' }}
-        />
-        <div
-          className="absolute inset-0 opacity-24"
-          style={{ background: 'radial-gradient(circle at 100% 100%, rgba(6,182,212,0.16) 0%, transparent 50%)' }}
+          className="absolute inset-0"
+          style={{
+            opacity: isDayMode ? 0.11 : 0.14,
+            backgroundImage: isDayMode
+              ? 'linear-gradient(rgba(10,22,32,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(10,22,32,0.03) 1px, transparent 1px)'
+              : 'linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px)',
+            backgroundSize: '124px 124px',
+            maskImage: 'radial-gradient(circle at 50% 18%, black 24%, transparent 88%)',
+          }}
         />
       </div>
 
-      {/* ───────────────────── Main content ───────────────────── */}
-      <main className="relative z-10 flex-grow px-6 md:px-10 lg:px-14 pt-32 pb-24">
-        <div className="mx-auto w-full max-w-7xl">
+      <main className="relative z-10 w-full flex-grow pt-32 pb-24">
+        <div className="px-6 md:px-12 lg:px-20 xl:px-28">
+          <motion.section
+            variants={heroVariants}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: '-80px' }}
+            className="relative overflow-hidden rounded-[38px] p-7 md:p-10 xl:p-12"
+            style={{
+              border: `1px solid ${palette.borderPrimary}`,
+              background: isDayMode
+                ? 'linear-gradient(145deg, rgba(255,255,255,0.96), rgba(247,247,245,0.90))'
+                : 'linear-gradient(145deg, rgba(255,255,255,0.055), rgba(255,255,255,0.015))',
+              boxShadow: isDayMode ? '0 40px 120px rgba(15,23,42,0.08)' : '0 40px 120px rgba(0,0,0,0.45)',
+            }}
+          >
+            <div className="absolute inset-x-0 top-0 h-px" style={{ background: `linear-gradient(to right, transparent, ${isDayMode ? 'rgba(46,197,138,0.5)' : 'rgba(110,231,183,0.5)'}, transparent)` }} />
+            <div className="absolute -left-12 top-0 h-72 w-72 rounded-full blur-3xl" style={{ backgroundColor: isDayMode ? 'rgba(46,197,138,0.10)' : 'rgba(16,185,129,0.10)' }} />
+            <div className="absolute -right-12 top-10 h-72 w-72 rounded-full blur-3xl" style={{ backgroundColor: isDayMode ? 'rgba(255,224,163,0.18)' : 'rgba(6,182,212,0.10)' }} />
 
-          {/* ── Welcome header ──────────────────────────────────── */}
-          <div className="mb-10" style={{ animation: 'dashFadeUp 0.6s ease-out both' }}>
-            <div className="flex items-center gap-3 mb-4">
-              <span className="h-2 w-2 rounded-full bg-emerald-400" style={{ boxShadow: '0 0 10px rgba(16,185,129,0.9)' }} />
-              <span className="text-emerald-400 text-[10px] tracking-[0.3em] font-semibold uppercase">Dashboard</span>
-            </div>
+            <div className="relative z-10 grid gap-10 xl:grid-cols-[1.08fr_0.92fr] xl:items-start">
+              <div>
+                <div className="mb-6 flex flex-wrap items-center gap-3">
+                  <span className="inline-flex items-center gap-3 rounded-full px-4 py-2 text-[10px] font-bold uppercase tracking-[0.34em]" style={{ border: `1px solid ${palette.accentBorder}`, backgroundColor: palette.accentSoft, color: palette.accentDark }}>
+                    <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: palette.accentPrimary, boxShadow: isDayMode ? '0 0 18px rgba(46,197,138,0.45)' : '0 0 18px rgba(16,185,129,0.8)' }} />
+                    Personal Dashboard
+                  </span>
+                  <span className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.24em]" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: isDayMode ? 'rgba(255,255,255,0.78)' : 'rgba(255,255,255,0.03)', color: palette.textMuted }}>
+                    <Sparkles size={14} style={{ color: palette.accentPrimary }} />
+                    Command surface
+                  </span>
+                </div>
 
-            <div>
-              <h1
-                className="text-white font-black text-4xl md:text-5xl lg:text-6xl tracking-tight"
-                style={{ fontFamily: "'Archivo Black', 'Inter', sans-serif" }}
+                <h1
+                  className="max-w-5xl text-5xl font-bold leading-[0.9] md:text-6xl xl:text-[5.2rem]"
+                  style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary, textShadow: isDayMode ? '0 12px 36px rgba(255,255,255,0.55)' : '0 0 40px rgba(16,185,129,0.08)' }}
+                >
+                  Your quantum control room,
+                  <br />
+                  <span style={{ color: palette.accentPrimary }}>shaped around your role.</span>
+                </h1>
+
+                <p className="mt-7 max-w-3xl text-base leading-8 md:text-lg xl:text-[1.12rem]" style={{ color: palette.textSecondary }}>
+                  Move quickly between publishing, collaboration, opportunities, and account controls without the dashboard feeling noisy or overloaded.
+                </p>
+
+                <div className="mt-8 flex flex-wrap gap-4">
+                  <button
+                    type="button"
+                    onClick={() => navigate('/account', { state: { profile } })}
+                    className="inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold transition-all"
+                    style={{ border: `1px solid ${palette.accentBorder}`, backgroundColor: palette.accentSoft, color: isDayMode ? palette.accentDark : palette.accentLight }}
+                  >
+                    Manage account
+                    <ArrowRight size={16} />
+                  </button>
+                  <a
+                    href="#dashboard-actions"
+                    className="inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold no-underline transition-all"
+                    style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.btnSecondaryBg, color: palette.btnSecondaryText }}
+                  >
+                    Open actions
+                    <ArrowRight size={16} />
+                  </a>
+                </div>
+
+                <motion.div variants={containerVariants} initial="hidden" whileInView="visible" viewport={{ once: true }} className="mt-10 grid gap-4 md:grid-cols-3">
+                  <StatCard label="Role track" value={roleConfig.label} tone={isDayMode ? palette.accentDark : palette.accentLight} palette={palette} isDayMode={isDayMode} />
+                  <StatCard label="Profile completion" value={`${completion.percentage}%`} palette={palette} isDayMode={isDayMode} />
+                  <StatCard label="Member since" value={joinedLabel} palette={palette} isDayMode={isDayMode} />
+                </motion.div>
+              </div>
+
+              <div
+                className="relative overflow-hidden rounded-[34px] p-6 md:p-7"
+                style={{
+                  border: `1px solid ${palette.borderPrimary}`,
+                  background: isDayMode
+                    ? 'linear-gradient(180deg, rgba(255,255,255,0.96), rgba(247,247,245,0.90))'
+                    : 'linear-gradient(180deg, rgba(5,10,8,0.92), rgba(4,8,7,0.74))',
+                  boxShadow: isDayMode ? '0 24px 90px rgba(15,23,42,0.08)' : '0 24px 90px rgba(0,0,0,0.42)',
+                }}
               >
-                Welcome back,{' '}
-                <span className="text-emerald-400" style={{ textShadow: '0 0 40px rgba(16,185,129,0.25)' }}>
-                  {profile.fullName || 'Explorer'}
-                </span>
-              </h1>
-              <p className="mt-3 text-white/50 text-sm md:text-base max-w-2xl leading-relaxed">
-                Manage your content, groups, and account settings from your personalized command center.
+                <div className="absolute inset-x-8 top-0 h-px" style={{ background: `linear-gradient(to right, transparent, ${isDayMode ? 'rgba(46,197,138,0.4)' : 'rgba(110,231,183,0.4)'}, transparent)` }} />
+                <div className="absolute right-0 top-0 h-48 w-48 rounded-full blur-3xl" style={{ backgroundColor: isDayMode ? 'rgba(46,197,138,0.10)' : 'rgba(16,185,129,0.10)' }} />
+
+                <div className="relative z-10">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <div className="text-[10px] font-bold uppercase tracking-[0.28em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.8)' }}>Profile signal</div>
+                      <h2 className="mt-4 text-3xl font-bold leading-tight md:text-[2.1rem]" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
+                        {profile.fullName || 'Explorer'}
+                      </h2>
+                    </div>
+                    <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full text-lg font-bold shadow-[0_0_18px_rgba(16,185,129,0.18)]" style={{ border: `1px solid ${palette.accentBorder}`, backgroundColor: isDayMode ? 'rgba(255,255,255,0.86)' : 'rgba(0,0,0,0.3)', color: palette.textPrimary }}>
+                      {profileAvatar ? (
+                        <img src={profileAvatar} alt={profile.fullName || 'Profile avatar'} className="h-full w-full object-cover" />
+                      ) : (
+                        getInitials(profile.fullName)
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mt-6 flex flex-wrap gap-3">
+                    <span className="inline-flex items-center rounded-full px-3.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em]" style={{ border: `1px solid ${palette.accentBorder}`, backgroundColor: palette.accentSoft, color: isDayMode ? palette.accentDark : palette.accentLight }}>
+                      {roleConfig.eyebrow}
+                    </span>
+                    {profile.city && (
+                      <span className="inline-flex items-center gap-2 rounded-full px-3.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: isDayMode ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.04)', color: palette.textMuted }}>
+                        <MapPin size={12} style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.8)' }} />
+                        {profile.city}
+                      </span>
+                    )}
+                  </div>
+
+                  <p className="mt-6 text-base leading-8" style={{ color: palette.textSecondary }}>{profileSignal.note}</p>
+
+                  <div className="mt-7 grid gap-3">
+                    <div className="flex items-center gap-3 rounded-2xl px-4 py-3" style={{ border: `1px solid ${palette.borderSoft}`, backgroundColor: isDayMode ? 'rgba(255,255,255,0.82)' : 'rgba(0,0,0,0.2)' }}>
+                      <Building2 size={15} style={{ color: palette.accentPrimary }} />
+                      <span className="text-sm font-medium" style={{ color: palette.textSecondary }}>{profileSignal.baseLabel}: {profileSignal.baseValue}</span>
+                    </div>
+                    <div className="flex items-center gap-3 rounded-2xl px-4 py-3" style={{ border: `1px solid ${palette.borderSoft}`, backgroundColor: isDayMode ? 'rgba(255,255,255,0.82)' : 'rgba(0,0,0,0.2)' }}>
+                      <Telescope size={15} style={{ color: palette.accentPrimary }} />
+                      <span className="text-sm font-medium" style={{ color: palette.textSecondary }}>{profileSignal.trackLabel}: {profileSignal.trackValue}</span>
+                    </div>
+                    <div className="flex items-center gap-3 rounded-2xl px-4 py-3" style={{ border: `1px solid ${palette.borderSoft}`, backgroundColor: isDayMode ? 'rgba(255,255,255,0.82)' : 'rgba(0,0,0,0.2)' }}>
+                      <Mail size={15} style={{ color: palette.accentPrimary }} />
+                      <span className="truncate text-sm font-medium" style={{ color: palette.textSecondary }}>{profileEmail}</span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => navigate('/account', { state: { profile } })}
+                    className="mt-7 inline-flex items-center gap-2 text-sm font-semibold transition-all hover:gap-3"
+                    style={{ color: isDayMode ? palette.accentDark : palette.accentLight }}
+                  >
+                    Refine profile
+                    <ArrowRight size={16} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </motion.section>
+
+          <motion.section
+            variants={containerVariants}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: '-60px' }}
+            className="mt-8 grid gap-4 lg:grid-cols-[0.95fr_2.05fr]"
+          >
+            <div className="rounded-[30px] p-6 backdrop-blur-xl" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: isDayMode ? 'rgba(255,255,255,0.82)' : 'rgba(255,255,255,0.03)' }}>
+              <div className="text-[10px] font-bold uppercase tracking-[0.28em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.8)' }}>Dashboard note</div>
+              <h2 className="mt-4 text-2xl font-bold" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
+                Built to stay focused.
+              </h2>
+              <p className="mt-4 text-sm leading-7" style={{ color: palette.textSecondary }}>
+                This dashboard keeps only the actions and profile signals that actually help you move faster inside QSphere.
               </p>
             </div>
-          </div>
-
-          {/* ── Quick stats ──────────────────────────────────────── */}
-          <div
-            className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10"
-            style={{ animation: 'dashFadeUp 0.6s ease-out 0.15s both' }}
-          >
-            <StatCard icon={Sparkles} label="Role" value={roleConfig.label} accent />
-            <StatCard icon={PenLine} label="Joined" value={submittedLabel} />
-            <StatCard icon={Users2} label="Community" value="Member" accent />
-          </div>
-
-          {/* ── Action cards ─────────────────────────────────────── */}
-          <div className="mb-6" style={{ animation: 'dashFadeUp 0.6s ease-out 0.25s both' }}>
-            <h2
-              className="text-white text-2xl font-bold tracking-tight mb-1"
-              style={{ fontFamily: "'Inter', sans-serif" }}
-            >
-              Quick Actions
-            </h2>
-            <p className="text-white/40 text-sm mb-8">Create content, manage groups, or update your account.</p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-16">
-            <ActionCard
-              icon={BookPlus}
-              title="Add Blog"
-              description="Write and publish a new blog post to share your quantum insights, research findings, or tutorials with the community."
-              to="/blogs/new"
-              gradient="radial-gradient(circle at 20% 20%, rgba(16,185,129,0.14), transparent 65%)"
-              delay={0.3}
-            />
-            <ActionCard
-              icon={Users2}
-              title="Add Group"
-              description="Create a new research group or collaborative workspace. Invite members and start building something extraordinary together."
-              to="/groups/new"
-              gradient="radial-gradient(circle at 80% 20%, rgba(6,182,212,0.12), transparent 65%)"
-              delay={0.4}
-            />
-            <ActionCard
-              icon={UserCog}
-              title="Account Management"
-              description="Update your personal details, change your password, manage notification preferences, and configure your profile settings."
-              onClick={() => navigate('/account', { state: { profile } })}
-              gradient="radial-gradient(circle at 50% 80%, rgba(168,85,247,0.10), transparent 65%)"
-              delay={0.5}
-            />
-          </div>
-
-          {/* ── Explore section ──────────────────────────────────── */}
-          <div
-            className="rounded-3xl border border-white/[0.08] bg-white/[0.04] backdrop-blur-xl p-8 md:p-10 shadow-[0_24px_90px_-50px_rgba(0,0,0,0.75)]"
-            style={{ animation: 'dashFadeUp 0.7s ease-out 0.55s both' }}
-          >
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 mb-8">
-              <div>
-                <h2
-                  className="text-white text-2xl font-bold tracking-tight"
-                  style={{ fontFamily: "'Inter', sans-serif" }}
-                >
-                  Explore the Community
-                </h2>
-                <p className="mt-1 text-white/40 text-sm">Discover blogs, join groups, or dive into quantum discussions.</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="text-[10px] tracking-[0.2em] text-emerald-300/70 uppercase font-medium">Live community</span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <motion.div variants={containerVariants} initial="hidden" whileInView="visible" viewport={{ once: true }} className="grid gap-4 sm:grid-cols-3">
               {[
-                { label: 'Browse Blogs', desc: 'Read the latest articles', to: '/blogs', icon: BookPlus },
-                { label: 'Join Groups', desc: 'Collaborate with researchers', to: '/groups', icon: Users2 },
-                { label: 'About QSphere', desc: 'Learn about our mission', to: '/about', icon: Sparkles },
-                { label: 'Contact Us', desc: 'Get in touch with the team', to: '/contact', icon: Settings },
-              ].map((item, i) => (
-                <Link
-                  key={item.to}
-                  to={item.to}
-                  className="group flex items-center gap-4 rounded-2xl border border-white/[0.08] bg-white/[0.04] px-5 py-4 text-white/85 no-underline transition-all duration-300 hover:border-emerald-400/25 hover:bg-emerald-500/[0.08] hover:-translate-y-0.5"
-                  style={{ animation: `dashFadeUp 0.5s ease-out ${0.6 + i * 0.08}s both` }}
-                >
-                  <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-300 group-hover:bg-emerald-500/20 transition-colors">
-                    <item.icon size={16} />
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold text-white group-hover:text-emerald-300 transition-colors">{item.label}</div>
-                    <div className="text-xs text-white/35">{item.desc}</div>
-                  </div>
-                  <ArrowRight size={14} className="text-emerald-400/50 group-hover:text-emerald-400 transform group-hover:translate-x-1 transition-all shrink-0" />
-                </Link>
+                { label: 'Sharper entry', text: 'The hero makes your role, progress, and profile context visible at a glance.' },
+                { label: 'Cleaner actions', text: 'Creation paths and account controls are surfaced without crowding the page.' },
+                { label: 'Less filler', text: 'Only the sections that help you create, navigate, or refine your profile remain.' },
+              ].map((item) => (
+                <motion.div key={item.label} variants={itemVariants} className="rounded-[30px] p-6 backdrop-blur-xl" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: isDayMode ? 'rgba(255,255,255,0.82)' : 'rgba(255,255,255,0.03)' }}>
+                  <div className="text-[10px] font-bold uppercase tracking-[0.24em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.8)' }}>{item.label}</div>
+                  <p className="mt-4 text-sm leading-7" style={{ color: palette.textSecondary }}>{item.text}</p>
+                </motion.div>
               ))}
-            </div>
-          </div>
+            </motion.div>
+          </motion.section>
 
+          <motion.section
+            variants={containerVariants}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: '-60px' }}
+            id="dashboard-actions"
+            className="mt-10"
+          >
+            <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-[0.32em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.78)' }}>Command deck</div>
+                <h2 className="mt-4 text-3xl font-bold md:text-4xl" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
+                  Go straight to the work that matters.
+                </h2>
+              </div>
+              <p className="max-w-xl text-sm leading-7" style={{ color: palette.textSecondary }}>
+                Publish, organize, recruit, or refine your account from one surface without bouncing through the entire site.
+              </p>
+            </div>
+
+            <motion.div variants={containerVariants} initial="hidden" whileInView="visible" viewport={{ once: true }} className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+              {[
+                {
+                  icon: PenLine,
+                  title: 'Write a blog',
+                  description: 'Publish ideas, research notes, and technical insight with the same editorial surface used across the journal.',
+                  to: '/blogs/new',
+                  accent: isDayMode ? 'rgba(46,197,138,0.10)' : 'rgba(16,185,129,0.14)',
+                },
+                {
+                  icon: Users2,
+                  title: 'Create a group',
+                  description: 'Open a focused collaboration room for research, members, and delivery around a shared objective.',
+                  to: '/groups/new',
+                  accent: isDayMode ? 'rgba(6,182,212,0.08)' : 'rgba(6,182,212,0.12)',
+                },
+                {
+                  icon: CalendarPlus,
+                  title: 'Launch an event',
+                  description: 'Schedule a workshop, seminar, meetup, or signal-rich session for the broader community.',
+                  to: '/events/new',
+                  accent: isDayMode ? 'rgba(251,191,36,0.10)' : 'rgba(251,191,36,0.12)',
+                },
+                {
+                  icon: Briefcase,
+                  title: 'Post an opening',
+                  description: 'Share internships, research roles, and collaboration opportunities with stronger context upfront.',
+                  to: '/positions/new',
+                  accent: isDayMode ? 'rgba(99,102,241,0.10)' : 'rgba(99,102,241,0.12)',
+                },
+                {
+                  icon: UserCog,
+                  title: 'Manage account',
+                  description: 'Update identity, role details, and profile completeness without leaving the premium account surface.',
+                  onClick: () => navigate('/account', { state: { profile } }),
+                  accent: isDayMode ? 'rgba(46,197,138,0.10)' : 'rgba(16,185,129,0.12)',
+                },
+              ].map((item) => (
+                <motion.div key={item.title} variants={itemVariants}>
+                  <ActionCard {...item} palette={palette} isDayMode={isDayMode} />
+                </motion.div>
+              ))}
+            </motion.div>
+          </motion.section>
+
+          <motion.section
+            variants={containerVariants}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: '-60px' }}
+            className="mt-10 grid gap-6 xl:grid-cols-[1.05fr_0.95fr]"
+          >
+            <motion.div variants={itemVariants} className="rounded-[34px] p-7 md:p-8" style={{ border: `1px solid ${palette.borderPrimary}`, background: isDayMode ? 'linear-gradient(145deg, rgba(255,255,255,0.96), rgba(247,247,245,0.90))' : 'linear-gradient(145deg, rgba(255,255,255,0.05), rgba(255,255,255,0.015))', boxShadow: isDayMode ? '0 28px 100px rgba(15,23,42,0.08)' : '0 28px 100px rgba(0,0,0,0.42)' }}>
+              <div className="text-[10px] font-bold uppercase tracking-[0.3em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.78)' }}>Profile readiness</div>
+              <h2 className="mt-4 text-3xl font-bold" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
+                Keep your signal sharp.
+              </h2>
+              <p className="mt-5 max-w-2xl text-sm leading-7" style={{ color: palette.textSecondary }}>
+                Your profile becomes more useful when your role details, institution or organization, and focus areas stay current.
+              </p>
+
+              <div className="mt-8 grid gap-4 md:grid-cols-3">
+                {[
+                  {
+                    icon: Sparkles,
+                    label: 'Completion',
+                    value: `${completion.completed}/${completion.total} fields`,
+                  },
+                  {
+                    icon: GraduationCap,
+                    label: profileSignal.baseLabel,
+                    value: profileSignal.baseValue,
+                  },
+                  {
+                    icon: Telescope,
+                    label: profileSignal.trackLabel,
+                    value: profileSignal.trackValue,
+                  },
+                ].map((item) => (
+                  <div key={item.label} className="rounded-[24px] p-4" style={{ border: `1px solid ${palette.borderSoft}`, backgroundColor: isDayMode ? 'rgba(255,255,255,0.82)' : 'rgba(0,0,0,0.2)' }}>
+                    <div className="flex items-center gap-3">
+                      <span className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ border: `1px solid ${palette.accentBorder}`, backgroundColor: palette.accentSoft, color: palette.accentPrimary }}>
+                        <item.icon size={16} />
+                      </span>
+                      <div className="text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.72)' }}>{item.label}</div>
+                    </div>
+                    <div className="mt-4 text-sm font-semibold leading-6" style={{ color: palette.textSecondary }}>{item.value}</div>
+                  </div>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => navigate('/account', { state: { profile } })}
+                className="mt-8 inline-flex items-center gap-2 rounded-full px-5 py-3 text-sm font-semibold transition-all"
+                style={{ border: `1px solid ${palette.accentBorder}`, backgroundColor: palette.accentSoft, color: isDayMode ? palette.accentDark : palette.accentLight }}
+              >
+                Open account settings
+                <ArrowRight size={15} />
+              </button>
+            </motion.div>
+
+            <motion.div variants={itemVariants} className="rounded-[34px] p-7 backdrop-blur-xl md:p-8" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: isDayMode ? 'rgba(255,255,255,0.88)' : 'rgba(255,255,255,0.03)' }}>
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <div className="text-[10px] font-bold uppercase tracking-[0.3em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.78)' }}>Workspace routes</div>
+                  <h2 className="mt-4 text-3xl font-bold" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
+                    Step into the right room.
+                  </h2>
+                </div>
+                <span className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-[10px] font-bold uppercase tracking-[0.2em]" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: isDayMode ? 'rgba(247,247,245,0.90)' : 'rgba(0,0,0,0.2)', color: palette.textMuted }}>
+                  <LayoutDashboard size={13} style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.8)' }} />
+                  Live routes
+                </span>
+              </div>
+
+              <div className="mt-7 grid gap-4">
+                <RouteCard icon={BookPlus} label="Browse blogs" description="Read the latest journal entries and community writing." to="/blogs" palette={palette} isDayMode={isDayMode} />
+                <RouteCard icon={Users2} label="Explore groups" description="Find collaboration spaces and research communities." to="/groups" palette={palette} isDayMode={isDayMode} />
+                <RouteCard icon={CalendarPlus} label="See events" description="Jump into workshops, sessions, and live community gatherings." to="/events" palette={palette} isDayMode={isDayMode} />
+                <RouteCard icon={Briefcase} label="View positions" description="Review open roles, internships, and collaboration calls." to="/positions" palette={palette} isDayMode={isDayMode} />
+              </div>
+            </motion.div>
+          </motion.section>
         </div>
       </main>
 
       <Footer />
-
-      <style>{`
-        @keyframes dashFadeUp {
-          from { opacity: 0; transform: translateY(24px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-      `}</style>
     </div>
   )
 }

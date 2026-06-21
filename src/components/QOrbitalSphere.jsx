@@ -1,19 +1,20 @@
 import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
+import { useTheme } from '../contexts/ThemeContext'
 
 // Cyclic gradient: emerald -> teal -> cyan -> sky blue -> back to emerald
 // (matches the green/teal "quantum" branding used across the site)
-const GRADIENT_STOPS = ['#10b981', '#14b8a6', '#22d3ee', '#38bdf8', '#10b981'].map(
-  (hex) => new THREE.Color(hex),
-)
+const DARK_STOPS = ['#10b981', '#14b8a6', '#22d3ee', '#38bdf8', '#10b981'].map((hex) => new THREE.Color(hex))
+const DAY_STOPS = ['#10b981', '#14b8a6', '#22d3ee', '#38bdf8', '#10b981'].map((hex) => new THREE.Color(hex))
 
-const sampleGradient = (t) => {
+const sampleGradient = (t, isDayMode) => {
+  const stops = isDayMode ? DAY_STOPS : DARK_STOPS
   const wrapped = ((t % 1) + 1) % 1
-  const segments = GRADIENT_STOPS.length - 1
+  const segments = stops.length - 1
   const scaled = wrapped * segments
   const index = Math.min(Math.floor(scaled), segments - 1)
   const frac = scaled - index
-  return GRADIENT_STOPS[index].clone().lerp(GRADIENT_STOPS[index + 1], frac)
+  return stops[index].clone().lerp(stops[index + 1], frac)
 }
 
 const smoothstep = (t) => {
@@ -27,7 +28,7 @@ const smoothstep = (t) => {
 // fixed "stream" rings, so nothing reads as a static line. The whole shell
 // rotates as one body, which is what makes the particles look like they're
 // orbiting the label.
-const buildShell = (count, radius, jitter) => {
+const buildShell = (count, radius, jitter, isDayMode) => {
   const home = new Float32Array(count * 3)
   const scatterIn = new Float32Array(count * 3)
   const scatterOut = new Float32Array(count * 3)
@@ -64,7 +65,7 @@ const buildShell = (count, radius, jitter) => {
 
     const angle = Math.atan2(y, x)
     const t = (angle + Math.PI) / (Math.PI * 2)
-    const color = sampleGradient(t)
+    const color = sampleGradient(t, isDayMode)
     colors[i * 3] = color.r
     colors[i * 3 + 1] = color.g
     colors[i * 3 + 2] = color.b
@@ -76,7 +77,7 @@ const buildShell = (count, radius, jitter) => {
 }
 
 // Sparse dust scattered through a larger volume around the sphere.
-const buildAmbient = (count, minRadius, maxRadius) => {
+const buildAmbient = (count, minRadius, maxRadius, isDayMode) => {
   const home = new Float32Array(count * 3)
   const scatterIn = new Float32Array(count * 3)
   const scatterOut = new Float32Array(count * 3)
@@ -104,7 +105,10 @@ const buildAmbient = (count, minRadius, maxRadius) => {
     scatterOut[i * 3 + 1] = (Math.random() - 0.5) * 120
     scatterOut[i * 3 + 2] = (Math.random() - 0.5) * 60
 
-    const color = sampleGradient(Math.random()).lerp(new THREE.Color('#ffffff'), 0.55)
+    const color = sampleGradient(Math.random(), isDayMode)
+    if (!isDayMode) {
+      color.lerp(new THREE.Color('#ffffff'), 0.55)
+    }
     colors[i * 3] = color.r
     colors[i * 3 + 1] = color.g
     colors[i * 3 + 2] = color.b
@@ -115,16 +119,17 @@ const buildAmbient = (count, minRadius, maxRadius) => {
   return { home, scatterIn, scatterOut, colors, scales }
 }
 
-const createParticleMaterial = (sizeMultiplier, opacityMultiplier) =>
+const createParticleMaterial = (sizeMultiplier, opacityMultiplier, isDayMode) =>
   new THREE.ShaderMaterial({
     transparent: true,
     depthWrite: false,
-    blending: THREE.AdditiveBlending,
+    blending: isDayMode ? THREE.NormalBlending : THREE.AdditiveBlending,
     uniforms: {
       uTime: { value: 0 },
       uSize: { value: sizeMultiplier },
       uOpacity: { value: opacityMultiplier },
       uWobble: { value: 1.0 },
+      uDayMode: { value: isDayMode ? 1.0 : 0.0 },
     },
     vertexShader: `
       attribute float aScale;
@@ -132,6 +137,7 @@ const createParticleMaterial = (sizeMultiplier, opacityMultiplier) =>
       uniform float uTime;
       uniform float uSize;
       uniform float uWobble;
+      uniform float uDayMode;
       varying vec3 vColor;
       varying float vAlpha;
 
@@ -142,7 +148,8 @@ const createParticleMaterial = (sizeMultiplier, opacityMultiplier) =>
 
         vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
         gl_Position = projectionMatrix * mvPosition;
-        gl_PointSize = (uSize * aScale * 60.0) / -mvPosition.z;
+        float sizeMult = 1.0;
+        gl_PointSize = (uSize * aScale * 60.0 * sizeMult) / -mvPosition.z;
 
         vColor = aColor;
         vAlpha = 0.55 + aScale * 0.35;
@@ -150,6 +157,7 @@ const createParticleMaterial = (sizeMultiplier, opacityMultiplier) =>
     `,
     fragmentShader: `
       uniform float uOpacity;
+      uniform float uDayMode;
       varying vec3 vColor;
       varying float vAlpha;
 
@@ -180,6 +188,8 @@ const lerp3 = (out, a, b, t, offset) => {
 export const QOrbitalSphere = ({ className = '' }) => {
   const hostRef = useRef(null)
   const canvasRef = useRef(null)
+  const { theme } = useTheme()
+  const isDayMode = theme === 'light'
 
   useEffect(() => {
     const host = hostRef.current
@@ -204,11 +214,11 @@ export const QOrbitalSphere = ({ className = '' }) => {
     scene.add(root)
 
     // --- Particle layers -------------------------------------------------
-    const shellData = buildShell(3600, 1.7, 0.14)
-    const ambientData = buildAmbient(900, 3.9, 2.2)
+    const shellData = buildShell(3600, 1.7, 0.14, isDayMode)
+    const ambientData = buildAmbient(900, 3.9, 2.2, isDayMode)
 
-    const shellMaterial = createParticleMaterial(1.3, 1.0)
-    const ambientMaterial = createParticleMaterial(0.8, 0.7)
+    const shellMaterial = createParticleMaterial(1.8, 1.0, isDayMode) // increased size for day mode visibility
+    const ambientMaterial = createParticleMaterial(1.2, 0.9, isDayMode)
 
     const shell = buildPointCloud(shellData, shellMaterial)
     const ambient = buildPointCloud(ambientData, ambientMaterial)
@@ -430,7 +440,7 @@ export const QOrbitalSphere = ({ className = '' }) => {
 
       renderer.dispose()
     }
-  }, [])
+  }, [isDayMode])
 
   return (
     <div ref={hostRef} className={`relative ${className}`}>

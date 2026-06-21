@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { motion, useScroll, useTransform } from 'framer-motion'
 import {
   ArrowLeft,
   Settings,
@@ -34,6 +35,16 @@ import {
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import GhostInput from '../components/GhostInput'
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: { opacity: 1, transition: { staggerChildren: 0.06, delayChildren: 0.04 } },
+}
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] } },
+}
 
 export default function CreateBlogPage() {
   const navigate = useNavigate()
@@ -99,6 +110,10 @@ export default function CreateBlogPage() {
   // Title suggestions state
   const [showTitleSuggestions, setShowTitleSuggestions] = useState(false)
   const [suggestedTitles, setSuggestedTitles] = useState([])
+
+  const { scrollY } = useScroll()
+  const glowY1 = useTransform(scrollY, [0, 500], [0, -60])
+  const glowY2 = useTransform(scrollY, [0, 500], [0, -30])
 
   // Auto Save States
   const [autoSaveEnabled, setAutoSaveEnabled] = useState(() => {
@@ -786,37 +801,51 @@ export default function CreateBlogPage() {
   }
 
   return (
-    <div className="relative bg-[#08120d]" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div className="relative overflow-hidden bg-[#060a06]" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <Navbar currentPage="blogs" />
 
-      {/* Grid backgrounds */}
+      {/* Parallax ambient glows */}
       <div className="fixed inset-0 pointer-events-none" style={{ zIndex: 0 }}>
-        <div className="absolute inset-0 bg-[#08120d]" />
-        <div className="absolute inset-0 opacity-35" style={{ background: 'radial-gradient(circle at 50% 0%, rgba(16,185,129,0.16) 0%, transparent 60%)' }} />
-        <div className="absolute inset-0 opacity-20" style={{ background: 'radial-gradient(circle at 20% 10%, rgba(34,197,94,0.12) 0%, transparent 30%)' }} />
+        <div className="absolute inset-0 bg-[#060a06]" />
+        <motion.div className="absolute inset-0 opacity-40" style={{ background: 'radial-gradient(circle at 18% 0%, rgba(16,185,129,0.18) 0%, transparent 42%)', y: glowY1 }} />
+        <motion.div className="absolute inset-0 opacity-20" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(6,182,212,0.12) 0%, transparent 36%)', y: glowY2 }} />
+        <div
+          className="absolute inset-0 opacity-[0.14]"
+          style={{
+            backgroundImage:
+              'linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px)',
+            backgroundSize: '124px 124px',
+            maskImage: 'radial-gradient(circle at 50% 18%, black 24%, transparent 88%)',
+          }}
+        />
       </div>
 
       {/* Editor top navigation bar */}
-      <div className="relative z-10 w-full bg-white/[0.04] border-b border-white/[0.08] backdrop-blur-xl pt-24 px-6 md:px-10 lg:px-14">
+      <div className="relative z-10 w-full bg-white/[0.04] border-b border-white/[0.08] backdrop-blur-xl pt-24 px-6 md:px-12 lg:px-20 xl:px-28">
         <div className="mx-auto w-full flex flex-col md:flex-row md:items-center justify-between py-6 gap-4">
           <div className="flex items-center gap-4">
             <button
               onClick={() => navigate(-1)}
-              className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 hover:border-emerald-400/30 hover:bg-emerald-500/10 text-white/70 hover:text-emerald-300 transition-all"
+              className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 hover:border-emerald-400/30 hover:bg-emerald-500/10 text-white/70 hover:text-emerald-300 transition-all"
             >
               <ArrowLeft size={16} />
             </button>
             <div>
-              <div className="text-[10px] tracking-[0.25em] font-semibold text-emerald-400 uppercase">Interactive Publisher</div>
-              <h1 className="text-white font-bold text-lg leading-tight">Write Blog Post</h1>
+              <div className="flex items-center gap-3 mb-1">
+                <span className="inline-flex items-center gap-2 rounded-full border border-emerald-400/16 bg-emerald-400/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.28em] text-emerald-300">
+                  <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.7)]" />
+                  Interactive Publisher
+                </span>
+              </div>
+              <h1 className="text-white font-bold text-2xl leading-tight md:text-3xl" style={{ fontFamily: "'Syne', sans-serif" }}>Write Blog Post</h1>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
-            <span className="text-xs text-white/40 font-mono hidden sm:inline">{getAutoReadTime()} ({wordCount} {wordCount === 1 ? 'word' : 'words'}) estimated</span>
+            <span className="text-xs text-white/40 font-mono hidden sm:inline">{getAutoReadTime()} ({wordCount} {wordCount === 1 ? 'word' : 'words'})</span>
             <button
               onClick={handlePublish}
-              className="inline-flex items-center gap-2 rounded-xl bg-emerald-400 text-black px-6 py-2.5 text-xs font-extrabold hover:bg-emerald-300 shadow-[0_0_20px_rgba(16,185,129,0.25)] hover:shadow-[0_0_30px_rgba(16,185,129,0.4)] transition-all"
+              className="inline-flex items-center gap-2 rounded-2xl bg-emerald-400 text-[#05100b] px-6 py-3 text-xs font-extrabold hover:bg-emerald-300 shadow-[0_0_20px_rgba(16,185,129,0.25)] hover:shadow-[0_0_30px_rgba(16,185,129,0.4)] transition-all"
             >
               Publish Post
             </button>
@@ -825,11 +854,11 @@ export default function CreateBlogPage() {
       </div>
 
       {/* Editor container */}
-      <main className="relative z-10 flex-grow px-6 md:px-10 lg:px-14 py-8">
+      <main className="relative z-10 flex-grow px-6 md:px-12 lg:px-20 xl:px-28 py-8">
         <div className="mx-auto w-full">
 
           {hasDraftToRestore && (
-            <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4 rounded-2xl border border-emerald-400/20 bg-emerald-500/10 p-5 text-emerald-300 shadow-[0_18px_60px_-35px_rgba(16,185,129,0.55)]">
+            <motion.div variants={itemVariants} initial="hidden" whileInView="visible" viewport={{ once: true }} className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4 rounded-2xl border border-emerald-400/20 bg-emerald-500/10 p-5 text-emerald-300 shadow-[0_18px_60px_-35px_rgba(16,185,129,0.55)]">
               <div className="flex items-start gap-3">
                 <AlertCircle size={20} className="shrink-0 mt-0.5 text-emerald-400" />
                 <div>
@@ -853,27 +882,27 @@ export default function CreateBlogPage() {
                   View Drafts ({draftsList.length})
                 </button>
               </div>
-            </div>
+            </motion.div>
           )}
 
           {error && (
-            <div className="mb-6 flex items-center gap-3 rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-red-300 animate-pulse">
+            <motion.div variants={itemVariants} initial="hidden" whileInView="visible" viewport={{ once: true }} className="mb-6 flex items-center gap-3 rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-red-300">
               <AlertCircle size={18} className="shrink-0" />
               <span className="text-sm font-medium">{error}</span>
-            </div>
+            </motion.div>
           )}
 
           {successMsg && (
-            <div className="mb-6 flex items-center gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-4 text-emerald-300">
+            <motion.div variants={itemVariants} initial="hidden" whileInView="visible" viewport={{ once: true }} className="mb-6 flex items-center gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-4 text-emerald-300">
               <Check size={18} className="shrink-0" />
               <span className="text-sm font-medium">{successMsg}</span>
-            </div>
+            </motion.div>
           )}
 
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-8">
+          <motion.div variants={containerVariants} initial="hidden" whileInView="visible" viewport={{ once: true, margin: '-40px' }} className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-8">
             
             {/* LEFT COLUMN: The Rich Text Editor Panel */}
-            <div className="space-y-6">
+            <motion.div variants={itemVariants} className="space-y-6">
               
               {/* Document metadata heading area */}
               <div className="rounded-3xl border border-white/[0.08] bg-white/[0.035] p-6 space-y-4 shadow-[0_20px_70px_-45px_rgba(0,0,0,0.7)] backdrop-blur-xl">
@@ -1015,14 +1044,14 @@ export default function CreateBlogPage() {
 
               </div>
 
-            </div>
+            </motion.div>
 
             {/* RIGHT COLUMN: Settings & Publishing Controls */}
-            <div className="space-y-6">
+            <motion.div variants={itemVariants} className="space-y-6">
               
               {/* Cover Image Upload (No presets shown!) */}
               <div className="rounded-3xl border border-white/[0.08] bg-white/[0.035] p-6 space-y-4 shadow-[0_20px_70px_-45px_rgba(0,0,0,0.7)] backdrop-blur-xl">
-                <h2 className="text-white text-sm font-bold tracking-wider uppercase flex items-center justify-between">
+                <h2 className="text-white text-sm font-bold tracking-wider uppercase flex items-center justify-between" style={{ fontFamily: "'Syne', sans-serif" }}>
                   <span>Cover Banner Image</span>
                   <Settings size={14} className="text-emerald-400" />
                 </h2>
@@ -1061,7 +1090,7 @@ export default function CreateBlogPage() {
               {/* Image Properties Panel (Only shows when an image is selected in the editor) */}
               {selectedImageNode && (
                 <div className="rounded-3xl border border-emerald-400/30 bg-emerald-950/20 p-6 space-y-4 shadow-[0_20px_70px_-45px_rgba(16,185,129,0.3)] backdrop-blur-xl animate-in slide-in-from-top-4 fade-in">
-                  <h2 className="text-emerald-400 text-sm font-bold tracking-wider uppercase flex items-center justify-between">
+                  <h2 className="text-emerald-400 text-sm font-bold tracking-wider uppercase flex items-center justify-between" style={{ fontFamily: "'Syne', sans-serif" }}>
                     <span>Image Properties</span>
                     <Settings size={14} />
                   </h2>
@@ -1090,7 +1119,7 @@ export default function CreateBlogPage() {
               {/* Auto Save Settings Panel */}
               <div className="rounded-3xl border border-white/[0.08] bg-white/[0.035] p-6 space-y-4 shadow-[0_20px_70px_-45px_rgba(0,0,0,0.7)] backdrop-blur-xl">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-white text-sm font-bold tracking-wider uppercase">
+                  <h2 className="text-white text-sm font-bold tracking-wider uppercase" style={{ fontFamily: "'Syne', sans-serif" }}>
                     Auto Save
                   </h2>
                   <div className="flex items-center gap-2">
@@ -1132,7 +1161,7 @@ export default function CreateBlogPage() {
 
               {/* Dynamic Categories (Defaults removed!) */}
               <div className="rounded-3xl border border-white/[0.08] bg-white/[0.035] p-6 space-y-4 shadow-[0_20px_70px_-45px_rgba(0,0,0,0.7)] backdrop-blur-xl">
-                <h2 className="text-white text-sm font-bold tracking-wider uppercase">
+                <h2 className="text-white text-sm font-bold tracking-wider uppercase" style={{ fontFamily: "'Syne', sans-serif" }}>
                   Categories List
                 </h2>
 
@@ -1182,7 +1211,7 @@ export default function CreateBlogPage() {
 
               {/* Publish Info Panel */}
               <div className="rounded-3xl border border-white/[0.08] bg-white/[0.035] p-6 space-y-4 shadow-[0_20px_70px_-45px_rgba(0,0,0,0.7)] backdrop-blur-xl">
-                <h2 className="text-white text-sm font-bold tracking-wider uppercase">
+                <h2 className="text-white text-sm font-bold tracking-wider uppercase" style={{ fontFamily: "'Syne', sans-serif" }}>
                   Post Metadata
                 </h2>
 
@@ -1244,9 +1273,9 @@ export default function CreateBlogPage() {
                 </div>
               </div>
 
-            </div>
+            </motion.div>
 
-          </div>
+          </motion.div>
 
         </div>
       </main>
@@ -1254,7 +1283,7 @@ export default function CreateBlogPage() {
       {linkModalOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/55" onClick={cancelLink} />
-          <div className="relative z-60 w-full max-w-xl rounded-xl border border-white/10 bg-[#0b1510] p-6 shadow-[0_30px_100px_-40px_rgba(0,0,0,0.9)]">
+          <div className="relative z-60 w-full max-w-xl rounded-2xl border border-white/10 bg-[#0a120c] p-6 shadow-[0_30px_100px_-40px_rgba(0,0,0,0.9)]">
             <h3 className="text-sm font-bold text-white mb-3">Insert Link</h3>
             <div className="space-y-3">
               <div>
@@ -1403,7 +1432,7 @@ export default function CreateBlogPage() {
       {showDraftsModal && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowDraftsModal(false)} />
-          <div className="relative z-60 w-full max-w-4xl max-h-[85vh] flex flex-col rounded-3xl border border-white/10 bg-[#0b1510] shadow-[0_40px_100px_-20px_rgba(0,0,0,0.8)]">
+          <div className="relative z-60 w-full max-w-4xl max-h-[85vh] flex flex-col rounded-3xl border border-white/10 bg-[#0a120c] shadow-[0_40px_100px_-20px_rgba(0,0,0,0.8)]">
             <div className="flex items-center justify-between border-b border-white/10 p-6">
               <div>
                 <h3 className="text-xl font-black text-white tracking-tight">Your Drafts</h3>
@@ -1483,7 +1512,7 @@ export default function CreateBlogPage() {
       {seoIncompleteModalOpen && (
   <div className="fixed inset-0 z-[70] flex items-center justify-center">
     <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setSeoIncompleteModalOpen(false)} />
-    <div className="relative z-60 w-full max-w-lg rounded-3xl border border-white/[0.08] bg-[#0b1510] p-8 shadow-[0_40px_100px_-40px_rgba(0,0,0,0.8)]">
+    <div className="relative z-60 w-full max-w-lg rounded-3xl border border-white/[0.08] bg-[#0a120c] p-8 shadow-[0_40px_100px_-40px_rgba(0,0,0,0.8)]">
       <div className="flex items-center gap-3 mb-5">
         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400">
           <AlertCircle size={20} />

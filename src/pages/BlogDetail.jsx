@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom'
+import { ArrowLeft, ArrowUpRight, BookOpenText, Calendar, Clock3, Download, MessageSquareText, Share2, Sparkles, UserRound } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { jsPDF } from 'jspdf'
+import { useTheme } from '../contexts/ThemeContext'
+import { darkTheme, dayTheme } from '../themeColors'
 
 const formatDate = (dateStr) => {
   if (!dateStr) return ''
@@ -18,6 +21,10 @@ export default function BlogDetail() {
   const postId = Number(id || 0)
   const navigate = useNavigate()
   const location = useLocation()
+
+  const { theme } = useTheme()
+  const isDayMode = theme === 'light'
+  const palette = isDayMode ? dayTheme : darkTheme
 
   const [post, setPost] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -584,14 +591,15 @@ export default function BlogDetail() {
   const categoryLabel = post?.category || 'Featured Article'
   const readingLabel = [publishedLabel, post?.readingTime].filter(Boolean).join('  ·  ')
   const viewerName = viewerProfile?.fullName || viewerProfile?.emailAddress || viewerProfile?.email || 'Signed-in member'
+  const commentCountLabel = `${comments.length} comment${comments.length === 1 ? '' : 's'}`
 
   if (loading) {
     return (
-      <div className="relative min-h-screen bg-[#060a06] text-white">
+      <div className="relative min-h-screen" style={{ backgroundColor: palette.bgPrimary, color: palette.textPrimary }}>
         <Navbar currentPage="blogs" />
         <main className="pt-28 px-6 md:px-12 lg:px-20">
           <div className="max-w-4xl mx-auto py-40 text-center">
-            <p className="text-white/60">Loading article...</p>
+            <p style={{ color: palette.textSecondary }}>Loading article...</p>
           </div>
         </main>
         <Footer />
@@ -601,13 +609,13 @@ export default function BlogDetail() {
 
   if (!post) {
     return (
-      <div className="relative min-h-screen bg-[#060a06] text-white">
+      <div className="relative min-h-screen" style={{ backgroundColor: palette.bgPrimary, color: palette.textPrimary }}>
         <Navbar currentPage="blogs" />
         <main className="pt-28 px-6 md:px-12 lg:px-20">
           <div className="max-w-4xl mx-auto py-40 text-center">
             <h1 className="text-3xl font-bold mb-4">Article not found</h1>
-            <p className="text-white/60 mb-8">We couldn't find the article you're looking for.</p>
-            <Link to="/blogs" className="inline-flex items-center px-6 py-3 rounded-xl bg-white text-black font-semibold">Back to articles</Link>
+            <p className="mb-8" style={{ color: palette.textSecondary }}>We couldn't find the article you're looking for.</p>
+            <Link to="/blogs" className="inline-flex items-center px-6 py-3 rounded-xl font-semibold transition" style={{ backgroundColor: palette.textPrimary, color: palette.bgPrimary }}>Back to articles</Link>
           </div>
         </main>
         <Footer />
@@ -616,26 +624,22 @@ export default function BlogDetail() {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#060a06] text-white">
+    <div className="relative min-h-screen overflow-hidden" style={{ backgroundColor: palette.bgPrimary, color: palette.textPrimary }}>
       <Navbar currentPage="blogs" />
 
       <style>{`
         .blog-shell {
-          background:
-            linear-gradient(180deg, rgba(9, 18, 13, 0.98) 0%, rgba(7, 14, 10, 0.97) 100%),
-            radial-gradient(circle at top right, rgba(16, 185, 129, 0.08), transparent 38%);
-          border: 1px solid rgba(110, 231, 183, 0.12);
-          box-shadow:
-            0 32px 90px -45px rgba(0, 0, 0, 0.9),
-            0 0 0 1px rgba(16, 185, 129, 0.04) inset;
+          background: ${isDayMode ? `linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 249, 0.92) 100%)` : `linear-gradient(180deg, rgba(7, 14, 10, 0.98) 0%, rgba(6, 11, 8, 0.985) 100%)`};
+          border: 1px solid ${palette.borderPrimary};
+          box-shadow: ${isDayMode ? `0 0 0 1px rgba(255, 255, 255, 0.6) inset, ${palette.shadowCard}` : `0 32px 90px -45px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(16, 185, 129, 0.04) inset`};
           backdrop-filter: blur(24px);
         }
 
         .blog-prose {
-          color: rgba(236, 253, 245, 0.84);
+          color: ${isDayMode ? 'rgba(30, 41, 59, 0.88)' : 'rgba(236, 253, 245, 0.88)'};
           font-family: Georgia, 'Times New Roman', serif;
-          font-size: clamp(1.04rem, 1vw + 0.7rem, 1.17rem);
-          line-height: 1.95;
+          font-size: clamp(1.08rem, 1vw + 0.78rem, 1.22rem);
+          line-height: 2.02;
           letter-spacing: 0.002em;
         }
 
@@ -644,20 +648,20 @@ export default function BlogDetail() {
         }
 
         .blog-prose p {
-          color: rgba(236, 253, 245, 0.84);
-          margin: 1.2em 0;
+          color: ${isDayMode ? 'rgba(30, 41, 59, 0.88)' : 'rgba(236, 253, 245, 0.88)'};
+          margin: 1.28em 0;
         }
 
         .blog-prose h1,
         .blog-prose h2,
         .blog-prose h3,
         .blog-prose h4 {
-          color: #f7fffb;
-          font-family: 'Inter', 'Segoe UI', sans-serif;
+          color: ${isDayMode ? '#0f172a' : '#f7fffb'};
+          font-family: 'Syne', 'Inter', 'Segoe UI', sans-serif;
           font-weight: 800;
           letter-spacing: -0.03em;
-          line-height: 1.18;
-          margin-top: 1.9em;
+          line-height: 1.12;
+          margin-top: 2em;
           margin-bottom: 0.55em;
         }
 
@@ -666,7 +670,7 @@ export default function BlogDetail() {
         }
 
         .blog-prose h2 {
-          font-size: clamp(1.7rem, 2.2vw, 2.25rem);
+          font-size: clamp(1.78rem, 2.2vw, 2.4rem);
         }
 
         .blog-prose h3 {
@@ -678,36 +682,36 @@ export default function BlogDetail() {
         }
 
         .blog-prose a {
-          color: #86efac;
+          color: ${palette.accentPrimary};
           text-decoration: underline;
-          text-decoration-color: rgba(110, 231, 183, 0.55);
+          text-decoration-color: ${isDayMode ? 'rgba(16, 185, 129, 0.4)' : 'rgba(110, 231, 183, 0.55)'};
           text-underline-offset: 0.18em;
           transition: color 0.2s ease, text-decoration-color 0.2s ease;
         }
 
         .blog-prose a:hover {
-          color: #d1fae5;
-          text-decoration-color: rgba(209, 250, 229, 0.92);
+          color: ${palette.accentDark};
+          text-decoration-color: ${isDayMode ? 'rgba(16, 185, 129, 0.8)' : 'rgba(209, 250, 229, 0.92)'};
         }
 
         .blog-prose strong,
         .blog-prose b {
-          color: #ffffff;
+          color: ${isDayMode ? '#0f172a' : '#ffffff'};
           font-weight: 800;
         }
 
         .blog-prose em,
         .blog-prose i {
-          color: rgba(220, 252, 231, 0.92);
+          color: ${isDayMode ? 'rgba(15, 23, 42, 0.92)' : 'rgba(220, 252, 231, 0.92)'};
         }
 
         .blog-prose blockquote {
           margin: 2em 0;
-          padding: 1.15rem 1.35rem;
-          border-left: 3px solid rgba(52, 211, 153, 0.82);
+          padding: 1.25rem 1.45rem;
+          border-left: 3px solid ${palette.accentPrimary};
           border-radius: 0 1.1rem 1.1rem 0;
-          background: linear-gradient(90deg, rgba(16, 185, 129, 0.14), rgba(16, 185, 129, 0.04));
-          color: rgba(236, 253, 245, 0.9);
+          background: ${isDayMode ? 'linear-gradient(90deg, rgba(16, 185, 129, 0.08), rgba(16, 185, 129, 0.01))' : 'linear-gradient(90deg, rgba(16, 185, 129, 0.14), rgba(16, 185, 129, 0.04))'};
+          color: ${isDayMode ? 'rgba(30, 41, 59, 0.9)' : 'rgba(236, 253, 245, 0.9)'};
           font-size: 1.03em;
         }
 
@@ -723,30 +727,30 @@ export default function BlogDetail() {
         }
 
         .blog-prose li::marker {
-          color: rgba(110, 231, 183, 0.88);
+          color: ${palette.accentPrimary};
         }
 
         .blog-prose hr {
           border: 0;
           height: 1px;
           margin: 2.25em 0;
-          background: linear-gradient(90deg, transparent, rgba(110, 231, 183, 0.45), transparent);
+          background: ${isDayMode ? 'linear-gradient(90deg, transparent, rgba(16, 185, 129, 0.3), transparent)' : 'linear-gradient(90deg, transparent, rgba(110, 231, 183, 0.45), transparent)'};
         }
 
         .blog-prose img {
           width: 100%;
           border-radius: 1.4rem;
-          border: 1px solid rgba(110, 231, 183, 0.12);
+          border: 1px solid ${palette.borderPrimary};
           margin: 2rem 0;
-          box-shadow: 0 24px 55px -38px rgba(0, 0, 0, 0.95);
+          box-shadow: ${isDayMode ? '0 12px 30px -15px rgba(0,0,0,0.1)' : '0 24px 55px -38px rgba(0, 0, 0, 0.95)'};
         }
 
         .blog-prose code {
           font-family: 'Cascadia Code', 'Consolas', monospace;
           font-size: 0.92em;
-          color: #d1fae5;
-          background: rgba(7, 24, 17, 0.96);
-          border: 1px solid rgba(110, 231, 183, 0.12);
+          color: ${isDayMode ? '#0f172a' : '#d1fae5'};
+          background: ${isDayMode ? 'rgba(0, 0, 0, 0.04)' : 'rgba(7, 24, 17, 0.96)'};
+          border: 1px solid ${palette.borderPrimary};
           border-radius: 0.5rem;
           padding: 0.14rem 0.45rem;
         }
@@ -755,16 +759,16 @@ export default function BlogDetail() {
           overflow-x: auto;
           padding: 1.2rem 1.25rem;
           border-radius: 1.15rem;
-          background: rgba(2, 11, 8, 0.96);
-          border: 1px solid rgba(110, 231, 183, 0.14);
-          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+          background: ${isDayMode ? 'rgba(248, 250, 252, 0.8)' : 'rgba(2, 11, 8, 0.96)'};
+          border: 1px solid ${palette.borderPrimary};
+          box-shadow: ${isDayMode ? 'none' : 'inset 0 1px 0 rgba(255, 255, 255, 0.03)'};
         }
 
         .blog-prose pre code {
           background: transparent;
           border: 0;
           padding: 0;
-          color: rgba(236, 253, 245, 0.9);
+          color: ${isDayMode ? 'rgba(15, 23, 42, 0.9)' : 'rgba(236, 253, 245, 0.9)'};
         }
 
         .blog-prose table {
@@ -774,24 +778,24 @@ export default function BlogDetail() {
           border-collapse: separate;
           border-spacing: 0;
           margin: 1.9rem 0;
-          border: 1px solid rgba(110, 231, 183, 0.12);
+          border: 1px solid ${palette.borderPrimary};
           border-radius: 1.2rem;
-          background: rgba(255, 255, 255, 0.02);
+          background: ${isDayMode ? 'rgba(0, 0, 0, 0.01)' : 'rgba(255, 255, 255, 0.02)'};
         }
 
         .blog-prose th,
         .blog-prose td {
           padding: 0.95rem 1rem;
-          border-bottom: 1px solid rgba(110, 231, 183, 0.08);
-          border-right: 1px solid rgba(110, 231, 183, 0.08);
+          border-bottom: 1px solid ${palette.borderPrimary};
+          border-right: 1px solid ${palette.borderPrimary};
           text-align: left;
           vertical-align: top;
           min-width: 180px;
         }
 
         .blog-prose th {
-          background: rgba(16, 185, 129, 0.13);
-          color: #d1fae5;
+          background: ${isDayMode ? 'rgba(16, 185, 129, 0.08)' : 'rgba(16, 185, 129, 0.13)'};
+          color: ${isDayMode ? '#065f46' : '#d1fae5'};
           font-family: 'Inter', 'Segoe UI', sans-serif;
           font-size: 0.8rem;
           font-weight: 700;
@@ -800,7 +804,11 @@ export default function BlogDetail() {
         }
 
         .blog-prose td {
-          color: rgba(236, 253, 245, 0.77);
+          color: ${isDayMode ? 'rgba(30, 41, 59, 0.8)' : 'rgba(236, 253, 245, 0.77)'};
+        }
+
+        .blog-prose > :first-child {
+          margin-top: 0;
         }
 
         .blog-prose tr:last-child td {
@@ -818,109 +826,167 @@ export default function BlogDetail() {
         <div className="absolute bottom-0 right-0 h-[30rem] w-[30rem] rounded-full bg-cyan-400/10 blur-3xl" />
       </div>
 
-      {/* Hero / image with overlaid title */}
-      <div className="relative w-full overflow-hidden border-b border-white/5 min-h-[58vh] flex flex-col justify-end">
+      <div className="relative w-full overflow-hidden min-h-[72vh] flex flex-col justify-end" style={{ borderBottom: `1px solid ${palette.borderPrimary}` }}>
         {post.coverImage ? (
           <img src={post.coverImage} alt={post.title} className="absolute inset-0 h-full w-full object-cover" />
         ) : (
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.28),_transparent_45%),linear-gradient(180deg,_#10231b_0%,_#07100d_100%)]" />
+          <div className="absolute inset-0" style={{ background: isDayMode ? 'radial-gradient(circle at top, rgba(46,197,138,0.18), transparent 45%), linear-gradient(180deg, #f0fdf4 0%, #ffffff 100%)' : 'radial-gradient(circle at top, rgba(16,185,129,0.28), transparent 45%), linear-gradient(180deg, #10231b 0%, #07100d 100%)' }} />
         )}
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(2,8,6,0.2)_0%,rgba(2,8,6,0.55)_45%,rgba(2,8,6,0.95)_100%)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.2),_transparent_40%)]" />
-        <div className="relative z-20 w-full px-5 pb-14 pt-40 sm:px-8 md:px-12 lg:px-16 lg:pt-48">
+        <div className="absolute inset-y-0 left-0 w-[68%]" style={{ background: isDayMode ? 'linear-gradient(90deg, rgba(255,255,255,0.2) 0%, transparent 100%)' : 'linear-gradient(90deg, rgba(2,8,6,0.96) 0%, rgba(2,8,6,0.86) 38%, rgba(2,8,6,0.36) 74%, transparent 100%)' }} />
+        <div className="absolute inset-0" style={{ background: isDayMode ? 'linear-gradient(180deg, transparent, rgba(255,255,255,0.4) 100%)' : 'linear-gradient(180deg, rgba(2,8,6,0.16) 0%, rgba(2,8,6,0.48) 34%, rgba(2,8,6,0.92) 72%, rgba(2,8,6,0.98) 100%)' }} />
+        <div className="absolute inset-0" style={{ background: isDayMode ? 'radial-gradient(circle at top, rgba(46,197,138,0.05), transparent 40%)' : 'radial-gradient(circle at top, rgba(16,185,129,0.2), transparent 40%)' }} />
+        <div className="relative z-20 w-full px-5 pb-20 pt-40 sm:px-8 md:px-12 lg:px-16 lg:pt-48">
           <div className="mx-auto w-full max-w-[1680px]">
             <Link
               to="/blogs"
-              className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/25 px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-white/80 backdrop-blur-md transition hover:border-emerald-300/35 hover:text-emerald-200"
+              className="mb-8 inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] backdrop-blur-md transition"
+              style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: isDayMode ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.25)', color: palette.textSecondary }}
             >
+              <ArrowLeft size={14} />
               Back to blogs
             </Link>
+
+            <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_340px] xl:items-end">
+              <div className="max-w-5xl">
+                <div className="rounded-[32px] px-5 py-5 backdrop-blur-xl md:px-7 md:py-7 lg:px-8 lg:py-8" style={{ border: `1px solid ${palette.borderPrimary}`, background: isDayMode ? 'linear-gradient(180deg, rgba(255,255,255,0.95), rgba(248,250,249,0.9))' : 'linear-gradient(180deg, rgba(4,10,8,0.88), rgba(4,10,8,0.68))', boxShadow: palette.shadowCard }}>
+                  <div className="mb-6 flex flex-wrap items-center gap-3 text-xs font-semibold uppercase tracking-[0.24em]" style={{ color: palette.accentDark }}>
+                    <span className="rounded-full px-3 py-1.5" style={{ border: `1px solid ${palette.accentBorder}`, backgroundColor: palette.accentSoft }}>Feature article</span>
+                    <span className="rounded-full px-3 py-1.5" style={{ border: `1px solid ${palette.accentBorder}`, backgroundColor: palette.accentSoft }}>{categoryLabel}</span>
+                    <span className="rounded-full px-3 py-1.5" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.bgSecondary, color: palette.textSecondary }}>{commentCountLabel}</span>
+                  </div>
+
+                  <h1
+                    className="font-bold leading-[0.9]"
+                    style={{ color: palette.textPrimary, fontSize: 'clamp(2.7rem, 5vw, 5.6rem)', fontFamily: "'Syne', 'Inter', sans-serif" }}
+                  >
+                    {post.title}
+                  </h1>
+
+                  <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-3 text-sm" style={{ color: palette.textSecondary }}>
+                    <span className="inline-flex items-center gap-2"><UserRound size={15} style={{ color: palette.accentPrimary, opacity: 0.8 }} /> {authorName}</span>
+                    {publishedLabel ? <span className="inline-flex items-center gap-2"><Calendar size={15} style={{ color: palette.accentPrimary, opacity: 0.8 }} /> {publishedLabel}</span> : null}
+                    {post?.readingTime ? <span className="inline-flex items-center gap-2"><Clock3 size={15} style={{ color: palette.accentPrimary, opacity: 0.8 }} /> {post.readingTime}</span> : null}
+                  </div>
+
+                  <div className="mt-8 max-w-4xl rounded-[24px] px-5 py-5 text-[1.03rem] leading-8 md:px-6" style={{ border: `1px solid ${palette.accentBorder}`, backgroundColor: palette.accentSoft, color: isDayMode ? palette.textSecondary : 'rgba(236,253,245,0.84)', boxShadow: isDayMode ? 'none' : 'inset 0 1px 0 rgba(255,255,255,0.03)' }}>
+                    {post.excerpt || 'Read the full article with a cleaner, more comfortable layout tailored to the QSphere visual theme.'}
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-[28px] p-5 backdrop-blur-xl" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.cardBg, boxShadow: palette.shadowCard }}>
+                <div className="text-[10px] font-semibold uppercase tracking-[0.32em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(167,243,208,0.7)' }}>Reading overview</div>
+                <div className="mt-5 grid gap-3">
+                  {[
+                    { label: 'Author', value: authorName },
+                    { label: 'Published', value: publishedLabel || 'Not available' },
+                    { label: 'Read time', value: post.readingTime || 'Flexible read' },
+                    { label: 'Category', value: categoryLabel },
+                  ].map((item) => (
+                    <div key={item.label} className="rounded-2xl px-4 py-3" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.bgSecondary }}>
+                      <div className="text-[10px] uppercase tracking-[0.22em]" style={{ color: palette.textMuted }}>{item.label}</div>
+                      <div className="mt-2 text-sm font-semibold" style={{ color: palette.textPrimary }}>{item.value}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
       <main className="relative z-10 -mt-14 px-4 pb-24 sm:px-6 lg:-mt-16 lg:px-8">
         <div className="mx-auto w-full max-w-[1680px]">
-          <div className="blog-shell rounded-[30px] p-5 sm:p-7 lg:p-10">
-            <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_280px] lg:gap-10">
+          <div className="blog-shell rounded-[34px] p-5 sm:p-7 lg:p-10 xl:p-12">
+            <div className="grid justify-center gap-8 lg:grid-cols-[minmax(0,860px)_320px] lg:gap-12">
               <article className="min-w-0">
-                <div className="mb-7 flex flex-wrap items-center gap-3 text-xs font-semibold uppercase tracking-[0.26em] text-emerald-200/80">
-                  <span className="rounded-full border border-emerald-300/18 bg-emerald-500/10 px-3 py-1.5">Feature article</span>
-                  <span className="rounded-full border border-emerald-300/18 bg-emerald-500/10 px-3 py-1.5">{categoryLabel}</span>
-                </div>
+                <div className="mx-auto w-full max-w-[76ch]">
+                  <div className="mb-8 grid gap-4 md:grid-cols-3">
+                    {[
+                      { label: 'Author', value: authorName, icon: UserRound },
+                      { label: 'Published', value: publishedLabel || 'Not available', icon: Calendar },
+                      { label: 'Read time', value: post.readingTime || 'Flexible read', icon: Clock3 },
+                    ].map((item) => {
+                      const Icon = item.icon
+                      return (
+                        <div key={item.label} className="rounded-[24px] p-4" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.cardBg, boxShadow: isDayMode ? palette.shadowCard : '0 18px 40px -34px rgba(0,0,0,0.88)' }}>
+                          <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.24em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(167,243,208,0.72)' }}>
+                            <Icon size={14} />
+                            {item.label}
+                          </div>
+                          <div className="mt-3 text-sm font-semibold leading-6" style={{ color: palette.textPrimary }}>{item.value}</div>
+                        </div>
+                      )
+                    })}
+                  </div>
 
-                <h1
-                  className="text-white font-black leading-[0.98] mb-6"
-                  style={{ fontSize: 'clamp(2.4rem, 5vw, 4.8rem)', fontFamily: "'Archivo Black', 'Inter', sans-serif" }}
-                >
-                  {post.title}
-                </h1>
-                
-                <div className="mb-6 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-white/72">
-                  <span>By <span className="font-semibold text-white">{authorName}</span></span>
-                  {readingLabel ? <span>{readingLabel}</span> : null}
-                </div>
-
-                <div className="mb-8 rounded-[22px] border border-emerald-300/14 bg-emerald-500/[0.07] px-5 py-5 text-[1.03rem] italic leading-8 text-emerald-50/84 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] md:px-6">
-                  {post.excerpt || 'Read the full article with a cleaner, more comfortable layout tailored to the QSphere visual theme.'}
-                </div>
-
-                <div className="prose blog-prose max-w-none">
-                  {post.blogData ? (
-                    <div dangerouslySetInnerHTML={{ __html: post.blogData }} />
-                  ) : (
-                    <p className="whitespace-pre-wrap text-lg leading-relaxed">No content available.</p>
-                  )}
+                  <div className="prose blog-prose max-w-none">
+                    {post.blogData ? (
+                      <div dangerouslySetInnerHTML={{ __html: post.blogData }} />
+                    ) : (
+                      <p className="whitespace-pre-wrap text-lg leading-relaxed">No content available.</p>
+                    )}
+                  </div>
                 </div>
               </article>
 
               <aside className="min-w-0">
                 <div className="space-y-4 lg:sticky lg:top-28">
-                  <div className="rounded-[24px] border border-white/10 bg-white/[0.035] p-5 shadow-[0_18px_50px_-36px_rgba(0,0,0,0.85)]">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.32em] text-emerald-200/70">Article details</div>
-                    <div className="mt-4 space-y-4 text-sm text-white/74">
+                  <div className="rounded-[26px] p-5" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.cardBg, boxShadow: isDayMode ? palette.shadowCard : '0 18px 50px -36px rgba(0,0,0,0.85)' }}>
+                    <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.32em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(167,243,208,0.7)' }}>
+                      <BookOpenText size={14} />
+                      Article details
+                    </div>
+                    <div className="mt-4 space-y-4 text-sm" style={{ color: palette.textSecondary }}>
                       <div>
-                        <div className="text-white/40">Author</div>
-                        <div className="mt-1 text-base font-semibold text-white">{authorName}</div>
+                        <div style={{ color: palette.textMuted }}>Author</div>
+                        <div className="mt-1 text-base font-semibold" style={{ color: palette.textPrimary }}>{authorName}</div>
                       </div>
                       <div>
-                        <div className="text-white/40">Published</div>
-                        <div className="mt-1 text-white">{publishedLabel || 'Not available'}</div>
+                        <div style={{ color: palette.textMuted }}>Published</div>
+                        <div className="mt-1" style={{ color: palette.textPrimary }}>{publishedLabel || 'Not available'}</div>
                       </div>
                       <div>
-                        <div className="text-white/40">Read time</div>
-                        <div className="mt-1 text-white">{post.readingTime || 'Flexible read'}</div>
+                        <div style={{ color: palette.textMuted }}>Read time</div>
+                        <div className="mt-1" style={{ color: palette.textPrimary }}>{post.readingTime || 'Flexible read'}</div>
                       </div>
                       <div>
-                        <div className="text-white/40">Category</div>
-                        <div className="mt-1 text-white">{categoryLabel}</div>
+                        <div style={{ color: palette.textMuted }}>Category</div>
+                        <div className="mt-1" style={{ color: palette.textPrimary }}>{categoryLabel}</div>
                       </div>
                     </div>
                   </div>
 
-                  <div className="rounded-[24px] border border-white/10 bg-white/[0.035] p-5 shadow-[0_18px_50px_-36px_rgba(0,0,0,0.85)]">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.32em] text-emerald-200/70">Reader actions</div>
+                  <div className="rounded-[26px] p-5" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.cardBg, boxShadow: isDayMode ? palette.shadowCard : '0 18px 50px -36px rgba(0,0,0,0.85)' }}>
+                    <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.32em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(167,243,208,0.7)' }}>
+                      <Sparkles size={14} />
+                      Reader actions
+                    </div>
                     <div className="mt-4 flex flex-col gap-3">
                       <button
                         onClick={downloadPdf}
                         disabled={isDownloadingPdf}
-                        className="inline-flex items-center justify-center rounded-xl bg-emerald-300 px-4 py-3 text-sm font-semibold text-[#072114] transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-70"
+                        className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-70"
+                        style={{ backgroundColor: palette.btnPrimaryBg, color: palette.btnPrimaryText }}
                       >
+                        <Download size={15} />
                         {isDownloadingPdf ? 'Preparing PDF...' : 'Download PDF'}
                       </button>
 
                       <div className="relative">
                         <button
                           onClick={() => setShareOpen((s) => !s)}
-                          className="inline-flex w-full items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-white/88 transition hover:border-emerald-300/25 hover:text-emerald-200"
+                          className="inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition"
+                          style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.bgSecondary, color: palette.textPrimary }}
                         >
+                          <Share2 size={15} />
                           Share article
                         </button>
                         {shareOpen && (
-                          <div className="absolute left-0 right-0 top-full z-20 mt-2 rounded-2xl border border-white/10 bg-[#08110d]/96 p-2 shadow-[0_22px_50px_-28px_rgba(0,0,0,0.95)] backdrop-blur-xl">
-                            <button onClick={() => shareTo('facebook')} className="w-full rounded-xl px-3 py-2.5 text-left text-sm text-white/82 transition hover:bg-white/[0.05] hover:text-emerald-200">Facebook</button>
-                            <button onClick={() => shareTo('linkedin')} className="w-full rounded-xl px-3 py-2.5 text-left text-sm text-white/82 transition hover:bg-white/[0.05] hover:text-emerald-200">LinkedIn</button>
-                            <button onClick={() => shareTo('instagram')} className="w-full rounded-xl px-3 py-2.5 text-left text-sm text-white/82 transition hover:bg-white/[0.05] hover:text-emerald-200">Instagram</button>
+                          <div className="absolute left-0 right-0 top-full z-20 mt-2 rounded-2xl p-2 backdrop-blur-xl" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: isDayMode ? 'rgba(255,255,255,0.95)' : 'rgba(8,17,13,0.96)', boxShadow: palette.shadowCard }}>
+                            <button onClick={() => shareTo('facebook')} className="w-full rounded-xl px-3 py-2.5 text-left text-sm transition" style={{ color: palette.textSecondary }}>Facebook</button>
+                            <button onClick={() => shareTo('linkedin')} className="w-full rounded-xl px-3 py-2.5 text-left text-sm transition" style={{ color: palette.textSecondary }}>LinkedIn</button>
+                            <button onClick={() => shareTo('instagram')} className="w-full rounded-xl px-3 py-2.5 text-left text-sm transition" style={{ color: palette.textSecondary }}>Instagram</button>
                           </div>
                         )}
                       </div>
@@ -930,48 +996,54 @@ export default function BlogDetail() {
               </aside>
 
               <section ref={commentsSectionRef} className="lg:col-span-2">
-                <div className="rounded-[28px] border border-white/10 bg-black/18 p-5 sm:p-6 md:p-7">
+                <div className="rounded-[30px] p-5 sm:p-6 md:p-7" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: isDayMode ? 'rgba(0,0,0,0.02)' : 'rgba(0,0,0,0.18)' }}>
                   <div className="mb-5">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.34em] text-emerald-200/70">Discussion</div>
-                    <h4 className="mt-2 text-2xl font-bold tracking-tight text-white">Comments</h4>
-                    <p className="mt-2 max-w-2xl text-sm leading-6 text-white/55">Share your thoughts, add context, or continue the conversation around this article.</p>
+                    <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.34em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(167,243,208,0.7)' }}>
+                      <MessageSquareText size={14} />
+                      Discussion
+                    </div>
+                    <h4 className="mt-2 text-2xl font-bold tracking-tight" style={{ color: palette.textPrimary }}>Comments</h4>
+                    <p className="mt-2 max-w-2xl text-sm leading-6" style={{ color: palette.textSecondary }}>Share your thoughts, add context, or continue the conversation around this article.</p>
                   </div>
 
                   {isLoggedIn ? (
                     <>
-                      <div className="mb-4 rounded-2xl border border-emerald-300/12 bg-emerald-500/[0.06] px-4 py-3 text-sm text-emerald-50/84">
-                        Commenting as <span className="font-semibold text-white">{viewerName}</span>
+                      <div className="mb-4 rounded-2xl px-4 py-3 text-sm" style={{ border: `1px solid ${palette.accentBorder}`, backgroundColor: palette.accentSoft, color: palette.textSecondary }}>
+                        Commenting as <span className="font-semibold" style={{ color: palette.textPrimary }}>{viewerName}</span>
                       </div>
 
-                      <form onSubmit={addComment} className="grid gap-3 md:grid-cols-[220px_minmax(0,1fr)]">
+                      <form onSubmit={addComment} className="grid gap-3 md:grid-cols-[240px_minmax(0,1fr)]">
                         <input
                           ref={nameRef}
                           placeholder="Display name (optional)"
-                          className="w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white placeholder:text-white/30 outline-none transition focus:border-emerald-300/35 focus:bg-white/[0.06]"
+                          className="w-full rounded-2xl px-4 py-3 text-sm outline-none transition"
+                          style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.bgSecondary, color: palette.textPrimary }}
                         />
                         <textarea
                           ref={commentRef}
                           placeholder="Write a thoughtful comment..."
                           rows={4}
-                          className="w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm leading-6 text-white placeholder:text-white/30 outline-none transition focus:border-emerald-300/35 focus:bg-white/[0.06] md:row-span-2"
+                          className="w-full rounded-2xl px-4 py-3 text-sm leading-6 outline-none transition md:row-span-2"
+                          style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.bgSecondary, color: palette.textPrimary }}
                         />
                         <div className="flex flex-col items-start justify-between gap-3 md:py-1">
-                          <button type="submit" className="inline-flex items-center rounded-xl bg-emerald-300 px-5 py-2.5 text-sm font-semibold text-[#072114] transition hover:bg-emerald-200">Post comment</button>
-                          <div className="text-xs leading-5 text-white/46">Your comment is posted from your signed-in account.</div>
+                          <button type="submit" className="inline-flex items-center rounded-xl px-5 py-2.5 text-sm font-semibold transition" style={{ backgroundColor: palette.btnPrimaryBg, color: palette.btnPrimaryText }}>Post comment</button>
+                          <div className="text-xs leading-5" style={{ color: palette.textMuted }}>Your comment is posted from your signed-in account.</div>
                         </div>
                       </form>
                     </>
                   ) : (
-                    <div className="rounded-[24px] border border-dashed border-emerald-300/20 bg-white/[0.025] px-5 py-6 sm:px-6">
+                    <div className="rounded-[24px] border border-dashed px-5 py-6 sm:px-6" style={{ borderColor: palette.accentBorder, backgroundColor: palette.accentSoft }}>
                       <div className="max-w-2xl">
-                        <div className="text-lg font-semibold text-white">Sign in to join the conversation</div>
-                        <p className="mt-2 text-sm leading-6 text-white/58">
+                        <div className="text-lg font-semibold" style={{ color: palette.textPrimary }}>Sign in to join the conversation</div>
+                        <p className="mt-2 text-sm leading-6" style={{ color: palette.textSecondary }}>
                           Only logged-in QSphere members can comment on blog posts. Sign in to share your thoughts and keep the discussion trusted.
                         </p>
                         <button
                           type="button"
                           onClick={() => navigate('/auth', { state: { redirectTo: `/blogs/${postId}` } })}
-                          className="mt-4 inline-flex items-center rounded-xl bg-emerald-300 px-4 py-2.5 text-sm font-semibold text-[#072114] transition hover:bg-emerald-200"
+                          className="mt-4 inline-flex items-center rounded-xl px-4 py-2.5 text-sm font-semibold transition"
+                          style={{ backgroundColor: palette.btnPrimaryBg, color: palette.btnPrimaryText }}
                         >
                           Sign in to comment
                         </button>
@@ -981,7 +1053,7 @@ export default function BlogDetail() {
 
                   <div className="mt-8 space-y-4">
                     {comments.length === 0 && (
-                      <div className="rounded-2xl border border-dashed border-white/12 bg-white/[0.02] px-5 py-6 text-sm text-white/52">
+                      <div className="rounded-2xl border border-dashed px-5 py-6 text-sm" style={{ borderColor: palette.borderPrimary, backgroundColor: palette.bgSecondary, color: palette.textMuted }}>
                         No comments yet - be the first to start the discussion.
                       </div>
                     )}
@@ -993,31 +1065,38 @@ export default function BlogDetail() {
                       <div
                         key={c.id}
                         id={`blog-comment-${c.id}`}
-                        className={`rounded-2xl border p-4 shadow-[0_14px_34px_-28px_rgba(0,0,0,0.88)] sm:p-5 ${targetCommentId === c.id ? 'border-emerald-300/35 bg-emerald-500/[0.10] ring-1 ring-emerald-300/25' : 'border-white/8 bg-white/[0.03]'}`}
+                        className="rounded-2xl p-4 sm:p-5"
+                        style={{
+                          border: targetCommentId === c.id ? `1px solid ${palette.accentPrimary}` : `1px solid ${palette.borderPrimary}`,
+                          backgroundColor: targetCommentId === c.id ? palette.accentSoft : palette.cardBg,
+                          boxShadow: isDayMode ? palette.shadowCard : '0 14px 34px -28px rgba(0,0,0,0.88)'
+                        }}
                       >
                         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                           <div>
-                            <div className="text-base font-semibold text-white">{c.name}</div>
-                            <div className="mt-1 text-xs uppercase tracking-[0.24em] text-emerald-200/50">Community response</div>
+                            <div className="text-base font-semibold" style={{ color: palette.textPrimary }}>{c.name}</div>
+                            <div className="mt-1 text-xs uppercase tracking-[0.24em]" style={{ color: palette.textMuted }}>Community response</div>
                           </div>
                           <div className="flex items-center gap-2">
                             {isOwn && !isEditing && (
                               <>
                                 <button
                                   onClick={() => handleEdit(c)}
-                                  className="rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[11px] font-medium text-white/62 transition hover:border-emerald-300/30 hover:text-emerald-200"
+                                  className="rounded-lg px-2.5 py-1 text-[11px] font-medium transition hover:brightness-125"
+                                  style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.bgSecondary, color: palette.textSecondary }}
                                 >
                                   Edit
                                 </button>
                                 <button
                                   onClick={() => handleDelete(c.id)}
-                                  className="rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[11px] font-medium text-white/62 transition hover:border-red-400/30 hover:text-red-300"
+                                  className="rounded-lg px-2.5 py-1 text-[11px] font-medium transition hover:brightness-125"
+                                  style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.bgSecondary, color: isDayMode ? '#ef4444' : '#fca5a5' }}
                                 >
                                   Delete
                                 </button>
                               </>
                             )}
-                            <div className="text-xs text-white/42">{new Date(c.created_at).toLocaleString()}</div>
+                            <div className="text-xs" style={{ color: palette.textMuted }}>{new Date(c.created_at).toLocaleString()}</div>
                           </div>
                         </div>
                         {isEditing ? (
@@ -1026,25 +1105,28 @@ export default function BlogDetail() {
                               value={editText}
                               onChange={(e) => setEditText(e.target.value)}
                               rows={3}
-                              className="w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm leading-6 text-white placeholder:text-white/30 outline-none transition focus:border-emerald-300/35 focus:bg-white/[0.06]"
+                              className="w-full rounded-2xl px-4 py-3 text-sm leading-6 outline-none transition"
+                              style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.bgSecondary, color: palette.textPrimary }}
                             />
                             <div className="mt-2 flex items-center gap-2">
                               <button
                                 onClick={() => handleSaveEdit(c.id)}
-                                className="inline-flex items-center rounded-lg bg-emerald-300 px-3.5 py-1.5 text-xs font-semibold text-[#072114] transition hover:bg-emerald-200"
+                                className="inline-flex items-center rounded-lg px-3.5 py-1.5 text-xs font-semibold transition"
+                                style={{ backgroundColor: palette.btnPrimaryBg, color: palette.btnPrimaryText }}
                               >
                                 Save
                               </button>
                               <button
                                 onClick={handleCancelEdit}
-                                className="rounded-lg border border-white/10 bg-white/[0.04] px-3.5 py-1.5 text-xs font-medium text-white/62 transition hover:border-white/25 hover:text-white"
+                                className="rounded-lg px-3.5 py-1.5 text-xs font-medium transition hover:brightness-125"
+                                style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.bgSecondary, color: palette.textSecondary }}
                               >
                                 Cancel
                               </button>
                             </div>
                           </div>
                         ) : (
-                          <div className="mt-3 text-[0.98rem] leading-7 text-white/82">{c.text}</div>
+                          <div className="mt-3 text-[0.98rem] leading-7" style={{ color: palette.textSecondary }}>{c.text}</div>
                         )}
                       </div>
                       )
@@ -1055,16 +1137,16 @@ export default function BlogDetail() {
 
               {others.length > 0 && (
                 <section className="lg:col-span-2">
-                  <div className="mt-2 rounded-[28px] border border-white/10 bg-white/[0.03] p-5 sm:p-6 md:p-7">
+                  <div className="mt-2 rounded-[30px] p-5 sm:p-6 md:p-7" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.cardBg, boxShadow: isDayMode ? palette.shadowCard : 'none' }}>
                     <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                       <div>
-                        <div className="text-[10px] font-semibold uppercase tracking-[0.34em] text-emerald-200/70">Continue reading</div>
-                        <h4 className="mt-2 text-2xl font-bold tracking-tight text-white">More Blogs</h4>
-                        <p className="mt-2 text-sm text-white/52">Explore related writing from the QSphere community.</p>
+                        <div className="text-[10px] font-semibold uppercase tracking-[0.34em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(167,243,208,0.7)' }}>Continue reading</div>
+                        <h4 className="mt-2 text-2xl font-bold tracking-tight" style={{ color: palette.textPrimary }}>More Blogs</h4>
+                        <p className="mt-2 text-sm" style={{ color: palette.textSecondary }}>Explore related writing from the QSphere community.</p>
                       </div>
                       <div className="flex items-center gap-2">
-                        <button onClick={prevCarousel} className="rounded-xl border border-white/10 bg-white/[0.03] px-3.5 py-2.5 text-sm text-white/78 transition hover:border-emerald-300/25 hover:text-emerald-200">‹</button>
-                        <button onClick={nextCarousel} className="rounded-xl border border-white/10 bg-white/[0.03] px-3.5 py-2.5 text-sm text-white/78 transition hover:border-emerald-300/25 hover:text-emerald-200">›</button>
+                        <button onClick={prevCarousel} className="rounded-xl px-3.5 py-2.5 text-sm transition hover:brightness-125" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.bgSecondary, color: palette.textSecondary }}>‹</button>
+                        <button onClick={nextCarousel} className="rounded-xl px-3.5 py-2.5 text-sm transition hover:brightness-125" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.bgSecondary, color: palette.textSecondary }}>›</button>
                       </div>
                     </div>
 
@@ -1074,18 +1156,23 @@ export default function BlogDetail() {
                         return (
                           <article
                             key={item.id}
-                            className="group relative flex cursor-pointer flex-col overflow-hidden rounded-[22px] border border-emerald-300/10 bg-[#09120f] transition duration-300 hover:-translate-y-1 hover:border-emerald-300/24 hover:shadow-[0_28px_60px_-38px_rgba(16,185,129,0.34)]"
+                            className="group relative flex cursor-pointer flex-col overflow-hidden rounded-[24px] transition duration-300 hover:-translate-y-1"
                             onClick={() => navigate(`/blogs/${item.id}`)}
+                            style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: isDayMode ? '#ffffff' : '#09120f', boxShadow: isDayMode ? palette.shadowCard : 'none' }}
                           >
                             {item.coverImage ? (
                               <img src={item.coverImage} alt={item.title} className="h-48 w-full object-cover transition duration-500 group-hover:scale-[1.03]" />
                             ) : (
-                              <div className="h-48 w-full bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.24),_transparent_42%),linear-gradient(180deg,_#10231b_0%,_#07100d_100%)]" />
+                              <div className="h-48 w-full" style={{ background: isDayMode ? 'radial-gradient(circle at top, rgba(46,197,138,0.18), transparent 45%), linear-gradient(180deg, #f0fdf4 0%, #ffffff 100%)' : 'radial-gradient(circle at top, rgba(16,185,129,0.24), transparent 42%), linear-gradient(180deg, #10231b 0%, #07100d 100%)' }} />
                             )}
                             <div className="flex flex-1 flex-col p-5">
-                              <div className="text-[10px] font-semibold uppercase tracking-[0.32em] text-emerald-300/82">{item.category}</div>
-                              <h5 className="mt-3 text-lg font-bold leading-7 text-white transition group-hover:text-emerald-100">{item.title}</h5>
-                              <p className="mt-3 line-clamp-4 text-sm leading-6 text-white/52">{item.excerpt}</p>
+                              <div className="text-[10px] font-semibold uppercase tracking-[0.32em]" style={{ color: palette.accentPrimary }}>{item.category}</div>
+                              <h5 className="mt-3 text-lg font-bold leading-7 transition group-hover:opacity-80" style={{ color: palette.textPrimary, fontFamily: "'Syne', 'Inter', sans-serif" }}>{item.title}</h5>
+                              <p className="mt-3 line-clamp-4 text-sm leading-6" style={{ color: palette.textSecondary }}>{item.excerpt}</p>
+                              <div className="mt-4 inline-flex items-center gap-2 text-sm font-semibold transition-all group-hover:gap-3 group-hover:brightness-125" style={{ color: palette.accentPrimary }}>
+                                Read article
+                                <ArrowUpRight size={15} />
+                              </div>
                             </div>
                           </article>
                         )

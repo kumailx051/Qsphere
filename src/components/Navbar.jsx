@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { useTheme } from '../contexts/ThemeContext'
+import { darkTheme, dayTheme } from '../themeColors'
 import qubiImg from '../assets/Qubi.png'
+import logoImg from '../assets/logo.png'
 import qubiWaveVideo from '../assets/QubiWave.webm'
 import notificationSound from '../assets/notification.mp3'
 
@@ -65,6 +68,7 @@ const formatNotificationTime = (dateValue) => {
 }
 
 const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = null }) => {
+  const { theme, toggleTheme } = useTheme()
   const [menuOpen, setMenuOpen] = useState(false)
   const [profile, setProfile] = useState(readStoredProfile)
   const [notifications, setNotifications] = useState([])
@@ -89,8 +93,11 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
   const hoverCloseTimerRef = useRef(null)
   const notificationAudioRef = useRef(null)
   const hasLoadedNotificationsRef = useRef(false)
+  const hasFetchedNotificationsRef = useRef(false)
   const previousUnreadIdsRef = useRef([])
   const navigate = useNavigate()
+
+  const [showThemeHint, setShowThemeHint] = useState(false)
 
   // Draggable Qubi avatar state
   const [avatarPos, setAvatarPos] = useState(() => {
@@ -127,11 +134,43 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
   const isContactPage = currentPage === 'contact'
   const isBlogPage = currentPage === 'blogs'
   const isGroupsPage = currentPage === 'groups'
+  const isEventsPage = currentPage === 'events'
+  const isPositionsPage = currentPage === 'positions'
+  const isDashboardPage = currentPage === 'dashboard'
 
   const isLoggedIn = !!profile
   const profileAvatar = getProfileAvatar(profile)
   const profileEmail = getProfileEmail(profile)
   const unreadNotifications = notifications.filter((item) => item.unread).length
+  const isDayMode = theme === 'light'
+  const palette = isDayMode ? dayTheme : darkTheme
+
+  useEffect(() => {
+    if (theme === 'dark' && !localStorage.getItem('qsphere_theme_hint_seen')) {
+      const timer = setTimeout(() => setShowThemeHint(true), 2500)
+      const hideTimer = setTimeout(() => {
+        setShowThemeHint(false)
+        try { localStorage.setItem('qsphere_theme_hint_seen', '1') } catch {}
+      }, 12000)
+      return () => { clearTimeout(timer); clearTimeout(hideTimer) }
+    }
+  }, [theme])
+
+  const handleThemeToggle = () => {
+    toggleTheme()
+    setShowThemeHint(false)
+    try { localStorage.setItem('qsphere_theme_hint_seen', '1') } catch {}
+  }
+
+  const themeHintBubble = showThemeHint && (
+    <div className="absolute right-0 top-full mt-3 w-[240px] rounded-2xl p-3.5 text-sm backdrop-blur-xl shadow-[0_0_24px_rgba(16,185,129,0.3)] animate-in fade-in slide-in-from-top-2 z-[100]" style={{ backgroundColor: palette.bgSecondary, border: `1px solid ${palette.borderPrimary}`, color: palette.textPrimary }}>
+      <div className="flex items-start gap-2.5">
+        <span className="text-lg leading-none shrink-0" style={{ filter: 'drop-shadow(0 0 8px rgba(250,204,21,0.6))' }}>💡</span>
+        <span className="font-semibold leading-snug">Too much dark? Try day mode!</span>
+      </div>
+      <div className="absolute -top-1.5 right-4 h-3 w-3 rotate-45 border-l border-t" style={{ backgroundColor: palette.bgSecondary, borderColor: palette.borderPrimary }}></div>
+    </div>
+  )
 
   // Qubi avatar drag handlers
   const handleDragStart = (e) => {
@@ -300,35 +339,34 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
   }, [profile])
 
   useEffect(() => {
-    if (typeof window === 'undefined') return
+    const email = String(profileEmail || '').trim().toLowerCase()
+    if (typeof window === 'undefined' || !email) {
+      notificationAudioRef.current = null
+      return undefined
+    }
 
     const audio = new Audio(notificationSound)
     audio.preload = 'auto'
     notificationAudioRef.current = audio
 
-    const unlock = () => {
-      if (notificationAudioRef.current) {
-        notificationAudioRef.current.play().then(() => {
-          notificationAudioRef.current.pause()
-          notificationAudioRef.current.currentTime = 0
-        }).catch(() => {})
-      }
-      document.removeEventListener('pointerdown', unlock)
-    }
-    document.addEventListener('pointerdown', unlock)
-
     return () => {
-      document.removeEventListener('pointerdown', unlock)
-      notificationAudioRef.current = null
+      audio.pause()
+      audio.currentTime = 0
+
+      if (notificationAudioRef.current === audio) {
+        notificationAudioRef.current = null
+      }
     }
-  }, [])
+  }, [profileEmail])
 
   useEffect(() => {
     const email = String(profileEmail || '').trim().toLowerCase()
+    hasLoadedNotificationsRef.current = false
+    hasFetchedNotificationsRef.current = false
+    previousUnreadIdsRef.current = []
+
     if (!email) {
       setNotifications([])
-      hasLoadedNotificationsRef.current = false
-      previousUnreadIdsRef.current = []
       return undefined
     }
 
@@ -342,9 +380,11 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
         const data = await res.json()
         if (isCancelled) return
 
+        hasFetchedNotificationsRef.current = true
         setNotifications(Array.isArray(data) ? data.map(mapNotificationItem) : [])
       } catch {
         if (!isCancelled) {
+          hasFetchedNotificationsRef.current = true
           setNotifications([])
         }
       }
@@ -360,6 +400,8 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
   }, [profileEmail])
 
   useEffect(() => {
+    if (!hasFetchedNotificationsRef.current) return
+
     const unreadIds = notifications
       .filter((item) => item.unread)
       .map((item) => String(item.id))
@@ -577,34 +619,72 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
     ? (avatarPos.x + 70) >= window.innerWidth / 2
     : true // default bottom-right → right-0 (extends leftward)
 
-  const navItemClassName = (active) => active ? 'relative text-emerald-200' : 'hover:text-emerald-200 transition-colors'
-  const submenuClassName = 'absolute left-1/2 top-full mt-3 w-44 -translate-x-1/2 rounded-2xl border border-emerald-400/20 bg-black/90 p-2 text-left shadow-[0_20px_60px_-15px_rgba(0,0,0,0.9)] backdrop-blur-2xl transition-all duration-200'
+  const navItemClassName = (active) => active ? 'qs-nav-link qs-nav-link-active relative font-semibold' : 'qs-nav-link font-semibold transition-colors'
+  const mobileNavItemClassName = (active) => active ? 'qs-nav-link qs-nav-link-active flex items-center justify-between font-semibold' : 'qs-nav-link font-semibold transition-colors'
+  const submenuClassName = 'qs-nav-panel absolute left-1/2 top-full mt-3 w-44 -translate-x-1/2 rounded-2xl p-2 text-left backdrop-blur-2xl transition-all duration-200'
+  const navVars = {
+    '--qs-nav-shell-bg': isDayMode ? 'rgba(247,247,247,0.88)' : 'rgba(0,0,0,0.70)',
+    '--qs-nav-shell-border': isDayMode ? palette.borderPrimary : 'rgba(16,185,129,0.35)',
+    '--qs-nav-shell-shadow': isDayMode ? '0 20px 48px rgba(15,23,42,0.08)' : '0 0 36px rgba(16,185,129,0.28)',
+    '--qs-nav-text': isDayMode ? palette.textPrimary : 'rgba(255,255,255,0.9)',
+    '--qs-nav-text-strong': isDayMode ? palette.textPrimary : '#ffffff',
+    '--qs-nav-muted': isDayMode ? palette.textMuted : 'rgba(110,231,183,0.7)',
+    '--qs-nav-divider': isDayMode ? palette.borderSoft : 'rgba(255,255,255,0.06)',
+    '--qs-nav-accent': palette.accentPrimary,
+    '--qs-nav-accent-soft': palette.accentSoft,
+    '--qs-nav-accent-border': palette.accentBorder,
+    '--qs-nav-accent-strong': isDayMode ? palette.accentDark : palette.accentLight,
+    '--qs-nav-dot-shadow': isDayMode ? '0 0 8px rgba(46,197,138,0.45)' : '0 0 8px rgba(16,185,129,0.8)',
+    '--qs-nav-button-bg': isDayMode ? 'rgba(255,255,255,0.82)' : 'rgba(0,0,0,0.45)',
+    '--qs-nav-button-border': isDayMode ? palette.borderPrimary : 'rgba(16,185,129,0.3)',
+    '--qs-nav-button-hover-bg': isDayMode ? 'rgba(46,197,138,0.08)' : 'rgba(16,185,129,0.12)',
+    '--qs-nav-button-hover-border': isDayMode ? 'rgba(46,197,138,0.26)' : 'rgba(110,231,183,0.5)',
+    '--qs-nav-button-text': isDayMode ? palette.textPrimary : '#a7f3d0',
+    '--qs-nav-panel-bg': isDayMode ? 'rgba(255,255,255,0.96)' : '#07120e',
+    '--qs-nav-panel-border': isDayMode ? palette.borderPrimary : 'rgba(16,185,129,0.2)',
+    '--qs-nav-panel-shadow': isDayMode ? '0 24px 80px -24px rgba(15,23,42,0.16)' : '0 24px 80px -24px rgba(0,0,0,0.95), 0 0 30px rgba(16,185,129,0.12)',
+    '--qs-nav-surface': isDayMode ? 'rgba(247,247,245,0.78)' : 'rgba(255,255,255,0.03)',
+    '--qs-nav-surface-strong': isDayMode ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.05)',
+    '--qs-nav-surface-hover': isDayMode ? 'rgba(46,197,138,0.08)' : 'rgba(16,185,129,0.12)',
+    '--qs-nav-mobile-overlay': isDayMode ? 'rgba(250,249,247,0.76)' : 'rgba(0,0,0,0.70)',
+    '--qs-nav-mobile-sheet': isDayMode ? 'rgba(255,255,255,0.94)' : 'rgba(0,0,0,0.75)',
+    '--qs-nav-mobile-sheet-shadow': isDayMode ? '0 20px 60px rgba(15,23,42,0.12)' : '0 0 40px rgba(16,185,129,0.2)',
+  }
 
   return (
-    <>
+    <div className="qs-nav-theme" style={navVars}>
       {/* Desktop + Tablet Navbar */}
       <div className="fixed left-0 right-0 top-0 z-50 pointer-events-none">
-        <div className="pointer-events-auto mx-auto w-full max-w-7xl px-6 pt-6">
-          <div ref={homeNavFrameRef} className="flex items-center justify-between rounded-full border border-emerald-400/35 bg-black/70 px-5 py-3.5 backdrop-blur-2xl shadow-[0_0_36px_rgba(16,185,129,0.28)]">
+        <div className="pointer-events-auto mx-auto w-full max-w-[90rem] px-6 pt-6">
+          <div ref={homeNavFrameRef} className="qs-nav-shell flex items-center justify-between rounded-full border border-emerald-400/35 bg-black/70 px-5 py-3.5 backdrop-blur-2xl shadow-[0_0_36px_rgba(16,185,129,0.28)]">
             {/* Logo */}
             <div className="flex items-center">
               <div
                 ref={homeBrandRef}
-                className="text-[10px] tracking-[0.34em] font-semibold text-emerald-100 transition-opacity duration-200"
-                style={{ opacity: isHomePage ? 0 : 1, visibility: isHomePage ? 'hidden' : 'visible' }}
+                className="qs-nav-brand text-[1.35rem] font-bold leading-none transition-opacity duration-200"
+                style={{ opacity: isHomePage ? 0 : 1, visibility: isHomePage ? 'hidden' : 'visible', marginRight: isHomePage ? '2.5rem' : '0' }}
               >
-                QSPHERE
+                <span className="qs-nav-brand-mark">Q</span>
+                <span className="qs-nav-brand-rest">Sphere</span>
               </div>
             </div>
 
             {/* Desktop Navigation */}
-            <nav className="hidden md:flex items-center gap-10 text-[13px] tracking-[0.2em] text-white/90">
-              <Link to="/" className={isHomePage ? "relative text-emerald-200" : "hover:text-emerald-200 transition-colors"}>
+            <nav className="hidden md:flex items-center gap-10 text-[14px] tracking-[0.14em]" style={{ fontFamily: "'Syne', 'Inter', sans-serif" }}>
+              <Link to="/" className={navItemClassName(isHomePage)}>
                 Home
                 {isHomePage && (
                   <span className="absolute -bottom-2 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
                 )}
               </Link>
+              {isLoggedIn && (
+                <Link to="/dashboard" className={navItemClassName(isDashboardPage)}>
+                  Dashboard
+                  {isDashboardPage && (
+                    <span className="absolute -bottom-2 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
+                  )}
+                </Link>
+              )}
               <div
                 ref={blogsMenuRef}
                 className="relative"
@@ -628,7 +708,7 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
                   >
                     <Link
                       to="/blogs/new"
-                      className="flex items-center justify-between rounded-xl px-3 py-2 text-[11px] tracking-[0.18em] text-white/75 transition hover:bg-emerald-500/10 hover:text-emerald-200"
+                      className="qs-nav-submenu-item flex items-center justify-between rounded-xl px-3 py-2 text-[11px] tracking-[0.18em] text-white/75 transition hover:bg-emerald-500/10 hover:text-emerald-200"
                       onClick={() => setBlogsMenuOpen(false)}
                     >
                       <span>Add Blog</span>
@@ -660,7 +740,7 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
                   >
                     <Link
                       to="/groups/new"
-                      className="flex items-center justify-between rounded-xl px-3 py-2 text-[11px] tracking-[0.18em] text-white/75 transition hover:bg-emerald-500/10 hover:text-emerald-200"
+                      className="qs-nav-submenu-item flex items-center justify-between rounded-xl px-3 py-2 text-[11px] tracking-[0.18em] text-white/75 transition hover:bg-emerald-500/10 hover:text-emerald-200"
                       onClick={() => setGroupsMenuOpen(false)}
                     >
                       <span>Add Group</span>
@@ -669,13 +749,25 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
                   </div>
                 ) : null}
               </div>
-              <Link to="/about" className={isAboutPage ? "relative text-emerald-200" : "hover:text-emerald-200 transition-colors"}>
+              <Link to="/events" className={navItemClassName(isEventsPage)}>
+                Events
+                {isEventsPage && (
+                  <span className="absolute -bottom-2 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
+                )}
+              </Link>
+              <Link to="/positions" className={navItemClassName(isPositionsPage)}>
+                Positions
+                {isPositionsPage && (
+                  <span className="absolute -bottom-2 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
+                )}
+              </Link>
+              <Link to="/about" className={navItemClassName(isAboutPage)}>
                 About
                 {isAboutPage && (
                   <span className="absolute -bottom-2 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
                 )}
               </Link>
-              <Link to="/contact" className={isContactPage ? "relative text-emerald-200" : "hover:text-emerald-200 transition-colors"}>
+              <Link to="/contact" className={navItemClassName(isContactPage)}>
                 Contact
                 {isContactPage && (
                   <span className="absolute -bottom-2 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
@@ -688,10 +780,41 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
               {isLoggedIn ? (
                 /* ── Logged-in: Profile Avatar with hover dropdown ── */
                 <div className="flex items-center gap-2">
+                  {/* Theme Toggle */}
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={handleThemeToggle}
+                      className="qs-nav-icon-button relative inline-flex h-11 w-11 items-center justify-center rounded-full border transition-all duration-300 hover:shadow-[0_0_18px_rgba(16,185,129,0.2)]"
+                      style={{ borderColor: isDayMode ? palette.borderPrimary : 'rgba(16,185,129,0.3)', backgroundColor: isDayMode ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.45)', color: isDayMode ? palette.textSecondary : '#a7f3d0' }}
+                      aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+                      title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+                    >
+                      {theme === 'dark' ? (
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="12" cy="12" r="4" />
+                          <path d="M12 2v2" />
+                          <path d="M12 20v2" />
+                          <path d="m4.93 4.93 1.41 1.41" />
+                          <path d="m17.66 17.66 1.41 1.41" />
+                          <path d="M2 12h2" />
+                          <path d="M20 12h2" />
+                          <path d="m6.34 17.66-1.41 1.41" />
+                          <path d="m19.07 4.93-1.41 1.41" />
+                        </svg>
+                      ) : (
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
+                        </svg>
+                      )}
+                    </button>
+                    {themeHintBubble}
+                  </div>
                   <div ref={notificationsRef} className="relative">
                     <button
                       type="button"
-                      className="relative inline-flex h-11 w-11 items-center justify-center rounded-full border border-emerald-400/30 bg-black/45 text-emerald-200 transition-all duration-300 hover:border-emerald-300/50 hover:bg-emerald-500/12 hover:shadow-[0_0_18px_rgba(16,185,129,0.2)]"
+                      className="qs-nav-icon-button relative inline-flex h-11 w-11 items-center justify-center rounded-full border transition-all duration-300 hover:shadow-[0_0_18px_rgba(16,185,129,0.2)]"
+                      style={{ borderColor: isDayMode ? palette.borderPrimary : 'rgba(16,185,129,0.3)', backgroundColor: isDayMode ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.45)', color: isDayMode ? palette.textSecondary : '#a7f3d0' }}
                       aria-label="Notifications"
                       title="Notifications"
                       aria-haspopup="dialog"
@@ -728,17 +851,17 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
                     </button>
 
                     <div
-                      className={`absolute right-0 top-full mt-2 w-[min(92vw,360px)] overflow-hidden rounded-[26px] border border-emerald-400/20 bg-[#07120e] shadow-[0_24px_80px_-24px_rgba(0,0,0,0.95),0_0_30px_rgba(16,185,129,0.12)] transition-all duration-200 origin-top-right ${
+                      className={`qs-nav-panel absolute right-0 top-full mt-2 w-[min(92vw,360px)] overflow-hidden rounded-[26px] border backdrop-blur-2xl transition-all duration-200 origin-top-right ${
                         notificationsOpen
                           ? 'opacity-100 scale-100 pointer-events-auto'
                           : 'opacity-0 scale-95 pointer-events-none'
                       }`}
-                      style={{ zIndex: 999 }}
+                      style={{ zIndex: 999, borderColor: isDayMode ? palette.borderPrimary : 'rgba(16,185,129,0.2)', backgroundColor: isDayMode ? 'rgba(255,255,255,0.97)' : '#07120e', boxShadow: isDayMode ? palette.shadowDropdown : '0 24px 80px -24px rgba(0,0,0,0.95), 0 0 30px rgba(16,185,129,0.12)' }}
                     >
-                      <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-3.5">
+                      <div className="flex items-center justify-between px-4 py-3.5" style={{ borderBottom: `1px solid ${isDayMode ? palette.borderPrimary : 'rgba(255,255,255,0.06)'}` }}>
                         <div>
-                          <div className="text-[10px] uppercase tracking-[0.28em] text-emerald-300/70">Notifications</div>
-                          <div className="mt-1 text-sm font-semibold text-white">Recent activity</div>
+                          <div className="text-[10px] uppercase tracking-[0.28em]" style={{ color: palette.accentPrimary }}>Notifications</div>
+                          <div className="mt-1 text-sm font-semibold" style={{ color: palette.textPrimary }}>Recent activity</div>
                         </div>
                         <div className="flex items-center gap-2">
                           {unreadNotifications > 0 ? (
@@ -746,25 +869,26 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
                               <button
                                 type="button"
                                 onClick={handleClearAllNotifications}
-                                className="text-[11px] font-medium tracking-[0.04em] text-emerald-300/70 transition hover:text-emerald-200"
+                                className="text-[11px] font-medium tracking-[0.04em] transition"
+                                style={{ color: palette.accentPrimary }}
                               >
                                 Clear all
                               </button>
-                              <span className="rounded-full border border-emerald-400/20 bg-emerald-500/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-emerald-200">
+                              <span className="rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ border: `1px solid ${palette.accentBorder}`, backgroundColor: palette.accentSoft, color: palette.accentDark }}>
                                 {unreadNotifications} new
                               </span>
                             </>
                           ) : (
-                            <span className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-white/65">
+                            <span className="rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: isDayMode ? palette.bgInput : 'rgba(255,255,255,0.05)', color: palette.textMuted }}>
                               All caught up
                             </span>
                           )}
                         </div>
                       </div>
 
-                      <div className="max-h-[320px] overflow-y-auto bg-[#07120e] p-2">
+                      <div className="max-h-[320px] overflow-y-auto p-2" style={{ backgroundColor: isDayMode ? 'rgba(255,255,255,0.97)' : '#07120e' }}>
                         {notifications.length === 0 ? (
-                          <div className="rounded-2xl border border-white/[0.05] bg-white/[0.03] px-4 py-5 text-sm text-white/60">
+                          <div className="rounded-2xl px-4 py-5 text-sm" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: isDayMode ? palette.bgInput : 'rgba(255,255,255,0.03)', color: palette.textSecondary }}>
                             No notifications yet.
                           </div>
                         ) : notifications.map((item) => (
@@ -772,20 +896,21 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
                             key={item.id}
                             type="button"
                             onClick={() => handleNotificationRead(item)}
-                            className="flex w-full items-start gap-3 rounded-2xl border border-white/[0.05] bg-white/[0.03] px-3 py-3 text-left transition hover:border-emerald-400/20 hover:bg-emerald-500/12"
+                            className="flex w-full items-start gap-3 rounded-2xl border px-3 py-3 text-left transition"
+                            style={{ borderColor: isDayMode ? palette.borderPrimary : 'rgba(255,255,255,0.05)', backgroundColor: isDayMode ? palette.bgSurface : 'rgba(255,255,255,0.03)' }}
                           >
-                            <span className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border ${item.unread ? 'border-emerald-400/25 bg-emerald-500/15 text-emerald-200' : 'border-white/10 bg-white/[0.06] text-white/70'}`}>
+                            <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border" style={{ borderColor: item.unread ? palette.accentBorder : palette.borderPrimary, backgroundColor: item.unread ? palette.accentSoft : (isDayMode ? palette.bgInput : 'rgba(255,255,255,0.06)'), color: item.unread ? palette.accentPrimary : palette.textMuted }}>
                               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <path d="M12 3a6 6 0 0 0-6 6v3.2a2 2 0 0 1-.6 1.4L4 15h16l-1.4-1.4a2 2 0 0 1-.6-1.4V9a6 6 0 0 0-6-6Z" />
                               </svg>
                             </span>
                             <span className="min-w-0 flex-1">
                               <span className="flex items-center gap-2">
-                                <span className="truncate text-sm font-semibold text-white">{item.title}</span>
+                                <span className="truncate text-sm font-semibold" style={{ color: palette.textPrimary }}>{item.title}</span>
                                 {item.unread ? <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" /> : null}
                               </span>
-                              <span className="mt-1 block text-sm leading-5 text-white/55">{item.description}</span>
-                              <span className="mt-2 block text-[11px] uppercase tracking-[0.18em] text-emerald-300/55">{item.time}</span>
+                              <span className="mt-1 block text-sm leading-5" style={{ color: palette.textSecondary }}>{item.description}</span>
+                              <span className="mt-2 block text-[11px] uppercase tracking-[0.18em]" style={{ color: palette.accentPrimary }}>{item.time}</span>
                             </span>
                           </button>
                         ))}
@@ -804,7 +929,8 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
                   >
                     <button
                       type="button"
-                      className="flex items-center gap-2.5 rounded-full border border-emerald-400/40 bg-emerald-500/15 pl-1.5 pr-4 py-1.5 transition-all duration-300 hover:bg-emerald-500/25 hover:shadow-[0_0_22px_rgba(16,185,129,0.35)]"
+                      className="flex items-center gap-2.5 rounded-full border pl-1.5 pr-4 py-1.5 transition-all duration-300"
+                      style={{ borderColor: isDayMode ? palette.borderPrimary : 'rgba(16,185,129,0.4)', backgroundColor: isDayMode ? 'rgba(255,255,255,0.8)' : 'rgba(16,185,129,0.15)' }}
                       onClick={() => {
                         setNotificationsOpen(false)
                         setDropdownOpen(prev => !prev)
@@ -812,7 +938,7 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
                       aria-haspopup="true"
                       aria-expanded={dropdownOpen}
                     >
-                      <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-emerald-400/30 bg-emerald-500/20 shadow-[0_0_12px_rgba(16,185,129,0.3)]">
+                      <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border" style={{ borderColor: isDayMode ? palette.borderPrimary : 'rgba(16,185,129,0.3)', backgroundColor: isDayMode ? palette.accentSoft : 'rgba(16,185,129,0.2)' }}>
                         {profileAvatar ? (
                           <img
                             src={profileAvatar}
@@ -820,10 +946,10 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
                             className="h-full w-full object-cover"
                           />
                         ) : (
-                          <span className="text-[11px] font-bold text-emerald-200 leading-none">{initials}</span>
+                          <span className="text-[11px] font-bold leading-none" style={{ color: palette.accentDark }}>{initials}</span>
                         )}
                       </div>
-                      <span className="hidden sm:block text-[11px] tracking-[0.12em] font-semibold text-emerald-100 max-w-[100px] truncate">
+                      <span className="hidden sm:block text-[11px] tracking-[0.12em] font-semibold max-w-[100px] truncate" style={{ color: isDayMode ? palette.textPrimary : '#d1fae5' }}>
                         {profile.fullName || 'Profile'}
                       </span>
                       <svg
@@ -835,7 +961,8 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
                         strokeWidth="2.5"
                         strokeLinecap="round"
                         strokeLinejoin="round"
-                        className={`text-emerald-300/70 transition-transform duration-200 ${dropdownOpen ? 'rotate-180' : ''}`}
+                        className={`transition-transform duration-200 ${dropdownOpen ? 'rotate-180' : ''}`}
+                        style={{ color: isDayMode ? palette.textMuted : 'rgba(110,231,183,0.7)' }}
                       >
                         <path d="M6 9l6 6 6-6" />
                       </svg>
@@ -843,37 +970,28 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
 
                     {/* Dropdown */}
                     <div
-                      className={`absolute right-0 top-full mt-2 w-56 rounded-2xl border border-emerald-400/20 bg-black/90 backdrop-blur-2xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.9),0_0_30px_rgba(16,185,129,0.12)] overflow-hidden transition-all duration-200 origin-top-right ${
+                      className={`qs-nav-panel absolute right-0 top-full mt-2 w-56 rounded-2xl border backdrop-blur-2xl overflow-hidden transition-all duration-200 origin-top-right ${
                         dropdownOpen
                           ? 'opacity-100 scale-100 pointer-events-auto'
                           : 'opacity-0 scale-95 pointer-events-none'
                       }`}
-                      style={{ zIndex: 999 }}
+                      style={{ zIndex: 999, borderColor: isDayMode ? palette.borderPrimary : 'rgba(16,185,129,0.2)', backgroundColor: isDayMode ? 'rgba(255,255,255,0.97)' : 'rgba(0,0,0,0.9)', boxShadow: isDayMode ? palette.shadowDropdown : '0 20px 60px -15px rgba(0,0,0,0.9), 0 0 30px rgba(16,185,129,0.12)' }}
                       onMouseEnter={() => clearHoverCloseTimer()}
                       onMouseLeave={() => scheduleHoverClose(setDropdownOpen)}
                     >
                       {/* User info header */}
-                      <div className="px-4 py-3.5 border-b border-white/[0.06]">
-                        <div className="text-sm font-semibold text-white truncate">{profile.fullName || 'Explorer'}</div>
-                        <div className="text-[11px] text-emerald-300/60 mt-0.5 truncate">{getProfileEmail(profile) || 'Community member'}</div>
+                      <div className="px-4 py-3.5" style={{ borderBottom: `1px solid ${isDayMode ? palette.borderPrimary : 'rgba(255,255,255,0.06)'}` }}>
+                        <div className="text-sm font-semibold truncate" style={{ color: palette.textPrimary }}>{profile.fullName || 'Explorer'}</div>
+                        <div className="text-[11px] mt-0.5 truncate" style={{ color: palette.accentPrimary }}>{getProfileEmail(profile) || 'Community member'}</div>
                       </div>
 
                       {/* Menu items */}
                       <div className="py-1.5">
                         <button
                           type="button"
-                          onClick={() => { setDropdownOpen(false); navigate('/dashboard') }}
-                          className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-white/80 hover:bg-emerald-500/10 hover:text-emerald-300 transition-colors"
-                        >
-                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
-                            <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" />
-                          </svg>
-                          Dashboard
-                        </button>
-                        <button
-                          type="button"
                           onClick={handleAccountManagement}
-                          className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-white/80 hover:bg-emerald-500/10 hover:text-emerald-300 transition-colors"
+                          className="flex w-full items-center gap-3 px-4 py-2.5 text-sm transition-colors"
+                          style={{ color: palette.textSecondary }}
                         >
                           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
                             <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
@@ -884,11 +1002,12 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
                       </div>
 
                       {/* Logout */}
-                      <div className="border-t border-white/[0.06] py-1.5">
+                      <div className="py-1.5" style={{ borderTop: `1px solid ${isDayMode ? palette.borderPrimary : 'rgba(255,255,255,0.06)'}` }}>
                         <button
                           type="button"
                           onClick={handleLogout}
-                          className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-red-400/80 hover:bg-red-500/10 hover:text-red-400 transition-colors"
+                          className="flex w-full items-center gap-3 px-4 py-2.5 text-sm transition-colors"
+                          style={{ color: isDayMode ? '#dc2626' : 'rgba(248,113,113,0.8)' }}
                         >
                           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
                             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
@@ -900,22 +1019,53 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
                   </div>
                 </div>
               ) : (
-                /* ── Not logged-in: Join Community button ── */
-                <Link
-                  to="/auth"
-                  className="inline-flex items-center gap-2 rounded-full border border-emerald-400/50 bg-emerald-500/20 px-4 py-2 text-[11px] tracking-[0.2em] text-emerald-100 shadow-[0_0_22px_rgba(16,185,129,0.35)] hover:bg-emerald-500/30 transition-colors"
-                >
-                  Join Community
-                  <span className="flex h-6 w-6 items-center justify-center rounded-full border border-emerald-400/60 bg-emerald-400/20 text-emerald-200">
-                    →
-                  </span>
-                </Link>
+                /* ── Not logged-in: Theme toggle + Join Community button ── */
+                <div className="flex items-center gap-2">
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={handleThemeToggle}
+                      className="qs-nav-icon-button inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white/90 transition-all duration-300 hover:border-emerald-300/50 hover:bg-emerald-500/12 hover:text-emerald-200 hover:shadow-[0_0_18px_rgba(16,185,129,0.2)]"
+                      aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+                      title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+                    >
+                      {theme === 'dark' ? (
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="12" cy="12" r="4" />
+                          <path d="M12 2v2" />
+                          <path d="M12 20v2" />
+                          <path d="m4.93 4.93 1.41 1.41" />
+                          <path d="m17.66 17.66 1.41 1.41" />
+                          <path d="M2 12h2" />
+                          <path d="M20 12h2" />
+                          <path d="m6.34 17.66-1.41 1.41" />
+                          <path d="m19.07 4.93-1.41 1.41" />
+                        </svg>
+                      ) : (
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
+                        </svg>
+                      )}
+                    </button>
+                    {themeHintBubble}
+                  </div>
+                  <Link
+                    to="/auth"
+                    className="inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-[13px] font-semibold tracking-wide text-white transition-all hover:scale-[1.02] hover:brightness-110 active:scale-95"
+                    style={{ backgroundColor: palette.accentPrimary, boxShadow: isDayMode ? '0 10px 25px -5px rgba(16,185,129,0.3)' : '0 0 22px rgba(16,185,129,0.35)' }}
+                  >
+                    Join Community
+                    <span className="flex items-center justify-center text-white transition-transform group-hover:translate-x-0.5">
+                      →
+                    </span>
+                  </Link>
+                </div>
               )}
 
               {/* Mobile Menu Button */}
               <button
                 type="button"
-                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white/90 hover:bg-white/20 transition-colors md:hidden"
+                    className="qs-nav-icon-button inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white/90 hover:bg-white/20 transition-colors md:hidden"
                 aria-label="Open menu"
                 aria-expanded={menuOpen}
                 aria-controls="mobile-nav"
@@ -1077,25 +1227,26 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
       {/* Mobile Navigation */}
       {menuOpen && (
         <div className="fixed inset-0 z-[60] md:hidden">
-          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setMenuOpen(false)} />
+          <div className="qs-nav-mobile-overlay absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setMenuOpen(false)} />
           <div
             id="mobile-nav"
             role="dialog"
             aria-modal="true"
-            className="absolute right-4 top-4 bottom-4 flex w-[min(90vw,360px)] flex-col rounded-3xl border border-emerald-400/25 bg-black/75 p-6 shadow-[0_0_40px_rgba(16,185,129,0.2)] backdrop-blur-2xl"
+            className="qs-nav-mobile-sheet absolute right-4 top-4 bottom-4 flex w-[min(90vw,360px)] flex-col rounded-3xl border border-emerald-400/25 bg-black/75 p-6 shadow-[0_0_40px_rgba(16,185,129,0.2)] backdrop-blur-2xl"
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-emerald-400/30 bg-black/40 shadow-[0_0_18px_rgba(16,185,129,0.35)]">
+                <div className="qs-nav-mobile-logo flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-emerald-400/30 bg-black/40 shadow-[0_0_18px_rgba(16,185,129,0.35)]">
                   <img src={logoImg} alt="QSphere logo" className="h-full w-full object-contain p-1" />
                 </div>
-                <div className="text-[11px] tracking-[0.45em] font-semibold text-emerald-100">
-                  QSPHERE
+                <div className="qs-nav-brand text-[1.18rem] font-bold leading-none">
+                  <span className="qs-nav-brand-mark">Q</span>
+                  <span className="qs-nav-brand-rest">Sphere</span>
                 </div>
               </div>
               <button
                 type="button"
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/10 text-white/90 hover:bg-white/20 transition-colors"
+                className="qs-nav-icon-button inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/10 text-white/90 hover:bg-white/20 transition-colors"
                 aria-label="Close menu"
                 onClick={() => setMenuOpen(false)}
               >
@@ -1105,75 +1256,119 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
 
             {/* Mobile user info (when logged in) */}
             {isLoggedIn && (
-              <div className="mt-6 flex items-center gap-3 rounded-2xl border border-emerald-400/15 bg-emerald-500/[0.06] px-4 py-3">
-                <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border border-emerald-400/30 bg-emerald-500/20 shadow-[0_0_12px_rgba(16,185,129,0.2)]">
+              <div className="qs-nav-mobile-user mt-6 flex items-center gap-3 rounded-2xl border border-emerald-400/15 bg-emerald-500/[0.06] px-4 py-3">
+                <div className="qs-nav-mobile-avatar flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border border-emerald-400/30 bg-emerald-500/20 shadow-[0_0_12px_rgba(16,185,129,0.2)]">
                   {profileAvatar ? (
                     <img src={profileAvatar} alt="avatar" className="h-full w-full object-cover" />
                   ) : (
-                    <span className="text-xs font-bold text-emerald-200">{initials}</span>
+                    <span className="qs-nav-mobile-initials text-xs font-bold text-emerald-200">{initials}</span>
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="text-sm font-semibold text-white truncate">{profile.fullName || 'Explorer'}</div>
-                  <div className="text-[11px] text-emerald-300/60 truncate">{getProfileEmail(profile) || 'Member'}</div>
+                  <div className="qs-nav-mobile-name text-sm font-semibold text-white truncate">{profile.fullName || 'Explorer'}</div>
+                  <div className="qs-nav-mobile-email text-[11px] text-emerald-300/60 truncate">{getProfileEmail(profile) || 'Member'}</div>
                 </div>
               </div>
             )}
 
-            <nav className="mt-8 flex flex-col gap-5 text-base text-white/90">
-              <Link to="/" className={isHomePage ? "flex items-center justify-between text-emerald-200" : "hover:text-emerald-200 transition-colors"} onClick={() => setMenuOpen(false)}>
+            <nav className="mt-8 flex flex-col gap-5 text-[1.05rem] tracking-[0.06em]" style={{ fontFamily: "'Syne', 'Inter', sans-serif" }}>
+              <Link to="/" className={mobileNavItemClassName(isHomePage)} onClick={() => setMenuOpen(false)}>
                 Home
                 {isHomePage && (
                   <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
                 )}
               </Link>
-              <Link to="/blogs" className={isBlogPage ? "flex items-center justify-between text-emerald-200" : "hover:text-emerald-200 transition-colors"} onClick={() => setMenuOpen(false)}>
+              <Link to="/blogs" className={mobileNavItemClassName(isBlogPage)} onClick={() => setMenuOpen(false)}>
                 Blogs
                 {isBlogPage && (
                   <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
                 )}
               </Link>
-              <Link to="/groups" className={isGroupsPage ? "flex items-center justify-between text-emerald-200" : "hover:text-emerald-200 transition-colors"} onClick={() => setMenuOpen(false)}>
+              <Link to="/groups" className={mobileNavItemClassName(isGroupsPage)} onClick={() => setMenuOpen(false)}>
                 Groups
                 {isGroupsPage && (
                   <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
                 )}
               </Link>
-              <Link to="/about" className={isAboutPage ? "flex items-center justify-between text-emerald-200" : "hover:text-emerald-200 transition-colors"} onClick={() => setMenuOpen(false)}>
+              <Link to="/events" className={mobileNavItemClassName(isEventsPage)} onClick={() => setMenuOpen(false)}>
+                Events
+                {isEventsPage && (
+                  <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
+                )}
+              </Link>
+              <Link to="/positions" className={mobileNavItemClassName(isPositionsPage)} onClick={() => setMenuOpen(false)}>
+                Positions
+                {isPositionsPage && (
+                  <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
+                )}
+              </Link>
+              <Link to="/about" className={mobileNavItemClassName(isAboutPage)} onClick={() => setMenuOpen(false)}>
                 About
                 {isAboutPage && (
                   <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
                 )}
               </Link>
-              <Link to="/contact" className={isContactPage ? "flex items-center justify-between text-emerald-200" : "hover:text-emerald-200 transition-colors"} onClick={() => setMenuOpen(false)}>
+              <Link to="/contact" className={mobileNavItemClassName(isContactPage)} onClick={() => setMenuOpen(false)}>
                 Contact
                 {isContactPage && (
                   <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
                 )}
               </Link>
+              {isLoggedIn && (
+                <Link to="/dashboard" className={mobileNavItemClassName(isDashboardPage)} onClick={() => setMenuOpen(false)}>
+                  Dashboard
+                  {isDashboardPage && (
+                    <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
+                  )}
+                </Link>
+              )}
 
-              {/* Mobile-only: Dashboard, Account, Logout when logged in */}
+              {/* Mobile-only: Account, Logout when logged in */}
               {isLoggedIn && (
                 <>
-                  <div className="h-px bg-white/[0.06] my-1" />
-                  <Link to="/dashboard" className="hover:text-emerald-200 transition-colors" onClick={() => setMenuOpen(false)}>
-                    Dashboard
-                  </Link>
-                  <button type="button" onClick={handleAccountManagement} className="text-left hover:text-emerald-200 transition-colors">
+                  <div className="my-1 h-px" style={{ background: 'var(--qs-nav-divider)' }} />
+                  <button type="button" onClick={handleAccountManagement} className="qs-nav-link text-left font-semibold transition-colors">
                     Account Management
                   </button>
-                  <button type="button" onClick={handleLogout} className="text-left text-red-400/80 hover:text-red-400 transition-colors">
+                  <button type="button" onClick={handleLogout} className="text-left font-semibold text-red-400/80 hover:text-red-400 transition-colors">
                     Log Out
                   </button>
                 </>
               )}
+
+              {/* Mobile-only: Theme Toggle */}
+              <div className="my-1 h-px" style={{ background: 'var(--qs-nav-divider)' }} />
+              <button
+                type="button"
+                onClick={toggleTheme}
+                className="qs-nav-link flex items-center gap-3 font-semibold transition-colors"
+              >
+                {theme === 'dark' ? (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="4" />
+                    <path d="M12 2v2" />
+                    <path d="M12 20v2" />
+                    <path d="m4.93 4.93 1.41 1.41" />
+                    <path d="m17.66 17.66 1.41 1.41" />
+                    <path d="M2 12h2" />
+                    <path d="M20 12h2" />
+                    <path d="m6.34 17.66-1.41 1.41" />
+                    <path d="m19.07 4.93-1.41 1.41" />
+                  </svg>
+                ) : (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
+                  </svg>
+                )}
+                {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+              </button>
             </nav>
 
             <div className="mt-auto pt-8">
               {isLoggedIn ? (
                 <Link
                   to="/dashboard"
-                  className="inline-flex w-full items-center justify-between rounded-full border border-emerald-400/50 bg-emerald-500/20 px-4 py-3 text-[12px] tracking-[0.2em] text-emerald-100 shadow-[0_0_22px_rgba(16,185,129,0.35)] hover:bg-emerald-500/30 transition-colors"
+                  className="qs-nav-cta inline-flex w-full items-center justify-between rounded-full border border-emerald-400/50 bg-emerald-500/20 px-4 py-3 text-[12px] tracking-[0.2em] text-emerald-100 shadow-[0_0_22px_rgba(16,185,129,0.35)] hover:bg-emerald-500/30 transition-colors"
                   onClick={() => setMenuOpen(false)}
                 >
                   Go to Dashboard
@@ -1184,7 +1379,7 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
               ) : (
                 <Link
                   to="/auth"
-                  className="inline-flex w-full items-center justify-between rounded-full border border-emerald-400/50 bg-emerald-500/20 px-4 py-3 text-[12px] tracking-[0.2em] text-emerald-100 shadow-[0_0_22px_rgba(16,185,129,0.35)] hover:bg-emerald-500/30 transition-colors"
+                  className="qs-nav-cta inline-flex w-full items-center justify-between rounded-full border border-emerald-400/50 bg-emerald-500/20 px-4 py-3 text-[12px] tracking-[0.2em] text-emerald-100 shadow-[0_0_22px_rgba(16,185,129,0.35)] hover:bg-emerald-500/30 transition-colors"
                   onClick={() => setMenuOpen(false)}
                 >
                   Join Community
@@ -1197,7 +1392,103 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
           </div>
         </div>
       )}
-    </>
+
+      <style>{`
+        .qs-nav-theme .qs-nav-shell {
+          border-color: var(--qs-nav-shell-border) !important;
+          background: var(--qs-nav-shell-bg) !important;
+          box-shadow: var(--qs-nav-shell-shadow) !important;
+        }
+
+        .qs-nav-theme .qs-nav-brand {
+          display: inline-flex;
+          align-items: baseline;
+          gap: 0.04em;
+          font-family: 'Syne', sans-serif;
+          letter-spacing: -0.04em;
+          text-transform: none;
+        }
+
+        .qs-nav-theme .qs-nav-brand-mark {
+          color: var(--qs-nav-accent) !important;
+          text-shadow: ${isDayMode ? '0 8px 24px rgba(46,197,138,0.12)' : '0 0 24px rgba(16,185,129,0.22)'};
+        }
+
+        .qs-nav-theme .qs-nav-brand-rest {
+          color: ${isDayMode ? '#0A1620' : '#ffffff'} !important;
+        }
+
+        .qs-nav-theme .qs-nav-link {
+          color: var(--qs-nav-text) !important;
+        }
+
+        .qs-nav-theme .qs-nav-link:hover,
+        .qs-nav-theme .qs-nav-link-active {
+          color: var(--qs-nav-accent-strong) !important;
+        }
+
+        .qs-nav-theme .qs-nav-panel {
+          border-color: var(--qs-nav-panel-border) !important;
+          background: var(--qs-nav-panel-bg) !important;
+          box-shadow: var(--qs-nav-panel-shadow) !important;
+        }
+
+        .qs-nav-theme .qs-nav-submenu-item,
+        .qs-nav-theme .qs-nav-menu-item {
+          color: var(--qs-nav-text) !important;
+        }
+
+        .qs-nav-theme .qs-nav-submenu-item:hover,
+        .qs-nav-theme .qs-nav-menu-item:hover {
+          background: var(--qs-nav-surface-hover) !important;
+          color: var(--qs-nav-accent-strong) !important;
+        }
+
+        .qs-nav-theme .qs-nav-icon-button {
+          border-color: var(--qs-nav-button-border) !important;
+          background: var(--qs-nav-button-bg) !important;
+          color: var(--qs-nav-button-text) !important;
+        }
+
+        .qs-nav-theme .qs-nav-icon-button:hover {
+          border-color: var(--qs-nav-button-hover-border) !important;
+          background: var(--qs-nav-button-hover-bg) !important;
+        }
+
+        .qs-nav-theme .qs-nav-cta {
+          border-color: var(--qs-nav-accent-border) !important;
+          background: var(--qs-nav-accent-soft) !important;
+          color: var(--qs-nav-accent-strong) !important;
+          box-shadow: ${isDayMode ? '0 20px 40px rgba(30,158,107,0.14)' : '0 0 22px rgba(16,185,129,0.35)'} !important;
+        }
+
+        .qs-nav-theme .qs-nav-mobile-overlay {
+          background: var(--qs-nav-mobile-overlay) !important;
+        }
+
+        .qs-nav-theme .qs-nav-mobile-sheet {
+          border-color: var(--qs-nav-panel-border) !important;
+          background: var(--qs-nav-mobile-sheet) !important;
+          box-shadow: var(--qs-nav-mobile-sheet-shadow) !important;
+        }
+
+        .qs-nav-theme .qs-nav-mobile-logo,
+        .qs-nav-theme .qs-nav-mobile-avatar {
+          border-color: var(--qs-nav-accent-border) !important;
+          background: var(--qs-nav-accent-soft) !important;
+          box-shadow: none !important;
+        }
+
+        .qs-nav-theme .qs-nav-mobile-initials,
+        .qs-nav-theme .qs-nav-mobile-email {
+          color: var(--qs-nav-accent-strong) !important;
+        }
+
+        .qs-nav-theme .qs-nav-mobile-name {
+          color: var(--qs-nav-text-strong) !important;
+        }
+      `}</style>
+    </div>
   )
 }
 

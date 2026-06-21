@@ -214,8 +214,8 @@ const InfiniteGallery = ({ scale = 1 }) => {
                 className="w-full h-full overflow-hidden"
                 style={{
                   borderRadius: 20,
-                  background: '#fff',
-                  padding: 10,
+                  background: 'transparent',
+                  padding: 0,
                   boxShadow: 'none',
                 }}
               >

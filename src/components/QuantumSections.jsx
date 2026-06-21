@@ -1,6 +1,8 @@
 import { useRef, useEffect } from 'react'
 import { motion, useScroll, useTransform, useSpring, useAnimate, useMotionValueEvent, useInView, useMotionValue, animate as framerAnimate } from 'framer-motion'
 import quantamVideo from '../assets/quantam.webm'
+import { useTheme } from '../contexts/ThemeContext'
+import { dayTheme, darkTheme } from '../themeColors'
 
 const sections = [
   {
@@ -70,7 +72,7 @@ const itemVariants = {
 }
 
 /* ─── Text panel ─────────────────────────────────────────────── */
-const TextPanel = ({ section }) => {
+const TextPanel = ({ section, palette }) => {
   const titleLines = section.title.split('\n')
 
   return (
@@ -103,7 +105,7 @@ const TextPanel = ({ section }) => {
             fontWeight: 900,
             lineHeight: 1.05,
             letterSpacing: '-0.03em',
-            color: '#fff',
+            color: palette.textPrimary,
           }}
         >
           {titleLines.map((line) => (
@@ -118,7 +120,7 @@ const TextPanel = ({ section }) => {
         <motion.p
           variants={itemVariants}
           style={{
-            color: 'rgba(255,255,255,0.62)',
+            color: palette.textSecondary,
             fontSize: 'clamp(0.85rem, 1.1vw, 1rem)',
             lineHeight: 1.8,
             fontFamily: "'Inter', sans-serif",
@@ -137,6 +139,9 @@ export default function QuantumSections({ quoteEntered = false }) {
   const videoRef     = useRef(null)
   const quoteExitX   = useMotionValue(0)
   const quoteExitOpacity = useMotionValue(1)
+  const { theme } = useTheme()
+  const isDayMode = theme === 'light'
+  const palette = isDayMode ? dayTheme : darkTheme
 
   /* ── Ensure video plays (muted for autoplay compliance) ── */
   useEffect(() => {
@@ -229,7 +234,7 @@ export default function QuantumSections({ quoteEntered = false }) {
   return (
     <div
       ref={containerRef}
-      style={{ position: 'relative', background: '#050505' }}
+      style={{ position: 'relative', background: palette.bgPrimary }}
     >
       {/* ── Sticky video panel ───────────────────────────── */}
       <div
@@ -316,7 +321,7 @@ export default function QuantumSections({ quoteEntered = false }) {
           <motion.div
             style={{ width: '44%', maxWidth: 540 }}
           >
-            <TextPanel section={section} />
+            <TextPanel section={section} palette={palette} />
           </motion.div>
 
           {/* Section divider */}
@@ -340,7 +345,7 @@ export default function QuantumSections({ quoteEntered = false }) {
       <div
         style={{
           height: 120,
-          background: 'linear-gradient(to bottom,#050505,#000)',
+          background: `linear-gradient(to bottom, ${palette.bgPrimary}, ${palette.bgPrimary})`,
         }}
       />
     </div>

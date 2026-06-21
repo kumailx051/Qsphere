@@ -1,11 +1,27 @@
 import { useEffect, useMemo, useState, useRef, useCallback } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
+import { motion, useScroll, useTransform } from 'framer-motion'
 import {
   ArrowLeft, CheckCircle2, Clock, Download, FileText, LayoutGrid, MessageSquare, MoreVertical,
   Plus, Send, Sparkles, Trash2, Upload, Users2, X, Calendar, ClipboardList, FolderOpen, Edit3, UserPlus, Eye
 } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: { opacity: 1, transition: { staggerChildren: 0.07, delayChildren: 0.06 } },
+}
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 24 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.55, ease: [0.25, 0.46, 0.45, 0.94] } },
+}
+
+const heroVariants = {
+  hidden: { opacity: 0, y: 30, scale: 0.98 },
+  visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.7, ease: [0.25, 0.46, 0.45, 0.94] } },
+}
 
 const readStoredProfile = () => {
   try {
@@ -50,6 +66,10 @@ export default function ProjectDetailsPage() {
   const profile = useMemo(() => readStoredProfile(), [])
   const userEmail = profile?.emailAddress || ''
   const normalizedUserEmail = useMemo(() => userEmail.trim().toLowerCase(), [userEmail])
+
+  const { scrollY } = useScroll()
+  const glowY1 = useTransform(scrollY, [0, 500], [0, -60])
+  const glowY2 = useTransform(scrollY, [0, 500], [0, -30])
 
   const [project, setProject] = useState(null)
   const [tasks, setTasks] = useState([])
@@ -380,7 +400,7 @@ export default function ProjectDetailsPage() {
   const canEditChatMessage = useCallback((msg) => isMyMessage(msg) && !msg.deletedForEveryone, [isMyMessage])
   const canDeleteChatForEveryone = useCallback((msg) => (isMyMessage(msg) || isOwner) && !msg.deletedForEveryone, [isMyMessage, isOwner])
   const canDeleteChatForMe = useCallback((msg) => Boolean(msg?.id), [])
-  const canSeeChatReadBy = useCallback((msg) => isMyMessage(msg), [isMyMessage])
+  const canSeeChatReadBy = useCallback(() => true, [])
 
   const openChatActions = useCallback((msg) => {
     const hasActions = canEditChatMessage(msg) || canDeleteChatForMe(msg) || canDeleteChatForEveryone(msg) || canSeeChatReadBy(msg)
@@ -491,68 +511,130 @@ export default function ProjectDetailsPage() {
   const readReceiptEntries = (readReceiptMessage?.readBy || []).filter(reader => reader.emailAddress?.toLowerCase() !== normalizedUserEmail)
 
   if (loading) return (
-    <div className="relative min-h-screen bg-[#08120d] text-white">
+    <div className="relative overflow-hidden bg-[#060a06] text-white" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <Navbar currentPage="groups" />
-      <div className="flex min-h-screen items-center justify-center">
+      <div className="fixed inset-0 pointer-events-none" style={{ zIndex: 0 }}>
+        <div className="absolute inset-0 bg-[#060a06]" />
+        <motion.div className="absolute inset-0 opacity-40" style={{ background: 'radial-gradient(circle at 18% 0%, rgba(16,185,129,0.18) 0%, transparent 42%)', y: glowY1 }} />
+        <motion.div className="absolute inset-0 opacity-20" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(6,182,212,0.12) 0%, transparent 36%)', y: glowY2 }} />
+      </div>
+      <div className="relative z-10 flex min-h-screen items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-400 border-t-transparent" />
       </div>
     </div>
   )
 
   if (!project) return (
-    <div className="relative min-h-screen bg-[#08120d] text-white">
+    <div className="relative overflow-hidden bg-[#060a06] text-white" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <Navbar currentPage="groups" />
-      <main className="mx-auto max-w-4xl px-6 pt-28 pb-24">
-        <button onClick={() => navigate(-1)} className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-4 py-2 text-sm text-white/80"><ArrowLeft size={16} />Back</button>
-        <div className="rounded-3xl border border-white/[0.08] bg-white/[0.05] p-8">
-          <h1 className="text-3xl font-black">Project not found</h1>
-        </div>
+      <div className="fixed inset-0 pointer-events-none" style={{ zIndex: 0 }}>
+        <div className="absolute inset-0 bg-[#060a06]" />
+        <motion.div className="absolute inset-0 opacity-40" style={{ background: 'radial-gradient(circle at 18% 0%, rgba(16,185,129,0.18) 0%, transparent 42%)', y: glowY1 }} />
+        <motion.div className="absolute inset-0 opacity-20" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(6,182,212,0.12) 0%, transparent 36%)', y: glowY2 }} />
+      </div>
+      <main className="relative z-10 flex flex-1 items-center justify-center px-6 pt-28 pb-24">
+        <motion.div
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="w-full max-w-2xl rounded-[36px] border border-white/[0.08] bg-[linear-gradient(145deg,rgba(255,255,255,0.055),rgba(255,255,255,0.015))] p-8 text-center shadow-[0_40px_120px_rgba(0,0,0,0.45)] md:p-10"
+        >
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[24px] border border-emerald-400/18 bg-emerald-400/10 text-emerald-300 shadow-[0_0_30px_rgba(16,185,129,0.12)]">
+            <ClipboardList size={28} />
+          </div>
+          <div className="mt-6 text-[10px] font-bold uppercase tracking-[0.3em] text-emerald-300/78">Project not found</div>
+          <h1 className="mt-4 text-4xl font-bold leading-[0.95] text-white md:text-5xl" style={{ fontFamily: "'Syne', sans-serif" }}>
+            This project does not exist.
+          </h1>
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            className="mt-8 inline-flex items-center gap-2 rounded-full border border-emerald-400/18 bg-emerald-400/12 px-6 py-3 text-sm font-semibold text-emerald-300 transition-all hover:border-emerald-300/30 hover:bg-emerald-400/16 hover:text-emerald-200"
+          >
+            <ArrowLeft size={16} />
+            Go back
+          </button>
+        </motion.div>
       </main>
       <Footer />
     </div>
   )
 
   return (
-    <div className="relative min-h-screen bg-[#08120d] text-white">
+    <div className="relative overflow-hidden bg-[#060a06] text-white" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <Navbar currentPage="groups" />
 
       <div className="fixed inset-0 pointer-events-none" style={{ zIndex: 0 }}>
-        <div className="absolute inset-0 bg-[#08120d]" />
-        <div className="absolute inset-0 opacity-45" style={{ background: 'radial-gradient(circle at 50% 0%, rgba(16,185,129,0.18) 0%, transparent 65%)' }} />
+        <div className="absolute inset-0 bg-[#060a06]" />
+        <motion.div className="absolute inset-0 opacity-40" style={{ background: 'radial-gradient(circle at 18% 0%, rgba(16,185,129,0.18) 0%, transparent 42%)', y: glowY1 }} />
+        <motion.div className="absolute inset-0 opacity-20" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(6,182,212,0.12) 0%, transparent 36%)', y: glowY2 }} />
+        <div
+          className="absolute inset-0 opacity-[0.14]"
+          style={{
+            backgroundImage:
+              'linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px)',
+            backgroundSize: '124px 124px',
+            maskImage: 'radial-gradient(circle at 50% 18%, black 24%, transparent 88%)',
+          }}
+        />
       </div>
 
-      <main className="relative z-10 mx-auto w-full max-w-7xl px-6 pb-24 pt-28 md:px-10 lg:px-14">
-        <button onClick={() => navigate(-1)} className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-4 py-2 text-sm text-white/80 hover:border-emerald-400/30 hover:text-emerald-300 transition">
-          <ArrowLeft size={16} /> Back
-        </button>
+      <main className="relative z-10 flex-grow w-full pt-32 pb-24">
+        <div className="px-6 md:px-12 lg:px-20 xl:px-28">
+          <div className="mx-auto max-w-[1500px]">
+            <motion.button
+              variants={itemVariants}
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true }}
+              onClick={() => navigate(-1)}
+              className="mb-8 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-4 py-2 text-sm text-white/80 hover:border-emerald-400/30 hover:text-emerald-300 transition"
+            >
+              <ArrowLeft size={16} /> Back
+            </motion.button>
 
-        {/* Header */}
-        <section className="rounded-[32px] border border-white/[0.08] bg-white/[0.04] shadow-[0_30px_90px_-35px_rgba(0,0,0,0.85)] backdrop-blur-2xl overflow-hidden">
-          <div className="border-b border-white/[0.06] px-6 py-7 md:px-8">
-            <div className="flex flex-wrap items-start justify-between gap-6">
-              <div>
-                <div className="mb-3 flex items-center gap-3">
-                  <span className="h-2 w-2 rounded-full bg-emerald-400" style={{ boxShadow: '0 0 10px rgba(16,185,129,0.9)' }} />
-                  <span className="text-[10px] font-semibold uppercase tracking-[0.3em] text-emerald-400">{project.groupTitle || 'Project'}</span>
+            <motion.section
+              variants={heroVariants}
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: '-80px' }}
+              className="relative overflow-hidden rounded-[40px] border border-white/[0.08] bg-[linear-gradient(145deg,rgba(255,255,255,0.055),rgba(255,255,255,0.015))] shadow-[0_40px_120px_rgba(0,0,0,0.45)]"
+            >
+              <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-emerald-300/50 to-transparent" />
+              <div className="absolute -left-12 top-0 h-72 w-72 rounded-full blur-3xl bg-emerald-500/10" />
+              <div className="absolute -right-12 top-10 h-72 w-72 rounded-full blur-3xl bg-cyan-500/10" />
+
+              <div className="relative z-10 p-7 md:p-10 xl:p-12">
+                <div className="flex flex-wrap items-start justify-between gap-6">
+                  <div className="max-w-3xl">
+                    <div className="mb-5 flex flex-wrap items-center gap-3">
+                      <span className="inline-flex items-center gap-3 rounded-full border border-emerald-400/16 bg-emerald-400/10 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.34em] text-emerald-300">
+                        <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 shadow-[0_0_18px_rgba(16,185,129,0.8)]" />
+                        {project.groupTitle || 'Project'}
+                      </span>
+                    </div>
+                    <h1
+                      className="text-5xl font-bold leading-[0.9] text-white md:text-6xl xl:text-[5rem]"
+                      style={{ fontFamily: "'Syne', sans-serif", textShadow: '0 0 40px rgba(16,185,129,0.08)' }}
+                    >
+                      {project.title}
+                    </h1>
+                    <p className="mt-4 max-w-2xl text-base leading-8 text-white/58 md:text-lg">{project.description}</p>
+                  </div>
+                  <span className={`rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] ${statusBadge(project.status)}`}>{project.status}</span>
                 </div>
-                <h1 className="text-3xl font-black tracking-tight md:text-4xl">{project.title}</h1>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-white/55">{project.description}</p>
               </div>
-              <span className={`rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] ${statusBadge(project.status)}`}>{project.status}</span>
-            </div>
-          </div>
 
-          {/* Tabs */}
-          <div className="px-6 py-4 md:px-8">
-            <div className="flex flex-wrap gap-3">
-              {TABS.map(t => (
-                <button key={t.key} onClick={() => setActiveTab(t.key)}
-                  className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition ${activeTab === t.key ? 'border-emerald-400/35 bg-emerald-500/15 text-emerald-200' : 'border-white/10 bg-white/[0.03] text-white/65 hover:border-white/20 hover:text-white'}`}>
-                  <t.icon size={15} /> {t.label}
-                </button>
-              ))}
-            </div>
-          </div>
+              <div className="border-t border-white/[0.06] px-7 py-5 md:px-10 xl:px-12">
+                <div className="flex flex-wrap gap-3">
+                  {TABS.map(t => (
+                    <button key={t.key} onClick={() => setActiveTab(t.key)}
+                      className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition ${activeTab === t.key ? 'border-emerald-400/35 bg-emerald-500/15 text-emerald-200' : 'border-white/10 bg-white/[0.03] text-white/65 hover:border-white/20 hover:text-white'}`}>
+                      <t.icon size={15} /> {t.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
           <div className="px-6 pb-8 md:px-8">
             {/* ═══ SECTION 1: PROJECT DETAILS ═══ */}
@@ -614,7 +696,7 @@ export default function ProjectDetailsPage() {
                                 <MoreVertical size={14} />
                               </button>
                               {openDropdown === task.id && (
-                                <div className="absolute right-0 top-10 z-30 w-44 rounded-2xl border border-white/10 bg-[#0d1611] p-1.5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                                <div className="absolute right-0 top-10 z-30 w-44 rounded-2xl border border-white/10 bg-[#0a120c] p-1.5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
                                   <DropItem icon={Eye} label="Details" onClick={() => { setViewTask(task); setOpenDropdown(null) }} />
                                   {isOwner && <DropItem icon={UserPlus} label="Assign" onClick={() => { const email = window.prompt('Enter member email:'); if (email) assignTask(task.id, email); setOpenDropdown(null) }} />}
                                   {isOwner && <DropItem icon={Trash2} label="Remove" danger onClick={() => { deleteTask(task.id); setOpenDropdown(null) }} />}
@@ -820,10 +902,25 @@ export default function ProjectDetailsPage() {
               </div>
             )}
           </div>
-        </section>
+        </motion.section>
+          </div>
+        </div>
       </main>
 
       <Footer />
+
+      <style>{`
+        select option {
+          background: #0a120c;
+          color: #e2e8f0;
+        }
+        select option:hover,
+        select option:focus,
+        select option:checked {
+          background: rgba(16,185,129,0.15);
+          color: #6ee7b7;
+        }
+      `}</style>
 
       {/* ═══ ADD TASK MODAL ═══ */}
       {showTaskModal && (
@@ -1076,7 +1173,7 @@ const DropItem = ({ icon: Icon, label, onClick, danger }) => (
 
 const ModalOverlay = ({ children, onClose, maxWidthClassName = 'max-w-2xl' }) => (
   <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 py-8 backdrop-blur-md" onClick={onClose}>
-    <div className={`relative w-full ${maxWidthClassName} max-h-[90vh] overflow-y-auto rounded-[30px] border border-white/[0.09] bg-[#0d1611] p-6 shadow-[0_30px_120px_-40px_rgba(0,0,0,0.95)]`} onClick={(e) => e.stopPropagation()}>
+    <div className={`relative w-full ${maxWidthClassName} max-h-[90vh] overflow-y-auto rounded-[30px] border border-white/[0.09] bg-[#0a120c] p-6 shadow-[0_30px_120px_-40px_rgba(0,0,0,0.95)]`} onClick={(e) => e.stopPropagation()}>
       <button type="button" onClick={onClose} className="absolute top-4 right-4 flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-white/60 hover:text-white">
         <X size={16} />
       </button>

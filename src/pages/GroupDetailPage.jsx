@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState, useRef } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
+import { motion, useScroll, useTransform } from 'framer-motion'
 import {
   ArrowLeft,
   CheckCircle2,
   Crown,
   LayoutGrid,
   Plus,
-  Settings2,
   Shield,
   Sparkles,
   Trash2,
@@ -81,6 +81,21 @@ const formatDisplayDate = (value, fallback = 'N/A') => {
   return Number.isNaN(parsed.getTime()) ? String(value) : parsed.toISOString().split('T')[0]
 }
 
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: { opacity: 1, transition: { staggerChildren: 0.07, delayChildren: 0.06 } },
+}
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 24 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.55, ease: [0.25, 0.46, 0.45, 0.94] } },
+}
+
+const heroVariants = {
+  hidden: { opacity: 0, y: 30, scale: 0.98 },
+  visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.7, ease: [0.25, 0.46, 0.45, 0.94] } },
+}
+
 const GroupDetailPage = () => {
   const navigate = useNavigate()
   const { id } = useParams()
@@ -88,6 +103,10 @@ const GroupDetailPage = () => {
   const groupId = Number(id)
   const [groups, setGroups] = useState(() => getStoredGroups())
   const profile = useMemo(() => readStoredProfile(), [])
+
+  const { scrollY } = useScroll()
+  const glowY1 = useTransform(scrollY, [0, 500], [0, -60])
+  const glowY2 = useTransform(scrollY, [0, 500], [0, -30])
 
   useEffect(() => {
     const logged = localStorage.getItem('qsphere_logged_in') === '1'
@@ -323,22 +342,37 @@ const GroupDetailPage = () => {
 
   if (!group) {
     return (
-      <div className="relative min-h-screen bg-[#08120d] text-white">
+      <div className="relative overflow-hidden bg-[#060a06] text-white" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
         <Navbar currentPage="groups" />
-        <main className="relative z-10 mx-auto flex min-h-screen w-full max-w-4xl flex-col px-6 py-28 sm:px-8">
-          <button
-            type="button"
-            onClick={() => navigate('/groups')}
-            className="mb-6 inline-flex w-fit items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-4 py-2 text-sm text-white/80 hover:border-emerald-400/30 hover:text-emerald-300 transition"
+        <div className="fixed inset-0 pointer-events-none" style={{ zIndex: 0 }}>
+          <div className="absolute inset-0 bg-[#060a06]" />
+          <motion.div className="absolute inset-0 opacity-40" style={{ background: 'radial-gradient(circle at 18% 0%, rgba(16,185,129,0.18) 0%, transparent 42%)', y: glowY1 }} />
+          <motion.div className="absolute inset-0 opacity-20" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(6,182,212,0.12) 0%, transparent 36%)', y: glowY2 }} />
+        </div>
+        <main className="relative z-10 flex flex-1 items-center justify-center px-6 py-28">
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            className="w-full max-w-2xl rounded-[36px] border border-white/[0.08] bg-[linear-gradient(145deg,rgba(255,255,255,0.055),rgba(255,255,255,0.015))] p-8 text-center shadow-[0_40px_120px_rgba(0,0,0,0.45)] md:p-10"
           >
-            <ArrowLeft size={16} />
-            Back to groups
-          </button>
-          <div className="rounded-[28px] border border-white/[0.08] bg-white/[0.05] p-8 backdrop-blur-2xl">
-            <div className="text-[10px] uppercase tracking-[0.3em] text-emerald-300/70">Group not found</div>
-            <h1 className="mt-3 text-3xl font-black">This group does not exist.</h1>
-            <p className="mt-3 text-white/55">Return to the groups list and choose another project workspace.</p>
-          </div>
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[24px] border border-emerald-400/18 bg-emerald-400/10 text-emerald-300 shadow-[0_0_30px_rgba(16,185,129,0.12)]">
+              <Users2 size={28} />
+            </div>
+            <div className="mt-6 text-[10px] font-bold uppercase tracking-[0.3em] text-emerald-300/78">Group not found</div>
+            <h1 className="mt-4 text-4xl font-bold leading-[0.95] text-white md:text-5xl" style={{ fontFamily: "'Syne', sans-serif" }}>
+              This group does not exist.
+            </h1>
+            <p className="mx-auto mt-6 max-w-xl text-sm leading-7 text-white/56">Return to the groups list and choose another project workspace.</p>
+            <button
+              type="button"
+              onClick={() => navigate('/groups')}
+              className="mt-8 inline-flex items-center gap-2 rounded-full border border-emerald-400/18 bg-emerald-400/12 px-6 py-3 text-sm font-semibold text-emerald-300 transition-all hover:border-emerald-300/30 hover:bg-emerald-400/16 hover:text-emerald-200"
+            >
+              <ArrowLeft size={16} />
+              Back to groups
+            </button>
+          </motion.div>
         </main>
         <Footer />
       </div>
@@ -346,57 +380,100 @@ const GroupDetailPage = () => {
   }
 
   return (
-    <div className="relative min-h-screen bg-[#08120d] text-white">
+    <div className="relative overflow-hidden bg-[#060a06] text-white" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <Navbar currentPage="groups" />
 
       <div className="fixed inset-0 pointer-events-none" style={{ zIndex: 0 }}>
-        <div className="absolute inset-0 bg-[#08120d]" />
-        <div className="absolute inset-0 opacity-45" style={{ background: 'radial-gradient(circle at 50% 0%, rgba(16,185,129,0.18) 0%, transparent 65%)' }} />
-        <div className="absolute inset-0 opacity-20" style={{ background: 'radial-gradient(circle at 100% 100%, rgba(6,182,212,0.16) 0%, transparent 50%)' }} />
+        <div className="absolute inset-0 bg-[#060a06]" />
+        <motion.div className="absolute inset-0 opacity-40" style={{ background: 'radial-gradient(circle at 18% 0%, rgba(16,185,129,0.18) 0%, transparent 42%)', y: glowY1 }} />
+        <motion.div className="absolute inset-0 opacity-20" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(6,182,212,0.12) 0%, transparent 36%)', y: glowY2 }} />
+        <div
+          className="absolute inset-0 opacity-[0.14]"
+          style={{
+            backgroundImage:
+              'linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px)',
+            backgroundSize: '124px 124px',
+            maskImage: 'radial-gradient(circle at 50% 18%, black 24%, transparent 88%)',
+          }}
+        />
       </div>
 
-      <main className="relative z-10 mx-auto w-full max-w-7xl px-6 pb-24 pt-28 md:px-10 lg:px-14">
-        <button
-          type="button"
-          onClick={() => navigate('/groups')}
-          className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-4 py-2 text-sm text-white/80 hover:border-emerald-400/30 hover:text-emerald-300 transition"
-        >
-          <ArrowLeft size={16} />
-          Back to groups
-        </button>
+      <main className="relative z-10 flex-grow w-full pt-32 pb-24">
+        <div className="px-6 md:px-12 lg:px-20 xl:px-28">
+          <div className="mx-auto max-w-[1500px]">
+            <motion.button
+              variants={itemVariants}
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true }}
+              type="button"
+              onClick={() => navigate('/groups')}
+              className="mb-8 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-4 py-2 text-sm text-white/80 hover:border-emerald-400/30 hover:text-emerald-300 transition"
+            >
+              <ArrowLeft size={16} />
+              Back to groups
+            </motion.button>
 
-        <section className="overflow-hidden rounded-[32px] border border-white/[0.08] bg-white/[0.04] shadow-[0_30px_90px_-35px_rgba(0,0,0,0.85)] backdrop-blur-2xl">
-          <div className="border-b border-white/[0.06] px-6 py-7 md:px-8">
-            <div className="flex flex-wrap items-start justify-between gap-6">
-              <div className="max-w-3xl">
-                <div className="mb-4 flex items-center gap-3">
-                  <span className="h-2 w-2 rounded-full bg-emerald-400" style={{ boxShadow: '0 0 10px rgba(16,185,129,0.9)' }} />
-                  <span className="text-[10px] font-semibold uppercase tracking-[0.3em] text-emerald-400">Group workspace</span>
+            <motion.section
+              variants={heroVariants}
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: '-80px' }}
+              className="relative overflow-hidden rounded-[40px] border border-white/[0.08] bg-[linear-gradient(145deg,rgba(255,255,255,0.055),rgba(255,255,255,0.015))] shadow-[0_40px_120px_rgba(0,0,0,0.45)]"
+            >
+              <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-emerald-300/50 to-transparent" />
+              <div className="absolute -left-12 top-0 h-72 w-72 rounded-full blur-3xl bg-emerald-500/10" />
+              <div className="absolute -right-12 top-10 h-72 w-72 rounded-full blur-3xl bg-cyan-500/10" />
+
+              <div className="relative z-10 p-7 md:p-10 xl:p-12">
+                <div className="flex flex-wrap items-start justify-between gap-6">
+                  <div className="max-w-3xl">
+                    <div className="mb-5 flex flex-wrap items-center gap-3">
+                      <span className="inline-flex items-center gap-3 rounded-full border border-emerald-400/16 bg-emerald-400/10 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.34em] text-emerald-300">
+                        <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 shadow-[0_0_18px_rgba(16,185,129,0.8)]" />
+                        Group workspace
+                      </span>
+                      {group.groupType && (
+                        <span className="inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.24em] text-white/52">
+                          {group.groupType}
+                        </span>
+                      )}
+                    </div>
+                    <h1
+                      className="text-5xl font-bold leading-[0.9] text-white md:text-6xl xl:text-[5rem]"
+                      style={{ fontFamily: "'Syne', sans-serif", textShadow: '0 0 40px rgba(16,185,129,0.08)' }}
+                    >
+                      {group.groupTitle || group.title}
+                    </h1>
+                    <p className="mt-5 max-w-2xl text-base leading-8 text-white/58 md:text-lg">{group.groupDescription || group.description}</p>
+                  </div>
+
+                  <div className="rounded-[34px] border border-emerald-400/15 bg-emerald-500/10 px-6 py-5">
+                    <div className="flex items-center gap-3 text-emerald-200">
+                      <Crown size={18} />
+                      <span className="text-[10px] font-bold uppercase tracking-[0.28em]">Admin</span>
+                    </div>
+                    <div className="mt-3 text-xl font-bold text-white" style={{ fontFamily: "'Syne', sans-serif" }}>{group.owner}</div>
+                    <div className="mt-1 text-xs text-white/50">Project owner and management access holder</div>
+                  </div>
                 </div>
-                <h1 className="text-4xl font-black tracking-tight md:text-5xl" style={{ fontFamily: "'Archivo Black', 'Inter', sans-serif" }}>
-                  {group.groupTitle || group.title}
-                </h1>
-                <p className="mt-3 max-w-2xl text-sm leading-6 text-white/55 md:text-base">{group.groupDescription || group.description}</p>
+
+                <motion.div variants={containerVariants} initial="hidden" whileInView="visible" viewport={{ once: true }} className="mt-10 grid gap-4 md:grid-cols-3">
+                  <StatCard icon={Users2} label="Total Members" value={String(totalMembers)} accent />
+                  <StatCard icon={Sparkles} label="Active Users" value={String(activeUsers)} />
+                  <StatCard icon={LayoutGrid} label="Projects" value={String(totalProjects)} accent />
+                </motion.div>
               </div>
 
-              <div className="rounded-3xl border border-emerald-400/15 bg-emerald-500/10 px-5 py-4">
-                <div className="flex items-center gap-3 text-emerald-200">
-                  <Crown size={18} />
-                  <span className="text-xs font-semibold uppercase tracking-[0.24em]">Admin</span>
-                </div>
-                <div className="mt-2 text-lg font-bold text-white">{group.owner}</div>
-                <div className="mt-1 text-xs text-white/50">Project owner and management access holder</div>
-              </div>
-            </div>
+            </motion.section>
 
-            <div className="mt-8 grid gap-4 md:grid-cols-3">
-              <StatCard icon={Users2} label="Total Members" value={String(totalMembers)} accent />
-              <StatCard icon={Sparkles} label="Active Users" value={String(activeUsers)} />
-              <StatCard icon={LayoutGrid} label="Projects" value={String(totalProjects)} accent />
-            </div>
-          </div>
-
-          <div className="px-6 py-6 md:px-8">
+            <motion.section
+              variants={containerVariants}
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: '-60px' }}
+              className="relative z-10 mt-8 rounded-[40px] border border-white/[0.08] bg-[linear-gradient(145deg,rgba(255,255,255,0.04),rgba(255,255,255,0.015))] p-7 shadow-[0_40px_120px_rgba(0,0,0,0.45)] md:p-10 xl:p-12"
+            >
             <div className="flex flex-wrap items-center gap-3">
               <TabButton active={activeTab === 'details'} onClick={() => setActiveTab('details')} icon={CheckCircle2} label="Group Details" />
               {isAdmin ? (
@@ -707,15 +784,29 @@ const GroupDetailPage = () => {
                 </p>
               </div>
             ) : null}
+          </motion.section>
           </div>
-        </section>
+        </div>
       </main>
 
       <Footer />
 
+      <style>{`
+        select option {
+          background: #0a120c;
+          color: #e2e8f0;
+        }
+        select option:hover,
+        select option:focus,
+        select option:checked {
+          background: rgba(16,185,129,0.15);
+          color: #6ee7b7;
+        }
+      `}</style>
+
       {showProjectModal ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 py-8 backdrop-blur-md">
-          <div className="w-full max-w-2xl rounded-[30px] border border-white/[0.09] bg-[#0d1611] p-6 shadow-[0_30px_120px_-40px_rgba(0,0,0,0.95)]">
+          <div className="w-full max-w-2xl rounded-[30px] border border-white/[0.09] bg-[#0a120c] p-6 shadow-[0_30px_120px_-40px_rgba(0,0,0,0.95)]">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <div className="text-[10px] uppercase tracking-[0.3em] text-emerald-300/70">New Project</div>
@@ -845,7 +936,7 @@ const TabButton = ({ active, onClick, icon: Icon, label }) => (
 )
 
 const StatCard = ({ icon: Icon, label, value, accent = false }) => (
-  <div className="rounded-2xl border border-white/[0.06] bg-white/[0.025] p-5 transition-all duration-300 hover:border-emerald-400/20 hover:bg-white/[0.04]">
+  <motion.div variants={itemVariants} className="rounded-[28px] border border-white/[0.07] bg-black/20 p-5 backdrop-blur-xl">
     <div className="flex items-center gap-4">
       <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-emerald-400/15 bg-emerald-500/10 text-emerald-300">
         <Icon size={18} />
@@ -855,7 +946,7 @@ const StatCard = ({ icon: Icon, label, value, accent = false }) => (
         <div className={`mt-1 text-2xl font-bold ${accent ? 'text-emerald-300' : 'text-white'}`}>{value}</div>
       </div>
     </div>
-  </div>
+  </motion.div>
 )
 
 const MiniRow = ({ label, value }) => (

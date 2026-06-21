@@ -709,6 +709,12 @@ app.post('/api/auth/login', async (request, response) => {
 
 /* ─── Onboarding Endpoint ───────────────────────────────────────── */
 app.post('/api/users/onboarding', async (request, response) => {
+  const authEmail = getSignedCookie(request, authCookieName)
+  const verifyEmail = getSignedCookie(request, verifyCookieName)
+  if (!authEmail && !verifyEmail) {
+    return response.status(404).json({ error: 'Not found' })
+  }
+
   const {
     emailAddress,
     role,
@@ -2098,7 +2104,7 @@ app.post('/api/projects/:projectId/chat/read', async (request, response) => {
          SELECT pc.id, $2
          FROM project_chat pc
          WHERE pc."projectId" = $1
-           AND LOWER(COALESCE(pc."senderEmail", '')) <> $2
+           AND LOWER(COALESCE(pc."senderEmail", '')) <> LOWER($2::varchar)
            AND COALESCE(pc."deletedForEveryone", FALSE) = FALSE
          ON CONFLICT ("messageId", "userEmail") DO NOTHING
          RETURNING "messageId"

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { motion, useScroll, useTransform } from 'framer-motion'
 import {
   ArrowLeft,
   Bell,
@@ -15,6 +16,7 @@ import {
   KeyRound,
   List,
   ListOrdered,
+  MapPin,
   Pencil,
   Quote,
   RotateCcw,
@@ -37,10 +39,27 @@ import {
 } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
+import { useTheme } from '../contexts/ThemeContext'
+import { darkTheme, dayTheme } from '../themeColors'
 import { onboardingCommonFields, onboardingRoleFields, onboardingRoles } from '../data/onboarding'
 
 const storageKey = 'qsphere_onboarding_profile'
 const prefsStorageKey = 'qsphere_account_preferences'
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: { opacity: 1, transition: { staggerChildren: 0.07, delayChildren: 0.06 } },
+}
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 24 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.55, ease: [0.25, 0.46, 0.45, 0.94] } },
+}
+
+const heroVariants = {
+  hidden: { opacity: 0, y: 30, scale: 0.98 },
+  visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.7, ease: [0.25, 0.46, 0.45, 0.94] } },
+}
 
 const readStoredProfile = () => {
   try {
@@ -98,18 +117,32 @@ const fieldLabelMap = {
   cellAlternative: 'Cell No. (Alternative)',
 }
 
+const formatDateLabel = (value) => {
+  if (!value) return 'Recently joined'
+  const timestamp = new Date(value).getTime()
+  if (Number.isNaN(timestamp)) return 'Recently joined'
+
+  return new Date(timestamp).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+}
+
+const getInitials = (name) => {
+  const words = String(name || '').trim().split(/\s+/).filter(Boolean)
+  if (words.length === 0) return 'QS'
+  return words.slice(0, 2).map((word) => word[0]?.toUpperCase() || '').join('')
+}
+
 const inputClassName =
-  'mt-2 w-full rounded-xl border border-white/10 bg-white/[0.05] px-4 py-3 text-sm text-white placeholder:text-white/35 outline-none transition focus:border-emerald-400/40 focus:bg-white/[0.08] focus:shadow-[0_0_0_4px_rgba(16,185,129,0.12)] disabled:opacity-70'
+  'qs-account-input mt-2 w-full rounded-2xl border px-4 py-3 text-sm outline-none transition disabled:cursor-not-allowed disabled:opacity-70'
 
 const cardClassName =
-  'rounded-3xl border border-white/[0.08] bg-white/[0.05] p-6 shadow-[0_20px_70px_-35px_rgba(0,0,0,0.8)] backdrop-blur-2xl'
+  'qs-account-card rounded-[32px] border p-6 backdrop-blur-2xl md:p-7'
 
 const tabButtonClassName = (active) =>
-  `inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition ${
-    active
-      ? 'border-emerald-400/35 bg-emerald-500/15 text-emerald-200'
-      : 'border-white/10 bg-white/[0.03] text-white/65 hover:border-white/20 hover:text-white'
-  }`
+  `qs-account-tab inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition ${active ? 'qs-account-tab-active' : ''}`
 
 const makeBlogDraft = (blog) => ({
   id: blog?.id ?? null,
@@ -137,10 +170,10 @@ const fileToDataUrl = (file) =>
   })
 
 const ToggleRow = ({ label, description, checked, onChange, disabled }) => (
-  <label className="flex items-start justify-between gap-4 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3">
+  <label className="qs-account-soft-panel flex items-start justify-between gap-4 rounded-2xl border px-4 py-3">
     <div>
-      <div className="text-sm font-semibold text-white">{label}</div>
-      <div className="mt-1 text-xs text-white/45">{description}</div>
+      <div className="text-sm font-semibold qs-account-text-primary">{label}</div>
+      <div className="mt-1 text-xs qs-account-text-muted">{description}</div>
     </div>
     <button
       type="button"
@@ -148,13 +181,13 @@ const ToggleRow = ({ label, description, checked, onChange, disabled }) => (
       disabled={disabled}
       className={`relative mt-0.5 h-7 w-12 rounded-full border transition ${
         checked
-          ? 'border-emerald-400/50 bg-emerald-500/35'
-          : 'border-white/20 bg-white/10'
+          ? 'qs-account-toggle-active'
+          : 'qs-account-toggle-idle'
       } ${disabled ? 'cursor-not-allowed' : ''}`}
       aria-pressed={checked}
     >
       <span
-        className={`absolute top-1 h-5 w-5 rounded-full bg-white transition-transform ${checked ? 'translate-x-6' : 'translate-x-1'}`}
+        className={`absolute top-1 h-5 w-5 rounded-full qs-account-toggle-thumb transition-transform ${checked ? 'translate-x-6' : 'translate-x-1'}`}
       />
     </button>
   </label>
@@ -163,6 +196,7 @@ const ToggleRow = ({ label, description, checked, onChange, disabled }) => (
 const AccountManagementPage = () => {
   const navigate = useNavigate()
   const location = useLocation()
+  const { theme } = useTheme()
   const initialProfile = location.state?.profile ?? readStoredProfile()
 
   const [profile, setProfile] = useState(initialProfile || {})
@@ -204,6 +238,216 @@ const AccountManagementPage = () => {
 
   const [blogSaving, setBlogSaving] = useState(false)
   const [groupSaving, setGroupSaving] = useState(false)
+  const isDayMode = theme === 'light'
+  const palette = isDayMode ? dayTheme : darkTheme
+  const pageBg = isDayMode
+    ? 'linear-gradient(180deg, #faf9f7 0%, #f4f2ec 48%, #eeece6 100%)'
+    : palette.bgPrimary
+  const ambientPrimary = isDayMode ? 'rgba(46,197,138,0.12)' : 'rgba(16,185,129,0.18)'
+  const ambientSecondary = isDayMode ? 'rgba(6,182,212,0.08)' : 'rgba(6,182,212,0.12)'
+  const titleShadow = isDayMode ? '0 12px 36px rgba(255,255,255,0.55)' : '0 0 40px rgba(16,185,129,0.08)'
+  const cardBackground = isDayMode
+    ? 'linear-gradient(145deg, rgba(255,255,255,0.96), rgba(247,247,245,0.9))'
+    : 'linear-gradient(145deg, rgba(255,255,255,0.05), rgba(255,255,255,0.015))'
+  const shellBackground = isDayMode
+    ? 'linear-gradient(180deg, rgba(255,255,255,0.96), rgba(247,247,245,0.92))'
+    : 'linear-gradient(180deg, rgba(5,10,8,0.92), rgba(4,8,7,0.74))'
+  const accountThemeVars = {
+    '--qs-ac-bg-primary': palette.bgPrimary,
+    '--qs-ac-bg-secondary': palette.bgSecondary,
+    '--qs-ac-bg-tertiary': palette.bgTertiary,
+    '--qs-ac-surface': palette.bgSurface,
+    '--qs-ac-surface-hover': palette.bgSurfaceHover,
+    '--qs-ac-input': palette.bgInput,
+    '--qs-ac-input-focus': palette.bgInputFocus,
+    '--qs-ac-text': palette.textPrimary,
+    '--qs-ac-text-secondary': palette.textSecondary,
+    '--qs-ac-text-muted': palette.textMuted,
+    '--qs-ac-text-faint': palette.textFaint,
+    '--qs-ac-accent': palette.accentPrimary,
+    '--qs-ac-accent-strong': isDayMode ? palette.accentDark : palette.accentLight,
+    '--qs-ac-accent-soft': palette.accentSoft,
+    '--qs-ac-accent-border': palette.accentBorder,
+    '--qs-ac-border': palette.borderPrimary,
+    '--qs-ac-border-soft': palette.borderSoft,
+    '--qs-ac-border-input': palette.borderInput,
+    '--qs-ac-border-focus': palette.borderInputFocus,
+    '--qs-ac-shadow-card': isDayMode ? '0 28px 100px rgba(15,23,42,0.08)' : '0 28px 100px rgba(0,0,0,0.42)',
+    '--qs-ac-shadow-hero': isDayMode ? '0 40px 120px rgba(15,23,42,0.08)' : '0 40px 120px rgba(0,0,0,0.45)',
+    '--qs-ac-shadow-modal': palette.shadowDropdown,
+    '--qs-ac-btn-primary-bg': palette.btnPrimaryBg,
+    '--qs-ac-btn-primary-border': palette.btnPrimaryBorder,
+    '--qs-ac-btn-primary-text': palette.btnPrimaryText,
+    '--qs-ac-btn-primary-hover-bg': palette.btnPrimaryHoverBg,
+    '--qs-ac-btn-primary-hover-border': palette.btnPrimaryHoverBorder,
+    '--qs-ac-btn-primary-hover-text': palette.btnPrimaryHoverText,
+    '--qs-ac-btn-secondary-bg': palette.btnSecondaryBg,
+    '--qs-ac-btn-secondary-border': palette.btnSecondaryBorder,
+    '--qs-ac-btn-secondary-text': palette.btnSecondaryText,
+    '--qs-ac-btn-secondary-hover-bg': palette.btnSecondaryHoverBg,
+    '--qs-ac-btn-secondary-hover-border': palette.btnSecondaryHoverBorder,
+    '--qs-ac-btn-secondary-hover-text': palette.btnSecondaryHoverText,
+    '--qs-ac-danger-bg': isDayMode ? 'rgba(239,68,68,0.08)' : 'rgba(239,68,68,0.10)',
+    '--qs-ac-danger-border': 'rgba(239,68,68,0.25)',
+    '--qs-ac-danger-text': isDayMode ? '#b91c1c' : '#fecaca',
+    '--qs-ac-editor-prose': palette.textPrimary,
+    '--qs-ac-editor-placeholder': palette.textFaint,
+  }
+  const accountThemeStyles = `
+    .qs-account-theme { color: var(--qs-ac-text); }
+    .qs-account-theme .qs-account-card {
+      border-color: var(--qs-ac-border) !important;
+      background: ${cardBackground} !important;
+      box-shadow: var(--qs-ac-shadow-card) !important;
+    }
+    .qs-account-theme .qs-account-soft-panel {
+      border-color: var(--qs-ac-border-soft) !important;
+      background: ${isDayMode ? 'rgba(255,255,255,0.84)' : 'rgba(255,255,255,0.04)'} !important;
+    }
+    .qs-account-theme .qs-account-input {
+      border-color: var(--qs-ac-border-input) !important;
+      background: var(--qs-ac-input) !important;
+      color: var(--qs-ac-text) !important;
+    }
+    .qs-account-theme .qs-account-input::placeholder {
+      color: var(--qs-ac-editor-placeholder) !important;
+    }
+    .qs-account-theme .qs-account-input:focus {
+      border-color: var(--qs-ac-border-focus) !important;
+      background: var(--qs-ac-input-focus) !important;
+      box-shadow: 0 0 0 4px ${isDayMode ? 'rgba(46,197,138,0.12)' : 'rgba(16,185,129,0.12)'} !important;
+    }
+    .qs-account-theme .qs-account-tab {
+      border-color: var(--qs-ac-btn-secondary-border) !important;
+      background: var(--qs-ac-btn-secondary-bg) !important;
+      color: var(--qs-ac-btn-secondary-text) !important;
+    }
+    .qs-account-theme .qs-account-tab:hover {
+      border-color: var(--qs-ac-btn-secondary-hover-border) !important;
+      background: var(--qs-ac-btn-secondary-hover-bg) !important;
+      color: var(--qs-ac-btn-secondary-hover-text) !important;
+    }
+    .qs-account-theme .qs-account-tab-active {
+      border-color: var(--qs-ac-accent-border) !important;
+      background: var(--qs-ac-accent-soft) !important;
+      color: var(--qs-ac-accent-strong) !important;
+      box-shadow: ${isDayMode ? '0 0 18px rgba(46,197,138,0.08)' : '0 0 18px rgba(16,185,129,0.08)'} !important;
+    }
+    .qs-account-theme .qs-account-primary-btn {
+      border-color: var(--qs-ac-btn-primary-border) !important;
+      background: var(--qs-ac-btn-primary-bg) !important;
+      color: var(--qs-ac-btn-primary-text) !important;
+    }
+    .qs-account-theme .qs-account-primary-btn:hover {
+      border-color: var(--qs-ac-btn-primary-hover-border) !important;
+      background: var(--qs-ac-btn-primary-hover-bg) !important;
+      color: var(--qs-ac-btn-primary-hover-text) !important;
+    }
+    .qs-account-theme .qs-account-secondary-btn {
+      border-color: var(--qs-ac-btn-secondary-border) !important;
+      background: var(--qs-ac-btn-secondary-bg) !important;
+      color: var(--qs-ac-btn-secondary-text) !important;
+    }
+    .qs-account-theme .qs-account-secondary-btn:hover {
+      border-color: var(--qs-ac-btn-secondary-hover-border) !important;
+      background: var(--qs-ac-btn-secondary-hover-bg) !important;
+      color: var(--qs-ac-btn-secondary-hover-text) !important;
+    }
+    .qs-account-theme .qs-account-solid-btn {
+      border-color: var(--qs-ac-btn-primary-border) !important;
+      background: var(--qs-ac-accent) !important;
+      color: ${isDayMode ? '#ffffff' : '#000000'} !important;
+    }
+    .qs-account-theme .qs-account-solid-btn:hover {
+      background: ${isDayMode ? palette.accentDark : palette.accentLight} !important;
+      color: ${isDayMode ? '#ffffff' : '#000000'} !important;
+    }
+    .qs-account-theme .qs-account-danger-btn {
+      border-color: var(--qs-ac-danger-border) !important;
+      background: var(--qs-ac-danger-bg) !important;
+      color: var(--qs-ac-danger-text) !important;
+    }
+    .qs-account-theme .qs-account-danger-btn:hover {
+      background: ${isDayMode ? 'rgba(239,68,68,0.12)' : 'rgba(239,68,68,0.20)'} !important;
+    }
+    .qs-account-theme .qs-account-loading,
+    .qs-account-theme .qs-account-root,
+    .qs-account-theme .qs-account-empty-root {
+      color: var(--qs-ac-text);
+    }
+    .qs-account-theme .qs-account-text-primary { color: var(--qs-ac-text) !important; }
+    .qs-account-theme .qs-account-text-secondary { color: var(--qs-ac-text-secondary) !important; }
+    .qs-account-theme .qs-account-text-muted { color: var(--qs-ac-text-muted) !important; }
+    .qs-account-theme .qs-account-text-faint { color: var(--qs-ac-text-faint) !important; }
+    .qs-account-theme .qs-account-accent { color: var(--qs-ac-accent) !important; }
+    .qs-account-theme .qs-account-accent-strong { color: var(--qs-ac-accent-strong) !important; }
+    .qs-account-theme .qs-account-toggle-active {
+      border-color: var(--qs-ac-accent-border) !important;
+      background: ${isDayMode ? palette.accentPrimary : 'rgba(16,185,129,0.35)'} !important;
+    }
+    .qs-account-theme .qs-account-toggle-idle {
+      border-color: var(--qs-ac-border-input) !important;
+      background: ${isDayMode ? '#e7e5e1' : 'rgba(255,255,255,0.10)'} !important;
+    }
+    .qs-account-theme .qs-account-toggle-thumb {
+      background: ${isDayMode ? '#ffffff' : '#ffffff'} !important;
+      box-shadow: ${isDayMode ? '0 4px 10px rgba(15,23,42,0.12)' : 'none'};
+    }
+    .qs-account-theme .qs-account-editor-shell {
+      border-color: var(--qs-ac-border-input) !important;
+      background: ${isDayMode ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.02)'} !important;
+    }
+    .qs-account-theme .qs-account-editor-toolbar,
+    .qs-account-theme .qs-account-editor-footer {
+      border-color: var(--qs-ac-border-input) !important;
+      background: ${isDayMode ? 'rgba(247,247,245,0.92)' : 'rgba(255,255,255,0.06)'} !important;
+      color: var(--qs-ac-text-secondary) !important;
+    }
+    .qs-account-theme .qs-account-editor-toolbar button {
+      color: var(--qs-ac-text-secondary) !important;
+    }
+    .qs-account-theme .qs-account-editor-toolbar button:hover {
+      background: var(--qs-ac-surface-hover) !important;
+      color: var(--qs-ac-text) !important;
+    }
+    .qs-account-theme .qs-account-editor {
+      background: ${isDayMode ? 'rgba(255,255,255,0.98)' : 'rgba(255,255,255,0.03)'} !important;
+      color: var(--qs-ac-editor-prose) !important;
+    }
+    .qs-account-theme .qs-account-editor:focus {
+      background: ${isDayMode ? '#ffffff' : 'rgba(255,255,255,0.05)'} !important;
+    }
+    .qs-account-theme .qs-account-editor a {
+      color: var(--qs-ac-accent-strong) !important;
+    }
+    .qs-account-theme .qs-account-editor[data-placeholder]:empty::before {
+      content: attr(data-placeholder);
+      color: var(--qs-ac-editor-placeholder);
+      pointer-events: none;
+      float: left;
+      height: 0;
+    }
+    .qs-account-theme .qs-account-editor.prose,
+    .qs-account-theme .qs-account-editor.prose :where(h1,h2,h3,h4,strong,blockquote,p,li,span) {
+      color: var(--qs-ac-editor-prose) !important;
+    }
+    .qs-account-theme .qs-account-editor.prose blockquote {
+      border-left-color: var(--qs-ac-accent-border) !important;
+    }
+    .qs-account-theme .qs-account-dropdown {
+      border-color: var(--qs-ac-border) !important;
+      background: ${isDayMode ? 'rgba(255,255,255,0.96)' : 'rgba(8,18,13,0.95)'} !important;
+      box-shadow: var(--qs-ac-shadow-modal) !important;
+    }
+    .qs-account-theme .qs-account-modal-panel {
+      border-color: var(--qs-ac-border) !important;
+      background: ${isDayMode ? 'rgba(255,255,255,0.98)' : '#0b1510'} !important;
+      box-shadow: var(--qs-ac-shadow-modal) !important;
+    }
+    .qs-account-theme .qs-account-modal-overlay {
+      background: ${isDayMode ? 'rgba(10,22,32,0.22)' : 'rgba(0,0,0,0.55)'} !important;
+    }
+  `
 
   const roleConfig = useMemo(() => {
     if (!profile?.role) return onboardingRoles[0]
@@ -222,6 +466,27 @@ const AccountManagementPage = () => {
 
   const roleFields = onboardingRoleFields[roleConfig.id] ?? []
   const completion = getCompletion(profile, roleFields)
+  const profileAvatar = profile?.profileImage || profile?.avatarPreview || ''
+  const profileEmail = profile?.emailAddress || profile?.email || 'Email not available'
+  const joinedLabel = formatDateLabel(profile?.created_at || profile?.submittedAt)
+
+  const summaryLine = useMemo(() => {
+    const values = [
+      profile?.organization,
+      profile?.institute,
+      profile?.roleTitle,
+      profile?.designation,
+      profile?.researchFocus,
+      profile?.researchInterest,
+      profile?.degree,
+    ].filter((value) => String(value || '').trim())
+
+    return values[0] || roleConfig.description
+  }, [profile, roleConfig.description])
+
+  const { scrollY } = useScroll()
+  const glowY1 = useTransform(scrollY, [0, 500], [0, -60])
+  const glowY2 = useTransform(scrollY, [0, 500], [0, -30])
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -403,6 +668,7 @@ const AccountManagementPage = () => {
         const { user } = await res.json()
         setProfile(user)
         try {
+          localStorage.setItem(storageKey, JSON.stringify(user))
           localStorage.setItem(prefsStorageKey, JSON.stringify(prefs))
         } catch {
           // ignore
@@ -741,41 +1007,58 @@ const AccountManagementPage = () => {
 
   if (profileLoading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-[#030705]">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent" />
+      <div className="qs-account-theme qs-account-loading relative flex min-h-screen items-center justify-center overflow-hidden" style={{ ...accountThemeVars, background: pageBg }}>
+        <style>{accountThemeStyles}</style>
+        <div className="absolute inset-0" style={{ background: pageBg }} />
+        <div className="absolute inset-0 opacity-40" style={{ background: `radial-gradient(circle at 20% 0%, ${ambientPrimary} 0%, transparent 42%)` }} />
+        <div className="absolute inset-0 opacity-20" style={{ background: `radial-gradient(circle at 100% 0%, ${ambientSecondary} 0%, transparent 36%)` }} />
+        <div className="relative z-10 flex flex-col items-center gap-4">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-emerald-500/70 border-t-transparent" />
+          <div className="text-[10px] font-bold uppercase tracking-[0.3em] qs-account-accent-strong">Loading account surface</div>
+        </div>
       </div>
     )
   }
 
   if (!profile || Object.keys(profile).length === 0) {
     return (
-      <div className="relative min-h-screen bg-[#08120d] text-white">
+      <div className="qs-account-theme qs-account-empty-root relative min-h-screen overflow-hidden" style={{ ...accountThemeVars, background: pageBg }}>
+        <style>{accountThemeStyles}</style>
         <Navbar currentPage="dashboard" />
         <div className="fixed inset-0 pointer-events-none" style={{ zIndex: 0 }}>
-          <div className="absolute inset-0 bg-[#08120d]" />
-          <div
-            className="absolute inset-0 opacity-45"
-            style={{ background: 'radial-gradient(circle at 50% 0%, rgba(16,185,129,0.18) 0%, transparent 70%)' }}
-          />
+          <div className="absolute inset-0" style={{ background: pageBg }} />
+          <div className="absolute inset-0 opacity-40" style={{ background: `radial-gradient(circle at 18% 0%, ${ambientPrimary} 0%, transparent 42%)` }} />
+          <div className="absolute inset-0 opacity-20" style={{ background: `radial-gradient(circle at 100% 0%, ${ambientSecondary} 0%, transparent 36%)` }} />
         </div>
 
         <main className="relative z-10 mx-auto flex min-h-screen w-full max-w-3xl flex-col justify-center px-6 py-28 sm:px-8">
-          <div className="rounded-[28px] border border-white/[0.08] bg-white/[0.05] p-8 text-center shadow-[0_30px_90px_-35px_rgba(0,0,0,0.8)] backdrop-blur-2xl">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-emerald-400/20 bg-emerald-500/10 text-emerald-300">
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            className="rounded-[36px] border p-8 text-center backdrop-blur-2xl md:p-10"
+            style={{ border: `1px solid ${palette.borderPrimary}`, background: cardBackground, boxShadow: isDayMode ? '0 40px 120px rgba(15,23,42,0.08)' : '0 40px 120px rgba(0,0,0,0.45)' }}
+          >
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[24px]" style={{ border: `1px solid ${palette.accentBorder}`, backgroundColor: palette.accentSoft, color: palette.accentPrimary, boxShadow: isDayMode ? '0 0 30px rgba(46,197,138,0.08)' : '0 0 30px rgba(16,185,129,0.12)' }}>
               <UserCog size={24} />
             </div>
-            <h1 className="mt-5 text-3xl font-black tracking-tight">Account management needs profile data</h1>
-            <p className="mx-auto mt-3 max-w-md text-sm text-white/55">
-              Complete onboarding first, then return here to manage your account information and security preferences.
+            <div className="mt-6 text-[10px] font-bold uppercase tracking-[0.3em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.78)' }}>Account management</div>
+            <h1 className="mt-4 text-4xl font-bold leading-[0.95] md:text-5xl" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
+              This account surface needs
+              <br />
+              <span style={{ color: palette.accentPrimary }}>your profile context first.</span>
+            </h1>
+            <p className="mx-auto mt-6 max-w-xl text-sm leading-7" style={{ color: palette.textSecondary }}>
+              Complete onboarding, then come back here to manage your profile, security settings, blogs, and groups from one premium workspace.
             </p>
             <button
               type="button"
               onClick={() => navigate('/onboarding')}
-              className="mt-7 inline-flex items-center gap-2 rounded-xl bg-emerald-400 px-5 py-3 text-sm font-semibold text-black transition hover:bg-emerald-300"
+              className="qs-account-primary-btn mt-8 inline-flex items-center gap-2 rounded-full border px-6 py-3 text-sm font-semibold transition-all"
             >
               Go to onboarding
             </button>
-          </div>
+          </motion.div>
         </main>
         <Footer />
       </div>
@@ -783,136 +1066,216 @@ const AccountManagementPage = () => {
   }
 
   return (
-    <div className="relative min-h-screen bg-[#08120d] text-white">
+    <div className="qs-account-theme qs-account-root relative min-h-screen overflow-hidden" style={{ ...accountThemeVars, background: pageBg }}>
+      <style>{accountThemeStyles}</style>
       <Navbar currentPage="dashboard" />
 
       <div className="fixed inset-0 pointer-events-none" style={{ zIndex: 0 }}>
-        <div className="absolute inset-0 bg-[#08120d]" />
+        <div className="absolute inset-0" style={{ background: pageBg }} />
+        <motion.div className="absolute inset-0 opacity-40" style={{ background: `radial-gradient(circle at 18% 0%, ${ambientPrimary} 0%, transparent 42%)`, y: glowY1 }} />
+        <motion.div className="absolute inset-0 opacity-20" style={{ background: `radial-gradient(circle at 100% 0%, ${ambientSecondary} 0%, transparent 36%)`, y: glowY2 }} />
         <div
-          className="absolute inset-0 opacity-45"
-          style={{ background: 'radial-gradient(circle at 50% 0%, rgba(16,185,129,0.18) 0%, transparent 65%)' }}
-        />
-        <div
-          className="absolute inset-0 opacity-24"
-          style={{ background: 'radial-gradient(circle at 100% 100%, rgba(6,182,212,0.16) 0%, transparent 50%)' }}
+          className="absolute inset-0 opacity-[0.14]"
+          style={{
+            backgroundImage:
+              isDayMode
+                ? 'linear-gradient(rgba(10,22,32,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(10,22,32,0.05) 1px, transparent 1px)'
+                : 'linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px)',
+            backgroundSize: '124px 124px',
+            maskImage: 'radial-gradient(circle at 50% 18%, black 24%, transparent 88%)',
+          }}
         />
       </div>
 
-      <main className="relative z-10 w-full px-6 py-28 sm:px-8 lg:px-10">
+      <main className="relative z-10 w-full px-6 py-28 sm:px-8 lg:px-12 xl:px-20">
         <button
           type="button"
           onClick={() => navigate('/dashboard')}
-          className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-white/75 transition hover:border-emerald-400/30 hover:text-emerald-300"
+          className="qs-account-secondary-btn mb-6 inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm transition"
         >
           <ArrowLeft size={16} />
           Back to dashboard
         </button>
 
-        <section className="mb-6 rounded-[28px] border border-white/[0.08] bg-white/[0.05] p-6 shadow-[0_30px_90px_-35px_rgba(0,0,0,0.8)] backdrop-blur-2xl sm:p-8">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <motion.section
+          variants={heroVariants}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: '-80px' }}
+          className="relative mb-6 overflow-hidden rounded-[38px] border p-7 backdrop-blur-2xl md:p-10 xl:p-12"
+          style={{ border: `1px solid ${palette.borderPrimary}`, background: cardBackground, boxShadow: isDayMode ? '0 40px 120px rgba(15,23,42,0.08)' : '0 40px 120px rgba(0,0,0,0.45)' }}
+        >
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-emerald-300/50 to-transparent" />
+          <div className="absolute -left-12 top-0 h-72 w-72 rounded-full blur-3xl bg-emerald-500/10" />
+          <div className="absolute -right-12 top-10 h-72 w-72 rounded-full blur-3xl bg-cyan-500/10" />
+
+          <div className="relative z-10 grid gap-10 xl:grid-cols-[1.08fr_0.92fr] xl:items-start">
             <div>
-              <div className="text-[10px] uppercase tracking-[0.3em] text-emerald-300/70">Account management</div>
-              <h1 className="mt-2 text-4xl font-black tracking-tight">Manage your account</h1>
-              <p className="mt-2 max-w-2xl text-sm text-white/55">
-                Switch between account, blog, and group management without leaving this page.
-              </p>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-3">
-              {!editing ? (
-                <button
-                  type="button"
-                  onClick={() => setEditing(true)}
-                  className="inline-flex items-center gap-2 rounded-xl border border-emerald-400/35 bg-emerald-500/15 px-4 py-2.5 text-sm font-semibold text-emerald-200 transition hover:bg-emerald-500/25"
-                >
-                  <User size={16} />
-                  Edit profile
-                </button>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setProfile(readStoredProfile())
-                      setPrefs(readStoredPrefs())
-                      setEditing(false)
-                      setMessage('')
-                    }}
-                    className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm font-semibold text-white/80 transition hover:border-white/20 hover:text-white"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    disabled={saving}
-                    onClick={handleSaveProfile}
-                    className="inline-flex items-center gap-2 rounded-xl bg-emerald-400 px-4 py-2.5 text-sm font-semibold text-black transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-70"
-                  >
-                    <Save size={16} />
-                    {saving ? 'Saving...' : 'Save changes'}
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-
-          <div className="mt-6 flex flex-wrap gap-3">
-            {[
-              { id: 'account', label: 'Account', icon: UserCog },
-              { id: 'blogs', label: 'Blog management', icon: BookOpen },
-              { id: 'groups', label: 'Group management', icon: Users2 },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => {
-                  setActiveTab(tab.id)
-                  setMessage('')
-                }}
-                className={tabButtonClassName(activeTab === tab.id)}
-              >
-                <tab.icon size={15} />
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {[
-              { label: 'Role', value: roleConfig.label, icon: Sparkles },
-              {
-                label: 'Profile completion',
-                value: `${completion}%`,
-                icon: CheckCircle2,
-              },
-              {
-                label: 'Joined',
-                value: profile.created_at ? new Date(profile.created_at).toLocaleDateString() : profile.submittedAt ? new Date(profile.submittedAt).toLocaleDateString() : 'N/A',
-                icon: ShieldCheck,
-              },
-              { label: 'Status', value: 'Active', icon: Bell },
-            ].map((item) => (
-              <div key={item.label} className="rounded-2xl border border-white/[0.08] bg-white/[0.04] p-4">
-                <div className="flex items-center gap-2 text-emerald-300">
-                  <item.icon size={16} />
-                  <div className="text-[10px] uppercase tracking-[0.24em] text-white/45">{item.label}</div>
-                </div>
-                <div className="mt-2 text-sm font-semibold text-white">{item.value}</div>
+              <div className="flex flex-wrap items-center gap-3 mb-6">
+                <span className="inline-flex items-center gap-3 rounded-full border px-4 py-2 text-[10px] font-bold uppercase tracking-[0.34em]" style={{ border: `1px solid ${palette.accentBorder}`, backgroundColor: palette.accentSoft, color: isDayMode ? palette.accentDark : palette.accentLight }}>
+                  <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: palette.accentPrimary, boxShadow: isDayMode ? '0 0 18px rgba(46,197,138,0.45)' : '0 0 18px rgba(16,185,129,0.8)' }} />
+                  Account Management
+                </span>
+                <span className="inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.24em]" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.btnSecondaryBg, color: palette.textMuted }}>
+                  <Sparkles size={14} style={{ color: palette.accentPrimary }} />
+                  Control layer
+                </span>
               </div>
-            ))}
+
+              <h1 className="max-w-5xl text-5xl font-bold leading-[0.9] md:text-6xl xl:text-[5.15rem]" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary, textShadow: titleShadow }}>
+                Tune your profile,
+                <br />
+                <span style={{ color: palette.accentPrimary }}>content, and access from one room.</span>
+              </h1>
+
+              <p className="mt-7 max-w-3xl text-base leading-8 md:text-lg xl:text-[1.12rem]" style={{ color: palette.textSecondary }}>
+                Switch between account details, blog management, and group management without dropping into a cluttered admin surface.
+              </p>
+
+              <div className="mt-8 flex flex-wrap gap-4">
+                {!editing ? (
+                  <button
+                    type="button"
+                    onClick={() => setEditing(true)}
+                    className="qs-account-primary-btn inline-flex items-center gap-2 rounded-full border px-6 py-3 text-sm font-semibold transition-all"
+                  >
+                    <User size={16} />
+                    Edit profile
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setProfile(readStoredProfile())
+                        setPrefs(readStoredPrefs())
+                        setEditing(false)
+                        setMessage('')
+                      }}
+                      className="qs-account-secondary-btn inline-flex items-center gap-2 rounded-full border px-6 py-3 text-sm font-semibold transition-all"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      disabled={saving}
+                      onClick={handleSaveProfile}
+                      className="qs-account-primary-btn inline-flex items-center gap-2 rounded-full border px-6 py-3 text-sm font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-70"
+                    >
+                      <Save size={16} />
+                      {saving ? 'Saving...' : 'Save changes'}
+                    </button>
+                  </>
+                )}
+              </div>
+
+              <motion.div variants={containerVariants} initial="hidden" whileInView="visible" viewport={{ once: true }} className="mt-10 grid gap-4 md:grid-cols-3">
+                {[
+                  { label: 'Role track', value: roleConfig.label, tone: isDayMode ? palette.accentDark : palette.accentLight },
+                  { label: 'Profile completion', value: `${completion}%`, tone: palette.textPrimary },
+                  { label: 'Member since', value: joinedLabel, tone: palette.textPrimary },
+                ].map((item) => (
+                  <motion.div key={item.label} variants={itemVariants} className="rounded-[28px] border p-5 backdrop-blur-xl" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: isDayMode ? 'rgba(255,255,255,0.82)' : 'rgba(0,0,0,0.2)' }}>
+                    <div className="text-[10px] font-bold uppercase tracking-[0.24em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.8)' }}>{item.label}</div>
+                    <div className="mt-4 text-4xl font-bold" style={{ fontFamily: "'Syne', sans-serif", color: item.tone }}>{item.value}</div>
+                  </motion.div>
+                ))}
+              </motion.div>
+            </div>
+
+            <div className="relative overflow-hidden rounded-[34px] border p-6 md:p-7" style={{ border: `1px solid ${palette.borderPrimary}`, background: shellBackground, boxShadow: isDayMode ? '0 24px 90px rgba(15,23,42,0.08)' : '0 24px 90px rgba(0,0,0,0.42)' }}>
+              <div className="absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-emerald-300/40 to-transparent" />
+              <div className="absolute right-0 top-0 h-48 w-48 rounded-full blur-3xl bg-emerald-500/10" />
+
+              <div className="relative z-10">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="text-[10px] font-bold uppercase tracking-[0.28em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.8)' }}>Identity signal</div>
+                    <h2 className="mt-4 text-3xl font-bold leading-tight md:text-[2.1rem]" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
+                      {profile.fullName || 'Explorer'}
+                    </h2>
+                  </div>
+                  <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full text-lg font-bold shadow-[0_0_18px_rgba(16,185,129,0.18)]" style={{ border: `1px solid ${palette.accentBorder}`, backgroundColor: isDayMode ? 'rgba(255,255,255,0.86)' : 'rgba(0,0,0,0.3)', color: palette.textPrimary }}>
+                    {profileAvatar ? (
+                      <img src={profileAvatar} alt={profile.fullName || 'Profile avatar'} className="h-full w-full object-cover" />
+                    ) : (
+                      getInitials(profile.fullName)
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-6 flex flex-wrap gap-3">
+                  <span className="inline-flex items-center rounded-full border px-3.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em]" style={{ border: `1px solid ${palette.accentBorder}`, backgroundColor: palette.accentSoft, color: isDayMode ? palette.accentDark : palette.accentLight }}>
+                    {roleConfig.eyebrow}
+                  </span>
+                  {profile.city ? (
+                    <span className="inline-flex items-center gap-2 rounded-full border px-3.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: isDayMode ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.04)', color: palette.textMuted }}>
+                      <MapPin size={12} style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.8)' }} />
+                      {profile.city}
+                    </span>
+                  ) : null}
+                </div>
+
+                <p className="mt-6 text-base leading-8" style={{ color: palette.textSecondary }}>{summaryLine}</p>
+
+                <div className="mt-7 grid gap-3">
+                  <div className="flex items-center gap-3 rounded-2xl border px-4 py-3" style={{ border: `1px solid ${palette.borderSoft}`, backgroundColor: isDayMode ? 'rgba(255,255,255,0.82)' : 'rgba(0,0,0,0.2)' }}>
+                    <UserCog size={15} style={{ color: palette.accentPrimary }} />
+                    <span className="text-sm font-medium" style={{ color: palette.textSecondary }}>Current role: {roleConfig.label}</span>
+                  </div>
+                  <div className="flex items-center gap-3 rounded-2xl border px-4 py-3" style={{ border: `1px solid ${palette.borderSoft}`, backgroundColor: isDayMode ? 'rgba(255,255,255,0.82)' : 'rgba(0,0,0,0.2)' }}>
+                    <CheckCircle2 size={15} style={{ color: palette.accentPrimary }} />
+                    <span className="text-sm font-medium" style={{ color: palette.textSecondary }}>Profile completion: {completion}%</span>
+                  </div>
+                  <div className="flex items-center gap-3 rounded-2xl border px-4 py-3" style={{ border: `1px solid ${palette.borderSoft}`, backgroundColor: isDayMode ? 'rgba(255,255,255,0.82)' : 'rgba(0,0,0,0.2)' }}>
+                    <Bell size={15} style={{ color: palette.accentPrimary }} />
+                    <span className="truncate text-sm font-medium" style={{ color: palette.textSecondary }}>{profileEmail}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
-          {message ? (
-            <div className="mt-5 rounded-2xl border border-emerald-400/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
-              {message}
-            </div>
-          ) : null}
-        </section>
+          <motion.div variants={containerVariants} initial="hidden" whileInView="visible" viewport={{ once: true }} className="relative z-10 mt-8 grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
+            <motion.div variants={itemVariants} className="flex flex-wrap gap-3">
+              {[
+                { id: 'account', label: 'Account', icon: UserCog },
+                { id: 'blogs', label: 'Blog management', icon: BookOpen },
+                { id: 'groups', label: 'Group management', icon: Users2 },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => {
+                    setActiveTab(tab.id)
+                    setMessage('')
+                  }}
+                  className={tabButtonClassName(activeTab === tab.id)}
+                >
+                  <tab.icon size={15} />
+                  {tab.label}
+                </button>
+              ))}
+            </motion.div>
+
+            {message ? (
+              <motion.div variants={itemVariants} className="rounded-2xl border px-4 py-3 text-sm" style={{ border: `1px solid ${palette.accentBorder}`, backgroundColor: palette.accentSoft, color: isDayMode ? palette.accentDark : palette.accentLight }}>
+                {message}
+              </motion.div>
+            ) : null}
+          </motion.div>
+        </motion.section>
 
         {activeTab === 'account' ? (
-          <section className="grid gap-6 lg:grid-cols-2">
+          <motion.section
+            variants={containerVariants}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: '-60px' }}
+            className="grid gap-6 lg:grid-cols-2"
+          >
             <div className={cardClassName}>
-              <div className="text-[10px] uppercase tracking-[0.28em] text-emerald-300/70">Personal information</div>
+              <div className="text-[10px] uppercase tracking-[0.28em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.7)' }}>Personal information</div>
               <div className="mt-5 grid gap-4 sm:grid-cols-2">
                 {[
                   { key: 'fullName', type: 'text', required: true },
@@ -921,9 +1284,9 @@ const AccountManagementPage = () => {
                   { key: 'city', type: 'text' },
                 ].map((field) => (
                   <div key={field.key} className={field.key === 'address' ? 'sm:col-span-2' : ''}>
-                    <label className="text-sm text-white/70">
+                    <label className="text-sm" style={{ color: palette.textSecondary }}>
                       {fieldLabelMap[field.key] || onboardingCommonFields.find((f) => f.name === field.key)?.label || field.key}
-                      {field.required ? <span className="text-emerald-300"> *</span> : null}
+                      {field.required ? <span style={{ color: palette.accentPrimary }}> *</span> : null}
                     </label>
                     {field.type === 'select' ? (
                       <select
@@ -951,7 +1314,7 @@ const AccountManagementPage = () => {
                 ))}
 
                 <div className="sm:col-span-2">
-                  <label className="text-sm text-white/70">Address</label>
+                  <label className="text-sm" style={{ color: palette.textSecondary }}>Address</label>
                   <textarea
                     rows={3}
                     value={profile.address ?? ''}
@@ -962,36 +1325,36 @@ const AccountManagementPage = () => {
                 </div>
               </div>
 
-              <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-                <div className="text-sm text-white/80">Profile photo</div>
+              <div className="qs-account-soft-panel mt-5 rounded-2xl border p-4">
+                <div className="text-sm" style={{ color: palette.textPrimary }}>Profile photo</div>
                 <div className="mt-3 flex items-center gap-4">
-                  <div className="h-20 w-20 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.05]">
+                  <div className="h-20 w-20 overflow-hidden rounded-2xl border" style={{ border: `1px solid ${palette.borderSoft}`, backgroundColor: isDayMode ? 'rgba(247,247,245,0.95)' : 'rgba(255,255,255,0.05)' }}>
                     {profile.avatarPreview ? (
                       <img src={profile.avatarPreview} alt="Profile" className="h-full w-full object-cover" />
                     ) : (
-                      <div className="flex h-full w-full items-center justify-center text-xs text-white/30">No image</div>
+                      <div className="flex h-full w-full items-center justify-center text-xs" style={{ color: palette.textFaint }}>No image</div>
                     )}
                   </div>
                   {editing ? (
-                    <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-2 text-sm text-emerald-200 transition hover:bg-emerald-500/20">
+                    <label className="qs-account-primary-btn inline-flex cursor-pointer items-center gap-2 rounded-xl border px-4 py-2 text-sm transition">
                       Upload image
                       <input type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
                     </label>
                   ) : (
-                    <div className="text-xs text-white/45">Enable edit mode to change avatar.</div>
+                    <div className="text-xs" style={{ color: palette.textMuted }}>Enable edit mode to change avatar.</div>
                   )}
                 </div>
               </div>
             </div>
 
             <div className={cardClassName}>
-              <div className="text-[10px] uppercase tracking-[0.28em] text-emerald-300/70">Contact information</div>
+              <div className="text-[10px] uppercase tracking-[0.28em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.7)' }}>Contact information</div>
               <div className="mt-5 grid gap-4 sm:grid-cols-2">
                 {['emailAddress', 'cellMain', 'cellAlternative', 'cnic', 'passportNo'].map((key) => {
                   const field = onboardingCommonFields.find((f) => f.name === key || (key === 'emailAddress' && f.name === 'email') || (key === 'cellAlternative' && f.name === 'cellAlt') || (key === 'dateOfBirth' && f.name === 'dob'))
                   return (
                     <div key={key}>
-                      <label className="text-sm text-white/70">{fieldLabelMap[key] || field?.label || key}</label>
+                      <label className="text-sm" style={{ color: palette.textSecondary }}>{fieldLabelMap[key] || field?.label || key}</label>
                       <input
                         type={field?.type || 'text'}
                         value={profile[key] ?? ''}
@@ -1006,13 +1369,13 @@ const AccountManagementPage = () => {
             </div>
 
             <div className={cardClassName}>
-              <div className="text-[10px] uppercase tracking-[0.28em] text-emerald-300/70">Role-specific information</div>
-              <div className="mt-2 text-sm text-white/45">Current role: <span className="text-emerald-300">{roleConfig.label}</span></div>
+              <div className="text-[10px] uppercase tracking-[0.28em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.7)' }}>Role-specific information</div>
+              <div className="mt-2 text-sm" style={{ color: palette.textMuted }}>Current role: <span style={{ color: palette.accentPrimary }}>{roleConfig.label}</span></div>
 
               <div className="mt-5 grid gap-4 sm:grid-cols-2">
                 {roleFields.map((field) => (
                   <div key={field.name} className={field.type === 'textarea' || field.span === 2 ? 'sm:col-span-2' : ''}>
-                    <label className="text-sm text-white/70">{field.label}</label>
+                    <label className="text-sm" style={{ color: palette.textSecondary }}>{field.label}</label>
                     {field.type === 'textarea' ? (
                       <textarea
                         rows={3}
@@ -1036,11 +1399,11 @@ const AccountManagementPage = () => {
             </div>
 
             <div className={cardClassName}>
-              <div className="text-[10px] uppercase tracking-[0.28em] text-emerald-300/70">Security & preferences</div>
+              <div className="text-[10px] uppercase tracking-[0.28em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.7)' }}>Security & preferences</div>
 
-              <div className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-4">
-                <div className="mb-3 flex items-center gap-2 text-white">
-                  <KeyRound size={16} className="text-emerald-300" />
+              <div className="qs-account-soft-panel mt-5 rounded-2xl border p-4">
+                <div className="mb-3 flex items-center gap-2" style={{ color: palette.textPrimary }}>
+                  <KeyRound size={16} style={{ color: palette.accentPrimary }} />
                   <div className="text-sm font-semibold">Change password</div>
                 </div>
                 <div className="grid gap-3">
@@ -1068,7 +1431,7 @@ const AccountManagementPage = () => {
                   <button
                     type="button"
                     onClick={handleChangePassword}
-                    className="mt-1 inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-400/35 bg-emerald-500/12 px-4 py-2.5 text-sm font-semibold text-emerald-200 transition hover:bg-emerald-500/20"
+                    className="qs-account-primary-btn mt-1 inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition"
                   >
                     Update password
                   </button>
@@ -1078,20 +1441,26 @@ const AccountManagementPage = () => {
               <div className="mt-4 space-y-3">
               </div>
             </div>
-          </section>
+          </motion.section>
         ) : null}
 
         {activeTab === 'blogs' ? (
-          <section className="grid gap-6 lg:grid-cols-[340px_minmax(0,1fr)]">
+          <motion.section
+            variants={containerVariants}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: '-60px' }}
+            className="grid gap-6 lg:grid-cols-[340px_minmax(0,1fr)]"
+          >
             <div className={cardClassName}>
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <div className="text-[10px] uppercase tracking-[0.28em] text-emerald-300/70">Blog management</div>
-                  <h2 className="mt-2 text-2xl font-black tracking-tight">Manage blog content</h2>
+                  <div className="text-[10px] uppercase tracking-[0.28em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.7)' }}>Blog management</div>
+                  <h2 className="mt-2 text-2xl font-black tracking-tight" style={{ color: palette.textPrimary }}>Manage blog content</h2>
                 </div>
-                <BookOpen size={18} className="text-emerald-300" />
+                <BookOpen size={18} style={{ color: palette.accentPrimary }} />
               </div>
-              <p className="mt-3 text-sm text-white/50">
+              <p className="mt-3 text-sm" style={{ color: palette.textMuted }}>
                 Select a post to edit its title, metadata, excerpt, and body content, then save or delete it.
               </p>
 
@@ -1103,16 +1472,19 @@ const AccountManagementPage = () => {
                     onClick={() => setSelectedBlogId(blog.id)}
                     className={`w-full rounded-2xl border px-4 py-3 text-left transition ${
                       selectedBlogId === blog.id
-                        ? 'border-emerald-400/30 bg-emerald-500/12'
-                        : 'border-white/10 bg-black/20 hover:border-white/20 hover:bg-white/[0.04]'
+                        ? ''
+                        : ''
                     }`}
+                    style={selectedBlogId === blog.id
+                      ? { border: `1px solid ${palette.accentBorder}`, backgroundColor: palette.accentSoft }
+                      : { border: `1px solid ${palette.borderSoft}`, backgroundColor: isDayMode ? 'rgba(255,255,255,0.82)' : 'rgba(0,0,0,0.2)' }}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <div className="text-sm font-semibold text-white">{blog.title}</div>
-                        <div className="mt-1 text-xs text-white/45">{blog.category}</div>
+                        <div className="text-sm font-semibold" style={{ color: palette.textPrimary }}>{blog.title}</div>
+                        <div className="mt-1 text-xs" style={{ color: palette.textMuted }}>{blog.category}</div>
                       </div>
-                      <Pencil size={14} className="mt-0.5 text-emerald-300/70" />
+                      <Pencil size={14} className="mt-0.5" style={{ color: palette.accentPrimary }} />
                     </div>
                   </button>
                 ))}
@@ -1122,15 +1494,15 @@ const AccountManagementPage = () => {
             <div className={cardClassName}>
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <div className="text-[10px] uppercase tracking-[0.28em] text-emerald-300/70">Selected blog</div>
-                  <h2 className="mt-2 text-2xl font-black tracking-tight">{selectedBlog?.title || 'No blog selected'}</h2>
+                  <div className="text-[10px] uppercase tracking-[0.28em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.7)' }}>Selected blog</div>
+                  <h2 className="mt-2 text-2xl font-black tracking-tight" style={{ color: palette.textPrimary }}>{selectedBlog?.title || 'No blog selected'}</h2>
                 </div>
                 <div className="flex gap-2">
                   <button
                     type="button"
                     onClick={handleSaveBlog}
                     disabled={blogSaving || !selectedBlog}
-                    className="inline-flex items-center gap-2 rounded-xl bg-emerald-400 px-4 py-2.5 text-sm font-semibold text-black transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-70"
+                    className="qs-account-solid-btn inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-70"
                   >
                     <Save size={16} />
                     {blogSaving ? 'Saving...' : 'Save blog'}
@@ -1139,7 +1511,7 @@ const AccountManagementPage = () => {
                     type="button"
                     onClick={handleDeleteBlog}
                     disabled={!selectedBlog}
-                    className="inline-flex items-center gap-2 rounded-xl border border-red-400/25 bg-red-500/10 px-4 py-2.5 text-sm font-semibold text-red-200 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-70"
+                    className="qs-account-danger-btn inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-70"
                   >
                     <Trash2 size={16} />
                     Delete
@@ -1150,7 +1522,7 @@ const AccountManagementPage = () => {
               {selectedBlog ? (
                 <div className="mt-6 grid gap-4 sm:grid-cols-2">
                   <div>
-                    <label className="text-sm text-white/70">Title</label>
+                    <label className="text-sm" style={{ color: palette.textSecondary }}>Title</label>
                     <input
                       type="text"
                       value={blogDraft.title}
@@ -1159,20 +1531,21 @@ const AccountManagementPage = () => {
                     />
                   </div>
                   <div>
-                    <label className="text-sm text-white/70">Category</label>
+                    <label className="text-sm" style={{ color: palette.textSecondary }}>Category</label>
                     <div className="relative mt-2" ref={categoryRef}>
                       <button
                         type="button"
                         onClick={() => setCategoryOpen(!categoryOpen)}
-                        className="flex w-full items-center justify-between rounded-xl border border-white/10 bg-white/[0.05] px-4 py-3 text-sm text-white outline-none transition focus:border-emerald-400/40 focus:bg-white/[0.08] focus:shadow-[0_0_0_4px_rgba(16,185,129,0.12)]"
+                        className="qs-account-input flex w-full items-center justify-between rounded-xl border px-4 py-3 text-sm outline-none transition"
                       >
-                        <span className={categories.some(c => c.name === blogDraft.category) && blogDraft.category ? 'text-white' : 'text-white/60'}>
+                        <span style={{ color: categories.some(c => c.name === blogDraft.category) && blogDraft.category ? palette.textPrimary : palette.textMuted }}>
                           {categories.some(c => c.name === blogDraft.category) && blogDraft.category
                             ? blogDraft.category
                             : blogDraft.category || 'Select a category'}
                         </span>
                         <svg
-                          className={`text-white/40 transition-transform ${categoryOpen ? 'rotate-180' : ''}`}
+                          className={`transition-transform ${categoryOpen ? 'rotate-180' : ''}`}
+                          style={{ color: palette.textMuted }}
                           width="14"
                           height="14"
                           viewBox="0 0 24 24"
@@ -1186,9 +1559,9 @@ const AccountManagementPage = () => {
                         </svg>
                       </button>
                       {categoryOpen && (
-                        <div                        className="absolute left-0 right-0 z-50 mt-1.5 max-h-56 overflow-y-auto rounded-xl border border-white/[0.08] bg-[#08120d]/95 p-1.5 shadow-[0_15px_50px_-15px_rgba(0,0,0,0.9)] backdrop-blur-2xl">
+                        <div className="qs-account-dropdown absolute left-0 right-0 z-50 mt-1.5 max-h-56 overflow-y-auto rounded-xl border p-1.5 backdrop-blur-2xl">
                           {categories.length === 0 && (
-                            <div className="px-3 py-2 text-sm text-white/40">Loading categories…</div>
+                            <div className="px-3 py-2 text-sm" style={{ color: palette.textMuted }}>Loading categories...</div>
                           )}
                           {categories.map((cat) => (
                             <button
@@ -1200,14 +1573,17 @@ const AccountManagementPage = () => {
                               }}
                               className={`w-full rounded-lg px-3 py-2.5 text-left text-sm transition ${
                                 blogDraft.category === cat.name
-                                  ? 'bg-emerald-500/15 text-emerald-200'
-                                  : 'text-white/70 hover:bg-white/[0.06] hover:text-white'
+                                  ? ''
+                                  : ''
                               }`}
+                              style={blogDraft.category === cat.name
+                                ? { backgroundColor: palette.accentSoft, color: isDayMode ? palette.accentDark : palette.accentLight }
+                                : { color: palette.textSecondary }}
                             >
                               {cat.name}
                             </button>
                           ))}
-                          <div className="my-1 border-t border-white/[0.06]" />
+                          <div className="my-1 border-t" style={{ borderColor: palette.borderSoft }} />
                           <button
                             type="button"
                             onClick={() => {
@@ -1216,11 +1592,14 @@ const AccountManagementPage = () => {
                             }}
                             className={`w-full rounded-lg px-3 py-2.5 text-left text-sm transition ${
                               !categories.some(c => c.name === blogDraft.category) && blogDraft.category
-                                ? 'bg-emerald-500/15 text-emerald-200'
-                                : 'text-white/50 hover:bg-white/[0.06] hover:text-white'
+                                ? ''
+                                : ''
                             }`}
+                            style={!categories.some(c => c.name === blogDraft.category) && blogDraft.category
+                              ? { backgroundColor: palette.accentSoft, color: isDayMode ? palette.accentDark : palette.accentLight }
+                              : { color: palette.textMuted }}
                           >
-                            Other…
+                            Other...
                           </button>
                         </div>
                       )}
@@ -1237,7 +1616,7 @@ const AccountManagementPage = () => {
                   </div>
 
                   <div className="sm:col-span-2">
-                    <label className="text-sm text-white/70">Excerpt</label>
+                    <label className="text-sm" style={{ color: palette.textSecondary }}>Excerpt</label>
                     <textarea
                       rows={3}
                       value={blogDraft.excerpt}
@@ -1246,18 +1625,18 @@ const AccountManagementPage = () => {
                     />
                   </div>
                   <div className="sm:col-span-2">
-                    <label className="text-sm text-white/70">Cover image URL or data URI</label>
-                    <div className="mt-2 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                    <label className="text-sm" style={{ color: palette.textSecondary }}>Cover image URL or data URI</label>
+                    <div className="qs-account-soft-panel mt-2 rounded-2xl border p-4">
                       <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-                        <div className="h-24 w-36 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.05]">
+                        <div className="h-24 w-36 overflow-hidden rounded-2xl border" style={{ border: `1px solid ${palette.borderSoft}`, backgroundColor: isDayMode ? 'rgba(247,247,245,0.95)' : 'rgba(255,255,255,0.05)' }}>
                           {blogDraft.image ? (
                             <img src={blogDraft.image} alt={blogDraft.title || 'Blog cover'} className="h-full w-full object-cover" />
                           ) : (
-                            <div className="flex h-full w-full items-center justify-center text-xs text-white/30">No cover</div>
+                            <div className="flex h-full w-full items-center justify-center text-xs" style={{ color: palette.textFaint }}>No cover</div>
                           )}
                         </div>
                         <div className="flex flex-1 flex-col gap-3">
-                          <label className="inline-flex w-fit cursor-pointer items-center gap-2 rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-2 text-sm text-emerald-200 transition hover:bg-emerald-500/20">
+                          <label className="qs-account-primary-btn inline-flex w-fit cursor-pointer items-center gap-2 rounded-xl border px-4 py-2 text-sm transition">
                             <Upload size={16} />
                             Upload cover
                             <input type="file" accept="image/*" className="hidden" onChange={handleBlogCoverUpload} />
@@ -1274,33 +1653,33 @@ const AccountManagementPage = () => {
                     </div>
                   </div>
                   <div className="sm:col-span-2">
-                    <label className="text-sm text-white/70">Body</label>
-                    <div className="mt-2 rounded-2xl border border-white/10 bg-white/[0.02] backdrop-blur-xl overflow-hidden flex flex-col">
+                    <label className="text-sm" style={{ color: palette.textSecondary }}>Body</label>
+                    <div className="qs-account-editor-shell mt-2 rounded-2xl border backdrop-blur-xl overflow-hidden flex flex-col">
                       {/* TOOLBAR */}
-                      <div className="flex flex-wrap items-center gap-1 bg-white/[0.06] border-b border-white/10 p-2 text-white/85">
+                      <div className="qs-account-editor-toolbar flex flex-wrap items-center gap-1 border-b p-2">
                         <button type="button" onClick={() => execCmd('bold')} className="p-2 rounded hover:bg-white/5 transition-colors font-bold" title="Bold"><Bold size={15} /></button>
                         <button type="button" onClick={() => execCmd('italic')} className="p-2 rounded hover:bg-white/5 transition-colors" title="Italic"><Italic size={15} /></button>
                         <button type="button" onClick={() => execCmd('underline')} className="p-2 rounded hover:bg-white/5 transition-colors" title="Underline"><Underline size={15} /></button>
-                        <span className="w-[1px] h-5 bg-white/10 mx-1" />
+                        <span className="w-[1px] h-5 mx-1" style={{ backgroundColor: palette.borderSoft }} />
                         <button type="button" onClick={() => execCmd('insertUnorderedList')} className="p-2 rounded hover:bg-white/5 transition-colors" title="Bullet List"><List size={15} /></button>
                         <button type="button" onClick={() => execCmd('insertOrderedList')} className="p-2 rounded hover:bg-white/5 transition-colors" title="Numbered List"><ListOrdered size={15} /></button>
-                        <span className="w-[1px] h-5 bg-white/10 mx-1" />
+                        <span className="w-[1px] h-5 mx-1" style={{ backgroundColor: palette.borderSoft }} />
                         <button type="button" onClick={() => execCmd('formatBlock', '<h1>')} className="p-2 rounded hover:bg-white/5 transition-colors font-bold text-xs" title="Heading 1"><Heading1 size={15} /></button>
                         <button type="button" onClick={() => execCmd('formatBlock', '<h2>')} className="p-2 rounded hover:bg-white/5 transition-colors font-bold text-xs" title="Heading 2"><Heading2 size={15} /></button>
                         <button type="button" onClick={() => execCmd('formatBlock', '<h3>')} className="p-2 rounded hover:bg-white/5 transition-colors font-bold text-xs" title="Heading 3"><Heading3 size={15} /></button>
                         <button type="button" onClick={() => execCmd('formatBlock', '<p>')} className="p-2 rounded hover:bg-white/5 transition-colors" title="Paragraph"><Text size={15} /></button>
                         <button type="button" onClick={() => execCmd('formatBlock', '<blockquote>')} className="p-2 rounded hover:bg-white/5 transition-colors" title="Quote"><Quote size={15} /></button>
-                        <span className="w-[1px] h-5 bg-white/10 mx-1" />
+                        <span className="w-[1px] h-5 mx-1" style={{ backgroundColor: palette.borderSoft }} />
                         <button type="button" onClick={() => execCmd('justifyLeft')} className="p-2 rounded hover:bg-white/5 transition-colors" title="Align Left"><AlignLeft size={15} /></button>
                         <button type="button" onClick={() => execCmd('justifyCenter')} className="p-2 rounded hover:bg-white/5 transition-colors" title="Align Center"><AlignCenter size={15} /></button>
                         <button type="button" onClick={() => execCmd('justifyRight')} className="p-2 rounded hover:bg-white/5 transition-colors" title="Align Right"><AlignRight size={15} /></button>
                         <button type="button" onClick={() => execCmd('justifyFull')} className="p-2 rounded hover:bg-white/5 transition-colors" title="Align Justify"><AlignJustify size={15} /></button>
-                        <span className="w-[1px] h-5 bg-white/10 mx-1" />
+                        <span className="w-[1px] h-5 mx-1" style={{ backgroundColor: palette.borderSoft }} />
                         <button type="button" onClick={insertLink} className="p-2 rounded hover:bg-white/5 transition-colors" title="Insert Link"><LinkIcon size={15} /></button>
                         <span className="w-[1px] h-5 bg-white/10 mx-1" />
                         <button type="button" onClick={() => execCmd('undo')} className="p-2 rounded hover:bg-white/5 transition-colors" title="Undo"><RotateCcw size={15} /></button>
                         <button type="button" onClick={() => execCmd('redo')} className="p-2 rounded hover:bg-white/5 transition-colors" title="Redo"><RotateCw size={15} /></button>
-                        <button type="button" onClick={() => execCmd('removeFormat')} className="p-2 rounded hover:bg-white/5 text-red-300 transition-colors" title="Clear Formatting"><Eraser size={15} /></button>
+                        <button type="button" onClick={() => execCmd('removeFormat')} className="p-2 rounded transition-colors" style={{ color: isDayMode ? '#b91c1c' : '#fca5a5' }} title="Clear Formatting"><Eraser size={15} /></button>
                       </div>
 
                       {/* EDITABLE BODY */}
@@ -1310,46 +1689,52 @@ const AccountManagementPage = () => {
                         onInput={handleEditorChange}
                         onKeyUp={handleEditorChange}
                         onClick={handleEditorChange}
-                        className="w-full min-h-[420px] bg-white/[0.03] text-white p-6 leading-relaxed outline-none focus:bg-white/[0.05] transition-all prose prose-invert max-w-none"
+                        className={`qs-account-editor w-full min-h-[420px] p-6 leading-relaxed outline-none transition-all prose max-w-none ${isDayMode ? '' : 'prose-invert'}`}
                         style={{ overflowY: 'auto', fontFamily: "'Inter', sans-serif" }}
                         data-placeholder="Edit the article body..."
                       />
 
                       {/* EDITOR FOOTER */}
-                      <div className="flex justify-between items-center bg-white/[0.06] border-t border-white/10 px-4 py-2 text-[10px] text-white/60 font-mono select-none">
+                      <div className="qs-account-editor-footer flex justify-between items-center border-t px-4 py-2 text-[10px] font-mono select-none">
                         <div className="flex items-center gap-1">
-                          <FileText size={10} className="text-emerald-400" />
+                          <FileText size={10} style={{ color: palette.accentPrimary }} />
                           <span>{activeTags.join(' › ')}</span>
                         </div>
                         <div className="flex items-center gap-3">
                           <span>CHARS: {charCount}</span>
                           <span>WORDS: {wordCount}</span>
-                          <span className="text-emerald-400/60">POWERED BY QSPHERE EDITOR</span>
+                          <span style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.6)' }}>POWERED BY QSPHERE EDITOR</span>
                         </div>
                       </div>
                     </div>
                   </div>
                 </div>
               ) : (
-                <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.04] p-5 text-sm text-white/60">
+                <div className="qs-account-soft-panel mt-6 rounded-2xl border p-5 text-sm" style={{ color: palette.textMuted }}>
                   No blog records available.
                 </div>
               )}
             </div>
-          </section>
+          </motion.section>
         ) : null}
 
         {activeTab === 'groups' ? (
-          <section className="grid gap-6 lg:grid-cols-[340px_minmax(0,1fr)]">
+          <motion.section
+            variants={containerVariants}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: '-60px' }}
+            className="grid gap-6 lg:grid-cols-[340px_minmax(0,1fr)]"
+          >
             <div className={cardClassName}>
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <div className="text-[10px] uppercase tracking-[0.28em] text-emerald-300/70">Group management</div>
-                  <h2 className="mt-2 text-2xl font-black tracking-tight">Manage groups</h2>
+                  <div className="text-[10px] uppercase tracking-[0.28em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.7)' }}>Group management</div>
+                  <h2 className="mt-2 text-2xl font-black tracking-tight" style={{ color: palette.textPrimary }}>Manage groups</h2>
                 </div>
-                <Users2 size={18} className="text-emerald-300" />
+                <Users2 size={18} style={{ color: palette.accentPrimary }} />
               </div>
-              <p className="mt-3 text-sm text-white/50">
+              <p className="mt-3 text-sm" style={{ color: palette.textMuted }}>
                 Review group details, update descriptions, and remove groups you no longer need.
               </p>
 
@@ -1361,16 +1746,19 @@ const AccountManagementPage = () => {
                     onClick={() => setSelectedGroupId(group.id)}
                     className={`w-full rounded-2xl border px-4 py-3 text-left transition ${
                       selectedGroupId === group.id
-                        ? 'border-emerald-400/30 bg-emerald-500/12'
-                        : 'border-white/10 bg-white/[0.04] hover:border-white/20 hover:bg-white/[0.06]'
+                        ? ''
+                        : ''
                     }`}
+                    style={selectedGroupId === group.id
+                      ? { border: `1px solid ${palette.accentBorder}`, backgroundColor: palette.accentSoft }
+                      : { border: `1px solid ${palette.borderSoft}`, backgroundColor: isDayMode ? 'rgba(255,255,255,0.82)' : 'rgba(255,255,255,0.04)' }}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <div className="text-sm font-semibold text-white">{group.groupTitle || group.title}</div>
-                        <div className="mt-1 text-xs text-white/45">{group.owner}</div>
+                        <div className="text-sm font-semibold" style={{ color: palette.textPrimary }}>{group.groupTitle || group.title}</div>
+                        <div className="mt-1 text-xs" style={{ color: palette.textMuted }}>{group.owner}</div>
                       </div>
-                      <Pencil size={14} className="mt-0.5 text-emerald-300/70" />
+                      <Pencil size={14} className="mt-0.5" style={{ color: palette.accentPrimary }} />
                     </div>
                   </button>
                 ))}
@@ -1380,15 +1768,15 @@ const AccountManagementPage = () => {
             <div className={cardClassName}>
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <div className="text-[10px] uppercase tracking-[0.28em] text-emerald-300/70">Selected group</div>
-                  <h2 className="mt-2 text-2xl font-black tracking-tight">{selectedGroup?.groupTitle || selectedGroup?.title || 'No group selected'}</h2>
+                  <div className="text-[10px] uppercase tracking-[0.28em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.7)' }}>Selected group</div>
+                  <h2 className="mt-2 text-2xl font-black tracking-tight" style={{ color: palette.textPrimary }}>{selectedGroup?.groupTitle || selectedGroup?.title || 'No group selected'}</h2>
                 </div>
                 <div className="flex gap-2">
                   <button
                     type="button"
                     onClick={handleSaveGroup}
                     disabled={groupSaving || !selectedGroup}
-                    className="inline-flex items-center gap-2 rounded-xl bg-emerald-400 px-4 py-2.5 text-sm font-semibold text-black transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-70"
+                    className="qs-account-solid-btn inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-70"
                   >
                     <Save size={16} />
                     {groupSaving ? 'Saving...' : 'Save group'}
@@ -1397,7 +1785,7 @@ const AccountManagementPage = () => {
                     type="button"
                     onClick={handleDeleteGroup}
                     disabled={!selectedGroup}
-                    className="inline-flex items-center gap-2 rounded-xl border border-red-400/25 bg-red-500/10 px-4 py-2.5 text-sm font-semibold text-red-200 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-70"
+                    className="qs-account-danger-btn inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-70"
                   >
                     <Trash2 size={16} />
                     Delete
@@ -1408,7 +1796,7 @@ const AccountManagementPage = () => {
               {selectedGroup ? (
                 <div className="mt-6 grid gap-4 sm:grid-cols-2">
                   <div>
-                    <label className="text-sm text-white/70">Title</label>
+                    <label className="text-sm" style={{ color: palette.textSecondary }}>Title</label>
                     <input
                       type="text"
                       value={groupDraft.title}
@@ -1417,7 +1805,7 @@ const AccountManagementPage = () => {
                     />
                   </div>
                   <div>
-                    <label className="text-sm text-white/70">Owner</label>
+                    <label className="text-sm" style={{ color: palette.textSecondary }}>Owner</label>
                     <input
                       type="text"
                       value={groupDraft.owner}
@@ -1427,7 +1815,7 @@ const AccountManagementPage = () => {
                     />
                   </div>
                   <div className="sm:col-span-2">
-                    <label className="text-sm text-white/70">Description</label>
+                    <label className="text-sm" style={{ color: palette.textSecondary }}>Description</label>
                     <textarea
                       rows={4}
                       value={groupDraft.description}
@@ -1436,18 +1824,18 @@ const AccountManagementPage = () => {
                     />
                   </div>
                   <div className="sm:col-span-2">
-                    <label className="text-sm text-white/70">Avatar image</label>
-                    <div className="mt-2 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                    <label className="text-sm" style={{ color: palette.textSecondary }}>Avatar image</label>
+                    <div className="qs-account-soft-panel mt-2 rounded-2xl border p-4">
                       <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-                        <div className="h-20 w-20 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.05]">
+                        <div className="h-20 w-20 overflow-hidden rounded-2xl border" style={{ border: `1px solid ${palette.borderSoft}`, backgroundColor: isDayMode ? 'rgba(247,247,245,0.95)' : 'rgba(255,255,255,0.05)' }}>
                           {groupDraft.avatar ? (
                             <img src={groupDraft.avatar} alt={groupDraft.title || 'Group avatar'} className="h-full w-full object-cover" />
                           ) : (
-                            <div className="flex h-full w-full items-center justify-center text-xs text-white/30">No image</div>
+                            <div className="flex h-full w-full items-center justify-center text-xs" style={{ color: palette.textFaint }}>No image</div>
                           )}
                         </div>
                         <div className="flex flex-1 flex-col gap-3">
-                          <label className="inline-flex w-fit cursor-pointer items-center gap-2 rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-2 text-sm text-emerald-200 transition hover:bg-emerald-500/20">
+                          <label className="qs-account-primary-btn inline-flex w-fit cursor-pointer items-center gap-2 rounded-xl border px-4 py-2 text-sm transition">
                             <Upload size={16} />
                             Upload avatar
                             <input type="file" accept="image/*" className="hidden" onChange={handleGroupAvatarUpload} />
@@ -1465,56 +1853,57 @@ const AccountManagementPage = () => {
                   </div>
                 </div>
               ) : (
-                <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.04] p-5 text-sm text-white/60">
+                <div className="qs-account-soft-panel mt-6 rounded-2xl border p-5 text-sm" style={{ color: palette.textMuted }}>
                   No group records available.
                 </div>
               )}
             </div>
-          </section>
+          </motion.section>
         ) : null}
       </main>
 
       {/* Link insertion modal */}
       {linkModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/55" onClick={cancelLink} />
-          <div className="relative z-60 w-full max-w-xl rounded-xl border border-white/10 bg-[#0b1510] p-6 shadow-[0_30px_100px_-40px_rgba(0,0,0,0.9)]">
-            <h3 className="text-sm font-bold text-white mb-3">Insert Link</h3>
+          <div className="qs-account-modal-overlay absolute inset-0" onClick={cancelLink} />
+          <div className="qs-account-modal-panel relative z-60 w-full max-w-xl rounded-xl border p-6">
+            <h3 className="mb-3 text-sm font-bold" style={{ color: palette.textPrimary }}>Insert Link</h3>
             <div className="space-y-3">
               <div>
-                <label className="block text-xs text-white/50 mb-1">URL</label>
-                <div className="flex items-center w-full bg-white/[0.04] border border-white/10 rounded-xl px-3.5 py-2">
-                  <span className="text-emerald-300 text-xs mr-1 select-none">https://</span>
+                <label className="mb-1 block text-xs" style={{ color: palette.textMuted }}>URL</label>
+                <div className="flex w-full items-center rounded-xl border px-3.5 py-2" style={{ backgroundColor: isDayMode ? 'rgba(247,247,245,0.95)' : 'rgba(255,255,255,0.04)', borderColor: palette.borderInput }}>
+                  <span className="mr-1 select-none text-xs" style={{ color: palette.accentPrimary }}>https://</span>
                   <input
                     type="text"
                     value={linkUrl.replace(/^https:\/\//, '')}
                     onChange={(e) => setLinkUrl('https://' + e.target.value.replace(/^https?:\/\//, ''))}
-                    placeholder="example.com"
-                    className="flex-1 bg-transparent text-xs text-white placeholder-white/35 outline-none"
+                    className="flex-1 bg-transparent text-xs outline-none"
+                    style={{ color: palette.textPrimary }}
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-xs text-white/50 mb-1">Link type</label>
+                <label className="mb-1 block text-xs" style={{ color: palette.textMuted }}>Link type</label>
                 <div className="flex gap-2">
-                  <button type="button" onClick={() => setLinkRel('dofollow')} className={`px-3 py-1.5 rounded-xl text-xs ${linkRel === 'dofollow' ? 'bg-emerald-400 text-black' : 'bg-white/[0.06] text-white/70'}`}>Dofollow</button>
-                  <button type="button" onClick={() => setLinkRel('nofollow')} className={`px-3 py-1.5 rounded-xl text-xs ${linkRel === 'nofollow' ? 'bg-emerald-400 text-black' : 'bg-white/[0.06] text-white/70'}`}>Nofollow</button>
+                  <button type="button" onClick={() => setLinkRel('dofollow')} className="rounded-xl px-3 py-1.5 text-xs" style={linkRel === 'dofollow' ? { backgroundColor: palette.accentPrimary, color: isDayMode ? '#ffffff' : '#000000' } : { backgroundColor: isDayMode ? 'rgba(247,247,245,0.95)' : 'rgba(255,255,255,0.06)', color: palette.textSecondary }}>Dofollow</button>
+                  <button type="button" onClick={() => setLinkRel('nofollow')} className="rounded-xl px-3 py-1.5 text-xs" style={linkRel === 'nofollow' ? { backgroundColor: palette.accentPrimary, color: isDayMode ? '#ffffff' : '#000000' } : { backgroundColor: isDayMode ? 'rgba(247,247,245,0.95)' : 'rgba(255,255,255,0.06)', color: palette.textSecondary }}>Nofollow</button>
                 </div>
               </div>
 
-              <label className="flex items-center gap-2 cursor-pointer">
+              <label className="flex cursor-pointer items-center gap-2">
                 <input
                   type="checkbox"
                   checked={linkOpenInNewTab}
                   onChange={(e) => setLinkOpenInNewTab(e.target.checked)}
-                  className="w-3.5 h-3.5 rounded border-white/20 bg-white/[0.06] text-emerald-400 focus:ring-emerald-400/30"
+                  className="h-3.5 w-3.5 rounded"
+                  style={{ accentColor: palette.accentPrimary }}
                 />
-                <span className="text-xs text-white/60">Open in new tab</span>
+                <span className="text-xs" style={{ color: palette.textSecondary }}>Open in new tab</span>
               </label>
 
               <div className="flex justify-end gap-2 pt-4">
-                <button type="button" onClick={cancelLink} className="px-4 py-2 rounded-xl bg-white/[0.06] text-white/70">Cancel</button>
-                <button type="button" onClick={applyLink} className="px-4 py-2 rounded-xl bg-emerald-400 text-black">Insert</button>
+                <button type="button" onClick={cancelLink} className="qs-account-secondary-btn rounded-xl border px-4 py-2">Cancel</button>
+                <button type="button" onClick={applyLink} className="qs-account-solid-btn rounded-xl border px-4 py-2">Insert</button>
               </div>
             </div>
           </div>
