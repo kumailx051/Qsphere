@@ -36,7 +36,6 @@ export default function BlogDetail() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [editingCommentId, setEditingCommentId] = useState(null)
   const [editText, setEditText] = useState('')
-
   const nameRef = useRef(null)
   const commentRef = useRef(null)
   const commentsSectionRef = useRef(null)
@@ -595,9 +594,9 @@ export default function BlogDetail() {
 
   if (loading) {
     return (
-      <div className="relative min-h-screen" style={{ backgroundColor: palette.bgPrimary, color: palette.textPrimary }}>
+      <div className="relative min-h-screen flex flex-col" style={{ backgroundColor: palette.bgPrimary, color: palette.textPrimary }}>
         <Navbar currentPage="blogs" />
-        <main className="pt-28 px-6 md:px-12 lg:px-20">
+        <main className="flex-1 pt-28 px-6 md:px-12 lg:px-20">
           <div className="max-w-4xl mx-auto py-40 text-center">
             <p style={{ color: palette.textSecondary }}>Loading article...</p>
           </div>
@@ -609,9 +608,9 @@ export default function BlogDetail() {
 
   if (!post) {
     return (
-      <div className="relative min-h-screen" style={{ backgroundColor: palette.bgPrimary, color: palette.textPrimary }}>
+      <div className="relative min-h-screen flex flex-col" style={{ backgroundColor: palette.bgPrimary, color: palette.textPrimary }}>
         <Navbar currentPage="blogs" />
-        <main className="pt-28 px-6 md:px-12 lg:px-20">
+        <main className="flex-1 pt-28 px-6 md:px-12 lg:px-20">
           <div className="max-w-4xl mx-auto py-40 text-center">
             <h1 className="text-3xl font-bold mb-4">Article not found</h1>
             <p className="mb-8" style={{ color: palette.textSecondary }}>We couldn't find the article you're looking for.</p>
@@ -624,7 +623,7 @@ export default function BlogDetail() {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden" style={{ backgroundColor: palette.bgPrimary, color: palette.textPrimary }}>
+    <div className="relative min-h-screen flex flex-col overflow-hidden" style={{ backgroundColor: palette.bgPrimary, color: palette.textPrimary }}>
       <Navbar currentPage="blogs" />
 
       <style>{`
@@ -833,7 +832,7 @@ export default function BlogDetail() {
           <div className="absolute inset-0" style={{ background: isDayMode ? 'radial-gradient(circle at top, rgba(46,197,138,0.18), transparent 45%), linear-gradient(180deg, #f0fdf4 0%, #ffffff 100%)' : 'radial-gradient(circle at top, rgba(16,185,129,0.28), transparent 45%), linear-gradient(180deg, #10231b 0%, #07100d 100%)' }} />
         )}
         <div className="absolute inset-y-0 left-0 w-[68%]" style={{ background: isDayMode ? 'linear-gradient(90deg, rgba(255,255,255,0.2) 0%, transparent 100%)' : 'linear-gradient(90deg, rgba(2,8,6,0.96) 0%, rgba(2,8,6,0.86) 38%, rgba(2,8,6,0.36) 74%, transparent 100%)' }} />
-        <div className="absolute inset-0" style={{ background: isDayMode ? 'linear-gradient(180deg, transparent, rgba(255,255,255,0.4) 100%)' : 'linear-gradient(180deg, rgba(2,8,6,0.16) 0%, rgba(2,8,6,0.48) 34%, rgba(2,8,6,0.92) 72%, rgba(2,8,6,0.98) 100%)' }} />
+        <div className="absolute inset-0" style={{ background: isDayMode ? 'transparent' : 'linear-gradient(180deg, rgba(2,8,6,0.16) 0%, rgba(2,8,6,0.48) 34%, rgba(2,8,6,0.92) 72%, rgba(2,8,6,0.98) 100%)' }} />
         <div className="absolute inset-0" style={{ background: isDayMode ? 'radial-gradient(circle at top, rgba(46,197,138,0.05), transparent 40%)' : 'radial-gradient(circle at top, rgba(16,185,129,0.2), transparent 40%)' }} />
         <div className="relative z-20 w-full px-5 pb-20 pt-40 sm:px-8 md:px-12 lg:px-16 lg:pt-48">
           <div className="mx-auto w-full max-w-[1680px]">
@@ -846,48 +845,29 @@ export default function BlogDetail() {
               Back to blogs
             </Link>
 
-            <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_340px] xl:items-end">
-              <div className="max-w-5xl">
-                <div className="rounded-[32px] px-5 py-5 backdrop-blur-xl md:px-7 md:py-7 lg:px-8 lg:py-8" style={{ border: `1px solid ${palette.borderPrimary}`, background: isDayMode ? 'linear-gradient(180deg, rgba(255,255,255,0.95), rgba(248,250,249,0.9))' : 'linear-gradient(180deg, rgba(4,10,8,0.88), rgba(4,10,8,0.68))', boxShadow: palette.shadowCard }}>
-                  <div className="mb-6 flex flex-wrap items-center gap-3 text-xs font-semibold uppercase tracking-[0.24em]" style={{ color: palette.accentDark }}>
-                    <span className="rounded-full px-3 py-1.5" style={{ border: `1px solid ${palette.accentBorder}`, backgroundColor: palette.accentSoft }}>Feature article</span>
-                    <span className="rounded-full px-3 py-1.5" style={{ border: `1px solid ${palette.accentBorder}`, backgroundColor: palette.accentSoft }}>{categoryLabel}</span>
-                    <span className="rounded-full px-3 py-1.5" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.bgSecondary, color: palette.textSecondary }}>{commentCountLabel}</span>
-                  </div>
-
-                  <h1
-                    className="font-bold leading-[0.9]"
-                    style={{ color: palette.textPrimary, fontSize: 'clamp(2.7rem, 5vw, 5.6rem)', fontFamily: "'Syne', 'Inter', sans-serif" }}
-                  >
-                    {post.title}
-                  </h1>
-
-                  <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-3 text-sm" style={{ color: palette.textSecondary }}>
-                    <span className="inline-flex items-center gap-2"><UserRound size={15} style={{ color: palette.accentPrimary, opacity: 0.8 }} /> {authorName}</span>
-                    {publishedLabel ? <span className="inline-flex items-center gap-2"><Calendar size={15} style={{ color: palette.accentPrimary, opacity: 0.8 }} /> {publishedLabel}</span> : null}
-                    {post?.readingTime ? <span className="inline-flex items-center gap-2"><Clock3 size={15} style={{ color: palette.accentPrimary, opacity: 0.8 }} /> {post.readingTime}</span> : null}
-                  </div>
-
-                  <div className="mt-8 max-w-4xl rounded-[24px] px-5 py-5 text-[1.03rem] leading-8 md:px-6" style={{ border: `1px solid ${palette.accentBorder}`, backgroundColor: palette.accentSoft, color: isDayMode ? palette.textSecondary : 'rgba(236,253,245,0.84)', boxShadow: isDayMode ? 'none' : 'inset 0 1px 0 rgba(255,255,255,0.03)' }}>
-                    {post.excerpt || 'Read the full article with a cleaner, more comfortable layout tailored to the QSphere visual theme.'}
-                  </div>
+            <div>
+              <div className="rounded-[32px] px-5 py-5 backdrop-blur-xl md:px-7 md:py-7 lg:px-8 lg:py-8" style={{ border: `1px solid ${palette.borderPrimary}`, background: isDayMode ? 'linear-gradient(180deg, rgba(255,255,255,0.95), rgba(248,250,249,0.9))' : 'linear-gradient(180deg, rgba(4,10,8,0.88), rgba(4,10,8,0.68))', boxShadow: palette.shadowCard }}>
+                <div className="mb-6 flex flex-wrap items-center gap-3 text-xs font-semibold uppercase tracking-[0.24em]" style={{ color: palette.accentDark }}>
+                  <span className="rounded-full px-3 py-1.5" style={{ border: `1px solid ${palette.accentBorder}`, backgroundColor: palette.accentSoft }}>Feature article</span>
+                  <span className="rounded-full px-3 py-1.5" style={{ border: `1px solid ${palette.accentBorder}`, backgroundColor: palette.accentSoft }}>{categoryLabel}</span>
+                  <span className="rounded-full px-3 py-1.5" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.bgSecondary, color: palette.textSecondary }}>{commentCountLabel}</span>
                 </div>
-              </div>
 
-              <div className="rounded-[28px] p-5 backdrop-blur-xl" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.cardBg, boxShadow: palette.shadowCard }}>
-                <div className="text-[10px] font-semibold uppercase tracking-[0.32em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(167,243,208,0.7)' }}>Reading overview</div>
-                <div className="mt-5 grid gap-3">
-                  {[
-                    { label: 'Author', value: authorName },
-                    { label: 'Published', value: publishedLabel || 'Not available' },
-                    { label: 'Read time', value: post.readingTime || 'Flexible read' },
-                    { label: 'Category', value: categoryLabel },
-                  ].map((item) => (
-                    <div key={item.label} className="rounded-2xl px-4 py-3" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.bgSecondary }}>
-                      <div className="text-[10px] uppercase tracking-[0.22em]" style={{ color: palette.textMuted }}>{item.label}</div>
-                      <div className="mt-2 text-sm font-semibold" style={{ color: palette.textPrimary }}>{item.value}</div>
-                    </div>
-                  ))}
+                <h1
+                  className="font-bold leading-[0.9]"
+                  style={{ color: palette.textPrimary, fontSize: 'clamp(2.7rem, 5vw, 5.6rem)', fontFamily: "'Syne', 'Inter', sans-serif" }}
+                >
+                  {post.title}
+                </h1>
+
+                <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-3 text-sm" style={{ color: palette.textSecondary }}>
+                  <span className="inline-flex items-center gap-2"><UserRound size={15} style={{ color: palette.accentPrimary, opacity: 0.8 }} /> {authorName}</span>
+                  {publishedLabel ? <span className="inline-flex items-center gap-2"><Calendar size={15} style={{ color: palette.accentPrimary, opacity: 0.8 }} /> {publishedLabel}</span> : null}
+                  {post?.readingTime ? <span className="inline-flex items-center gap-2"><Clock3 size={15} style={{ color: palette.accentPrimary, opacity: 0.8 }} /> {post.readingTime}</span> : null}
+                </div>
+
+                <div className="mt-8 max-w-4xl rounded-[24px] px-5 py-5 text-[1.03rem] leading-8 md:px-6" style={{ border: `1px solid ${palette.accentBorder}`, backgroundColor: palette.accentSoft, color: isDayMode ? palette.textSecondary : 'rgba(236,253,245,0.84)', boxShadow: isDayMode ? 'none' : 'inset 0 1px 0 rgba(255,255,255,0.03)' }}>
+                  {post.excerpt || 'Read the full article with a cleaner, more comfortable layout tailored to the QSphere visual theme.'}
                 </div>
               </div>
             </div>
@@ -895,7 +875,7 @@ export default function BlogDetail() {
         </div>
       </div>
 
-      <main className="relative z-10 -mt-14 px-4 pb-24 sm:px-6 lg:-mt-16 lg:px-8">
+      <main className="flex-1 relative z-10 -mt-14 px-4 pb-24 sm:px-6 lg:-mt-16 lg:px-8">
         <div className="mx-auto w-full max-w-[1680px]">
           <div className="blog-shell rounded-[34px] p-5 sm:p-7 lg:p-10 xl:p-12">
             <div className="grid justify-center gap-8 lg:grid-cols-[minmax(0,860px)_320px] lg:gap-12">

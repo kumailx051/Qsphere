@@ -143,16 +143,12 @@ const EventsPage = () => {
             <div className="absolute -left-12 top-0 h-72 w-72 rounded-full blur-3xl" style={{ backgroundColor: isDayMode ? 'rgba(46,197,138,0.12)' : 'rgba(16,185,129,0.12)' }} />
             <div className="absolute -right-12 top-8 h-72 w-72 rounded-full blur-3xl" style={{ backgroundColor: isDayMode ? 'rgba(255,224,163,0.2)' : 'rgba(6,182,212,0.1)' }} />
 
-            <div className="relative z-10 grid gap-10 xl:grid-cols-[1.12fr_0.88fr] xl:items-start">
+            <div>
               <div>
                 <div className="flex flex-wrap items-center gap-3 mb-6">
                   <span className="inline-flex items-center gap-3 rounded-full px-4 py-2 text-[10px] font-bold uppercase tracking-[0.34em]" style={{ border: `1px solid ${palette.accentBorder}`, backgroundColor: palette.accentSoft, color: palette.accentDark }}>
                     <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: palette.accentPrimary, boxShadow: isDayMode ? '0 0 18px rgba(46,197,138,0.45)' : '0 0 18px rgba(16,185,129,0.8)' }} />
                     Community Events
-                  </span>
-                  <span className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.24em]" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: isDayMode ? 'rgba(255,255,255,0.72)' : 'rgba(255,255,255,0.03)', color: palette.textMuted }}>
-                    <Sparkles size={14} style={{ color: palette.accentPrimary }} />
-                    Signal-rich gatherings
                   </span>
                 </div>
 
@@ -201,122 +197,7 @@ const EventsPage = () => {
                   ))}
                 </motion.div>
               </div>
-
-              {featuredEvent && (() => {
-                const featuredDate = parseEventDate(featuredEvent.date)
-                const featuredDeadline = getRegistrationState(featuredEvent.deadline)
-                const featuredAccent = getEventAccent(featuredEvent.type)
-                const typeStyle = getDynamicTypeStyles(featuredEvent.type, isDayMode, palette)
-                const badgeStyle = getDynamicStatusBadgeStyles(featuredDeadline.badge, isDayMode, palette)
-
-                return (
-                  <Link
-                    to={`/events/${featuredEvent.id}`}
-                    className="group relative block overflow-hidden rounded-[34px] p-6 no-underline transition-all duration-500 hover:-translate-y-1.5 md:p-7"
-                    style={{
-                      border: `1px solid ${palette.borderPrimary}`,
-                      background: isDayMode ? 'linear-gradient(180deg, rgba(255,255,255,0.9), rgba(247,247,245,0.8))' : 'linear-gradient(180deg, rgba(5,10,8,0.92), rgba(4,8,7,0.74))',
-                      boxShadow: isDayMode ? `0 0 0 1px rgba(255,255,255,0.5) inset, 0 30px 100px rgba(15,23,42,0.08), 0 0 60px ${featuredAccent.glow}` : `0 0 0 1px rgba(255,255,255,0.02) inset, 0 30px 100px rgba(0,0,0,0.4), 0 0 60px ${featuredAccent.glow}`
-                    }}
-                  >
-                    <div className="absolute inset-x-8 top-0 h-px" style={{ background: `linear-gradient(90deg, transparent, ${featuredAccent.edge}, transparent)` }} />
-                    <div className="absolute right-0 top-0 h-48 w-48 rounded-full blur-3xl" style={{ background: featuredAccent.haze }} />
-
-                    <div className="relative z-10">
-                      <div className="flex items-center justify-between gap-4">
-                        <div>
-                          <div className="text-[10px] font-bold uppercase tracking-[0.28em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.8)' }}>Featured signal</div>
-                          <div className="mt-3 text-5xl font-bold leading-none" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
-                            {featuredDate.day}
-                          </div>
-                          <div className="mt-2 text-sm uppercase tracking-[0.24em]" style={{ color: palette.textMuted }}>{featuredDate.month} {featuredDate.year}</div>
-                        </div>
-                        <div
-                          className="inline-flex items-center rounded-full border px-3.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em]"
-                          style={{ backgroundColor: typeStyle.bg, color: typeStyle.color, borderColor: typeStyle.border, boxShadow: typeStyle.shadow }}
-                        >
-                          {featuredEvent.type}
-                        </div>
-                      </div>
-
-                      <h2 className="mt-8 text-3xl font-bold leading-tight transition-colors duration-300 md:text-[2.15rem]" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
-                        {featuredEvent.title}
-                      </h2>
-
-                      <p className="mt-5 text-base leading-8" style={{ color: palette.textSecondary }}>
-                        {featuredEvent.description}
-                      </p>
-
-                      <div className="mt-7 grid gap-3">
-                        <div className="flex items-center gap-3 rounded-2xl px-4 py-3" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: isDayMode ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.2)' }}>
-                          <MapPin size={15} style={{ color: palette.accentPrimary }} />
-                          <span className="text-sm font-medium" style={{ color: palette.textSecondary }}>{featuredEvent.location}</span>
-                        </div>
-                        <div className="flex items-center gap-3 rounded-2xl px-4 py-3" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: isDayMode ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.2)' }}>
-                          <Clock size={15} style={{ color: palette.accentPrimary }} />
-                          <span className="text-sm font-medium" style={{ color: palette.textSecondary }}>{formatEventTime(featuredEvent.date)}</span>
-                        </div>
-                      </div>
-
-                      <div className="mt-7 flex items-center justify-between gap-4 pt-5" style={{ borderTop: `1px solid ${palette.borderPrimary}` }}>
-                        <div>
-                          <div
-                            className="inline-flex rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em]"
-                            style={{ backgroundColor: badgeStyle.bg, color: badgeStyle.color, borderColor: badgeStyle.border }}
-                          >
-                            {featuredDeadline.badge}
-                          </div>
-                          <div className="mt-3 text-sm font-semibold" style={{ color: palette.textSecondary }}>{featuredDeadline.label}</div>
-                        </div>
-                        <span className="inline-flex items-center gap-2 text-sm font-semibold transition-all duration-300 group-hover:gap-3" style={{ color: palette.accentPrimary }}>
-                          Open details
-                          <ArrowUpRight size={16} />
-                        </span>
-                      </div>
-                    </div>
-                  </Link>
-                )
-              })()}
             </div>
-          </motion.section>
-
-          <motion.section
-            variants={containerVariants}
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, margin: '-60px' }}
-            className="mt-8 grid gap-4 lg:grid-cols-[0.9fr_2.1fr]"
-          >
-            <div className="rounded-[30px] p-6 backdrop-blur-xl" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: isDayMode ? 'rgba(255,255,255,0.72)' : 'rgba(255,255,255,0.03)' }}>
-              <div className="text-[10px] font-bold uppercase tracking-[0.28em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.8)' }}>Curation note</div>
-              <h2 className="mt-4 text-2xl font-bold" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
-                Not just a calendar.
-              </h2>
-              <p className="mt-4 text-sm leading-7" style={{ color: palette.textSecondary }}>
-                Each card below is designed to read faster, feel richer, and guide you into the detail page with more context before you even click.
-              </p>
-            </div>
-            <motion.div variants={containerVariants} initial="hidden" whileInView="visible" viewport={{ once: true }} className="grid gap-4 sm:grid-cols-3">
-              {[
-                {
-                  label: 'Fast to scan',
-                  text: 'Sharper hierarchy, clearer status, cleaner event type and time signals.',
-                },
-                {
-                  label: 'Better atmosphere',
-                  text: 'More glow, depth, contrast, and deliberate visual weight across the page.',
-                },
-                {
-                  label: 'Detail-first flow',
-                  text: 'The list now feels like the launch deck for the premium event pages behind it.',
-                },
-              ].map((item) => (
-                <motion.div key={item.label} variants={itemVariants} className="rounded-[30px] p-6 backdrop-blur-xl" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: isDayMode ? 'rgba(255,255,255,0.72)' : 'rgba(255,255,255,0.03)' }}>
-                  <div className="text-[10px] font-bold uppercase tracking-[0.24em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.8)' }}>{item.label}</div>
-                  <p className="mt-4 text-sm leading-7" style={{ color: palette.textSecondary }}>{item.text}</p>
-                </motion.div>
-              ))}
-            </motion.div>
           </motion.section>
 
           {events.length === 0 ? (
@@ -342,9 +223,6 @@ const EventsPage = () => {
                     Pick the room you want to enter next.
                   </h2>
                 </div>
-                <p className="max-w-xl text-sm leading-7" style={{ color: palette.textSecondary }}>
-                  From technical deep dives to community-facing sessions, each event card below is built to give you a premium preview before you step into the full detail experience.
-                </p>
               </div>
 
               <motion.div
@@ -459,7 +337,9 @@ const EventsPage = () => {
         </div>
       </main>
 
-      <Footer />
+      <div style={{ position: 'relative', zIndex: 1 }}>
+        <Footer />
+      </div>
 
       <style>{`
         @keyframes fadeUp {

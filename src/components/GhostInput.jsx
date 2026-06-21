@@ -5,6 +5,7 @@ export default function GhostInput({
   onChange,
   placeholder = '',
   className = '',
+  style = {},
   context = ''
 }) {
   const [suggestion, setSuggestion] = useState('')
@@ -80,6 +81,7 @@ export default function GhostInput({
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
         className={`${className} relative z-10 bg-transparent outline-none`}
+        style={style}
       />
       {suggestion && (
         <div 
@@ -87,7 +89,7 @@ export default function GhostInput({
           style={{ paddingLeft: '1rem', paddingRight: '1rem' }} // match px-4
         >
           <span className="opacity-0">{getHiddenText()}</span>
-          <span className="text-white/30 italic">{suggestion.startsWith(' ') ? suggestion : ' ' + suggestion}</span>
+          <span className="italic" style={{ color: value ? 'rgba(128,128,128,0.6)' : 'transparent' }}>{suggestion.startsWith(' ') ? suggestion : ' ' + suggestion}</span>
         </div>
       )}
     </div>

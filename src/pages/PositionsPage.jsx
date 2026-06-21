@@ -146,16 +146,12 @@ const PositionsPage = () => {
             <div className="absolute -left-12 top-0 h-72 w-72 rounded-full blur-3xl" style={{ backgroundColor: isDayMode ? 'rgba(46,197,138,0.12)' : 'rgba(16,185,129,0.12)' }} />
             <div className="absolute -right-12 top-10 h-72 w-72 rounded-full blur-3xl" style={{ backgroundColor: isDayMode ? 'rgba(6,182,212,0.12)' : 'rgba(6,182,212,0.1)' }} />
 
-            <div className="relative z-10 grid gap-10 xl:grid-cols-[1.12fr_0.88fr] xl:items-start">
+            <div>
               <div>
                 <div className="flex flex-wrap items-center gap-3 mb-6">
                   <span className="inline-flex items-center gap-3 rounded-full px-4 py-2 text-[10px] font-bold uppercase tracking-[0.34em]" style={{ border: `1px solid ${palette.accentBorder}`, backgroundColor: palette.accentSoft, color: palette.accentDark }}>
                     <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: palette.accentPrimary, boxShadow: isDayMode ? '0 0 18px rgba(46,197,138,0.45)' : '0 0 18px rgba(16,185,129,0.8)' }} />
                     Careers and Research
-                  </span>
-                  <span className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.24em]" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: isDayMode ? 'rgba(255,255,255,0.72)' : 'rgba(255,255,255,0.03)', color: palette.textMuted }}>
-                    <Sparkles size={14} style={{ color: palette.accentPrimary }} />
-                    Opportunity index
                   </span>
                 </div>
 
@@ -204,115 +200,7 @@ const PositionsPage = () => {
                   ))}
                 </motion.div>
               </div>
-
-              {featuredPosition && (() => {
-                const featuredDeadline = parsePositionDeadline(featuredPosition.deadline)
-                const featuredLoc = getDynamicLocationStyles(featuredPosition.location, isDayMode, palette)
-                const featuredTypeStyles = getDynamicTypeStyles(featuredPosition.type, isDayMode, palette)
-                const featuredAccent = getPositionAccent(featuredPosition.type)
-                const featuredStatusStyles = getDynamicStatusBadgeStyles(featuredDeadline, isDayMode, palette)
-
-                return (
-                  <Link
-                    to={`/positions/${featuredPosition.id}`}
-                    className="group relative block overflow-hidden rounded-[34px] p-6 no-underline transition-all duration-500 hover:-translate-y-1.5 md:p-7"
-                    style={{
-                      border: `1px solid ${palette.borderPrimary}`,
-                      background: isDayMode ? 'linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,250,249,0.92))' : 'linear-gradient(180deg, rgba(5,10,8,0.92), rgba(4,8,7,0.74))',
-                      boxShadow: isDayMode ? `0 0 0 1px rgba(255,255,255,0.6) inset, ${palette.shadowCard}, 0 0 40px ${featuredAccent.glow.replace('0.16', '0.08').replace('0.14', '0.06')}` : `0 0 0 1px rgba(255,255,255,0.02) inset, 0 30px 100px rgba(0,0,0,0.4), 0 0 60px ${featuredAccent.glow}`
-                    }}
-                  >
-                    <div className="absolute inset-x-8 top-0 h-px" style={{ background: `linear-gradient(90deg, transparent, ${featuredAccent.edge}, transparent)` }} />
-                    <div className="absolute right-0 top-0 h-48 w-48 rounded-full blur-3xl" style={{ background: featuredLoc.glow }} />
-
-                    <div className="relative z-10">
-                      <div className="flex items-start justify-between gap-4">
-                        <div>
-                          <div className="text-[10px] font-bold uppercase tracking-[0.28em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.8)' }}>Featured opening</div>
-                          <h2 className="mt-4 text-3xl font-bold leading-tight transition-colors duration-300 md:text-[2.15rem]" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
-                            {featuredPosition.title}
-                          </h2>
-                        </div>
-                        <span className="inline-flex rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em]" style={featuredStatusStyles}>
-                          {featuredDeadline.closed ? 'Closed' : featuredDeadline.urgent ? 'Priority' : 'Open'}
-                        </span>
-                      </div>
-
-                      <div className="mt-6 flex flex-wrap gap-3">
-                        <span className="inline-flex items-center rounded-full px-3.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em]" style={{ border: `1px solid ${featuredTypeStyles.border}`, backgroundColor: featuredTypeStyles.bg, color: featuredTypeStyles.color }}>
-                          {featuredPosition.type}
-                        </span>
-                        <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-semibold" style={{ border: `1px solid ${featuredLoc.border}`, backgroundColor: featuredLoc.bg, color: featuredLoc.color }}>
-                          <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: featuredLoc.dot }} />
-                          {featuredPosition.location}
-                        </span>
-                      </div>
-
-                      <p className="mt-6 text-base leading-8" style={{ color: palette.textSecondary }}>
-                        {featuredPosition.description}
-                      </p>
-
-                      <div className="mt-7 grid gap-3">
-                        <div className="flex items-center gap-3 rounded-2xl px-4 py-3" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: isDayMode ? 'rgba(0,0,0,0.02)' : 'rgba(0,0,0,0.2)' }}>
-                          <Clock size={15} style={{ color: palette.accentPrimary }} />
-                          <span className="text-sm font-medium" style={{ color: featuredDeadline.closed ? palette.textMuted : featuredDeadline.urgent ? (isDayMode ? '#d97706' : '#fcd34d') : palette.textSecondary }}>
-                            {featuredDeadline.closed ? 'Applications closed' : `Apply by ${featuredDeadline.label}`}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-3 rounded-2xl px-4 py-3" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: isDayMode ? 'rgba(0,0,0,0.02)' : 'rgba(0,0,0,0.2)' }}>
-                          <Mail size={15} style={{ color: palette.accentPrimary }} />
-                          <span className="truncate text-sm font-medium" style={{ color: palette.textSecondary }}>{featuredPosition.contact}</span>
-                        </div>
-                      </div>
-
-                      <div className="mt-7 inline-flex items-center gap-2 text-sm font-semibold transition-all duration-300 group-hover:gap-3" style={{ color: palette.accentPrimary }}>
-                        View and apply
-                        <ArrowUpRight size={16} />
-                      </div>
-                    </div>
-                  </Link>
-                )
-              })()}
             </div>
-          </motion.section>
-
-          <motion.section
-            variants={containerVariants}
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, margin: '-60px' }}
-            className="mt-8 grid gap-4 lg:grid-cols-[0.9fr_2.1fr]"
-          >
-            <div className="rounded-[30px] p-6 backdrop-blur-xl" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.cardBg }}>
-              <div className="text-[10px] font-bold uppercase tracking-[0.28em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.8)' }}>Selection note</div>
-              <h2 className="mt-4 text-2xl font-bold" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
-                Built to scan faster.
-              </h2>
-              <p className="mt-4 text-sm leading-7" style={{ color: palette.textSecondary }}>
-                The list below now gives you stronger context at a glance: urgency, location mode, role type, and the direct path into the full apply page.
-              </p>
-            </div>
-            <motion.div variants={containerVariants} initial="hidden" whileInView="visible" viewport={{ once: true }} className="grid gap-4 sm:grid-cols-3">
-              {[
-                {
-                  label: 'Clearer urgency',
-                  text: 'Open, priority, and closed states surface immediately without digging.',
-                },
-                {
-                  label: 'Richer previews',
-                  text: 'Each card carries more role signal before the reader opens the detail page.',
-                },
-                {
-                  label: 'Premium flow',
-                  text: 'The listing page now feels like the front door to the cinematic role pages behind it.',
-                },
-              ].map((item) => (
-                <motion.div key={item.label} variants={itemVariants} className="rounded-[30px] p-6 backdrop-blur-xl" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.cardBg }}>
-                  <div className="text-[10px] font-bold uppercase tracking-[0.24em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.8)' }}>{item.label}</div>
-                  <p className="mt-4 text-sm leading-7" style={{ color: palette.textSecondary }}>{item.text}</p>
-                </motion.div>
-              ))}
-            </motion.div>
           </motion.section>
 
           {positions.length === 0 ? (
@@ -345,9 +233,6 @@ const PositionsPage = () => {
                     Choose the role you want to step into next.
                   </h2>
                 </div>
-                <p className="max-w-xl text-sm leading-7" style={{ color: palette.textSecondary }}>
-                  These cards are tuned to preview the strongest fit signals first, then lead directly into the full role detail and application experience.
-                </p>
               </div>
 
               <motion.div
@@ -457,7 +342,9 @@ const PositionsPage = () => {
         </div>
       </main>
 
-      <Footer />
+      <div style={{ position: 'relative', zIndex: 1 }}>
+        <Footer />
+      </div>
 
       <style>{`
         @keyframes fadeUp {

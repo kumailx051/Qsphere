@@ -35,6 +35,8 @@ import {
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import GhostInput from '../components/GhostInput'
+import { useTheme } from '../contexts/ThemeContext'
+import { darkTheme, dayTheme } from '../themeColors'
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -49,6 +51,10 @@ const itemVariants = {
 export default function CreateBlogPage() {
   const navigate = useNavigate()
   const editorRef = useRef(null)
+
+  const { theme } = useTheme()
+  const isDayMode = theme === 'light'
+  const palette = isDayMode ? dayTheme : darkTheme
 
   // Main post metadata
   const [title, setTitle] = useState('')
@@ -801,14 +807,14 @@ export default function CreateBlogPage() {
   }
 
   return (
-    <div className="relative overflow-hidden bg-[#060a06]" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div className="relative overflow-hidden" style={{ backgroundColor: palette.bgPrimary, minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <Navbar currentPage="blogs" />
 
       {/* Parallax ambient glows */}
       <div className="fixed inset-0 pointer-events-none" style={{ zIndex: 0 }}>
-        <div className="absolute inset-0 bg-[#060a06]" />
-        <motion.div className="absolute inset-0 opacity-40" style={{ background: 'radial-gradient(circle at 18% 0%, rgba(16,185,129,0.18) 0%, transparent 42%)', y: glowY1 }} />
-        <motion.div className="absolute inset-0 opacity-20" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(6,182,212,0.12) 0%, transparent 36%)', y: glowY2 }} />
+        <div className="absolute inset-0" style={{ backgroundColor: palette.bgPrimary }} />
+        <motion.div className="absolute inset-0 opacity-40" style={{ background: `radial-gradient(circle at 18% 0%, ${palette.accentGlow} 0%, transparent 42%)`, y: glowY1 }} />
+        <motion.div className="absolute inset-0 opacity-20" style={{ background: `radial-gradient(circle at 100% 0%, ${palette.accentSecondaryGlow} 0%, transparent 36%)`, y: glowY2 }} />
         <div
           className="absolute inset-0 opacity-[0.14]"
           style={{
@@ -821,31 +827,31 @@ export default function CreateBlogPage() {
       </div>
 
       {/* Editor top navigation bar */}
-      <div className="relative z-10 w-full bg-white/[0.04] border-b border-white/[0.08] backdrop-blur-xl pt-24 px-6 md:px-12 lg:px-20 xl:px-28">
+      <div className="relative z-10 w-full backdrop-blur-xl pt-24 px-6 md:px-12 lg:px-20 xl:px-28" style={{ backgroundColor: palette.bgSurface, borderBottom: `1px solid ${palette.borderPrimary}` }}>
         <div className="mx-auto w-full flex flex-col md:flex-row md:items-center justify-between py-6 gap-4">
           <div className="flex items-center gap-4">
             <button
               onClick={() => navigate(-1)}
-              className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 hover:border-emerald-400/30 hover:bg-emerald-500/10 text-white/70 hover:text-emerald-300 transition-all"
+              className="flex h-10 w-10 items-center justify-center rounded-2xl transition-all" style={{ border: `1px solid ${palette.borderPrimary}`, color: palette.textSecondary }} onMouseEnter={e => { e.currentTarget.style.borderColor = palette.accentBorder; e.currentTarget.style.backgroundColor = palette.accentSoft; e.currentTarget.style.color = palette.accentLight }} onMouseLeave={e => { e.currentTarget.style.borderColor = palette.borderPrimary; e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = palette.textSecondary }}
             >
               <ArrowLeft size={16} />
             </button>
             <div>
               <div className="flex items-center gap-3 mb-1">
-                <span className="inline-flex items-center gap-2 rounded-full border border-emerald-400/16 bg-emerald-400/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.28em] text-emerald-300">
-                  <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.7)]" />
+                <span className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.28em]" style={{ border: `1px solid ${palette.accentBorder}`, backgroundColor: palette.accentSoft, color: palette.accentLight }}>
+                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: palette.accentPrimary, boxShadow: `0 0 10px ${palette.accentPrimary}` }} />
                   Interactive Publisher
                 </span>
               </div>
-              <h1 className="text-white font-bold text-2xl leading-tight md:text-3xl" style={{ fontFamily: "'Syne', sans-serif" }}>Write Blog Post</h1>
+              <h1 className="font-bold text-2xl leading-tight md:text-3xl" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>Write Blog Post</h1>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
-            <span className="text-xs text-white/40 font-mono hidden sm:inline">{getAutoReadTime()} ({wordCount} {wordCount === 1 ? 'word' : 'words'})</span>
+            <span className="text-xs font-mono hidden sm:inline" style={{ color: palette.textMuted }}>{getAutoReadTime()} ({wordCount} {wordCount === 1 ? 'word' : 'words'})</span>
             <button
               onClick={handlePublish}
-              className="inline-flex items-center gap-2 rounded-2xl bg-emerald-400 text-[#05100b] px-6 py-3 text-xs font-extrabold hover:bg-emerald-300 shadow-[0_0_20px_rgba(16,185,129,0.25)] hover:shadow-[0_0_30px_rgba(16,185,129,0.4)] transition-all"
+              className="inline-flex items-center gap-2 rounded-2xl px-6 py-3 text-xs font-extrabold transition-all" style={{ backgroundColor: palette.btnPrimaryBg, color: palette.btnPrimaryText, boxShadow: `0 0 20px ${palette.accentGlow}` }} onMouseEnter={e => { e.currentTarget.style.boxShadow = `0 0 30px ${palette.accentGlow}` }} onMouseLeave={e => { e.currentTarget.style.boxShadow = `0 0 20px ${palette.accentGlow}` }}
             >
               Publish Post
             </button>
@@ -858,26 +864,26 @@ export default function CreateBlogPage() {
         <div className="mx-auto w-full">
 
           {hasDraftToRestore && (
-            <motion.div variants={itemVariants} initial="hidden" whileInView="visible" viewport={{ once: true }} className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4 rounded-2xl border border-emerald-400/20 bg-emerald-500/10 p-5 text-emerald-300 shadow-[0_18px_60px_-35px_rgba(16,185,129,0.55)]">
+            <motion.div variants={itemVariants} initial="hidden" whileInView="visible" viewport={{ once: true }} className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4 rounded-2xl p-5" style={{ border: `1px solid ${palette.accentBorder}`, backgroundColor: palette.accentSoft, color: palette.accentLight, boxShadow: `0 18px 60px -35px ${palette.accentGlow}` }}>
               <div className="flex items-start gap-3">
-                <AlertCircle size={20} className="shrink-0 mt-0.5 text-emerald-400" />
+                <AlertCircle size={20} className="shrink-0 mt-0.5" style={{ color: palette.accentPrimary }} />
                 <div>
-                  <span className="text-sm font-bold text-white block">Unsaved Draft Found</span>
-                  <span className="text-xs text-white/60">We found an unsaved draft from your last session. Would you like to restore it?</span>
+                  <span className="text-sm font-bold block" style={{ color: palette.textPrimary }}>Unsaved Draft Found</span>
+                  <span className="text-xs" style={{ color: palette.textSecondary }}>We found an unsaved draft from your last session. Would you like to restore it?</span>
                 </div>
               </div>
               <div className="flex items-center gap-3 shrink-0">
                 <button
                   type="button"
                   onClick={dismissDraftBanner}
-                  className="px-4 py-1.5 rounded-xl border border-white/10 text-white/70 hover:text-white text-xs font-semibold transition"
+                  className="px-4 py-1.5 rounded-xl text-xs font-semibold transition" style={{ border: `1px solid ${palette.borderPrimary}`, color: palette.textSecondary }} onMouseEnter={e => { e.currentTarget.style.color = palette.textPrimary }} onMouseLeave={e => { e.currentTarget.style.color = palette.textSecondary }}
                 >
                   Dismiss
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowDraftsModal(true)}
-                  className="px-4 py-1.5 rounded-xl bg-emerald-400 text-black hover:bg-emerald-300 text-xs font-bold transition shadow-[0_0_15px_rgba(16,185,129,0.2)]"
+                  className="px-4 py-1.5 rounded-xl text-xs font-bold transition" style={{ backgroundColor: palette.btnPrimaryBg, color: palette.btnPrimaryText, boxShadow: `0 0 15px ${palette.accentGlow}` }}
                 >
                   View Drafts ({draftsList.length})
                 </button>
@@ -886,14 +892,14 @@ export default function CreateBlogPage() {
           )}
 
           {error && (
-            <motion.div variants={itemVariants} initial="hidden" whileInView="visible" viewport={{ once: true }} className="mb-6 flex items-center gap-3 rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-red-300">
+            <motion.div variants={itemVariants} initial="hidden" whileInView="visible" viewport={{ once: true }} className="mb-6 flex items-center gap-3 rounded-xl p-4" style={{ border: '1px solid rgba(239,68,68,0.20)', backgroundColor: 'rgba(239,68,68,0.10)', color: 'rgb(252,165,165)' }}>
               <AlertCircle size={18} className="shrink-0" />
               <span className="text-sm font-medium">{error}</span>
             </motion.div>
           )}
 
           {successMsg && (
-            <motion.div variants={itemVariants} initial="hidden" whileInView="visible" viewport={{ once: true }} className="mb-6 flex items-center gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-4 text-emerald-300">
+            <motion.div variants={itemVariants} initial="hidden" whileInView="visible" viewport={{ once: true }} className="mb-6 flex items-center gap-3 rounded-xl p-4" style={{ border: `1px solid ${palette.accentBorder}`, backgroundColor: palette.accentSoft, color: palette.accentLight }}>
               <Check size={18} className="shrink-0" />
               <span className="text-sm font-medium">{successMsg}</span>
             </motion.div>
@@ -905,20 +911,20 @@ export default function CreateBlogPage() {
             <motion.div variants={itemVariants} className="space-y-6">
               
               {/* Document metadata heading area */}
-              <div className="rounded-3xl border border-white/[0.08] bg-white/[0.035] p-6 space-y-4 shadow-[0_20px_70px_-45px_rgba(0,0,0,0.7)] backdrop-blur-xl">
+              <div className="rounded-3xl p-6 space-y-4 backdrop-blur-xl" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.bgSurface, boxShadow: palette.shadowCard }}>
                 <div className="flex flex-col md:flex-row md:items-start gap-4">
                   <GhostInput
                     value={title}
                     onChange={(v) => setTitle(v)}
                     placeholder="Enter Title..."
-                    className="flex-1 w-full text-white font-black text-3xl md:text-4xl outline-none placeholder-white/30 border-b border-white/10 focus:border-emerald-400/30 pb-4 transition-all"
-                    style={{ fontFamily: "'Archivo Black', 'Inter', sans-serif" }}
+                    className="flex-1 w-full font-black text-3xl md:text-4xl outline-none pb-4 transition-all"
+                    style={{ color: palette.textPrimary, borderBottom: `1px solid ${palette.borderPrimary}`, fontFamily: "'Archivo Black', 'Inter', sans-serif" }}
                   />
                   <button
                     type="button"
                     disabled={aiGenerating || (!title.trim() && !excerpt.trim())}
                     onClick={suggestTitles}
-                    className="shrink-0 md:mt-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-400 text-black font-bold text-sm shadow-[0_4px_15px_-4px_rgba(16,185,129,0.5)] hover:scale-105 transition disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-2"
+                    className="shrink-0 md:mt-2 px-4 py-2.5 rounded-xl font-bold text-sm hover:scale-105 transition disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-2" style={{ backgroundColor: palette.btnPrimaryBg, color: palette.btnPrimaryText, boxShadow: `0 4px 15px -4px ${palette.accentGlow}` }}
                   >
                     {aiGenerating ? (
                       <span className="flex items-center gap-2">
@@ -933,25 +939,24 @@ export default function CreateBlogPage() {
                   </button>
                 </div>
 
-                <div className="flex items-center gap-4 text-xs font-medium text-white/50" />
+                <div className="flex items-center gap-4 text-xs font-medium" style={{ color: palette.textMuted }} />
 
                 <div className="flex items-center gap-2">
                   <input
                     type="text"
                     value={excerpt}
                     onChange={(e) => setExcerpt(e.target.value)}
-                    placeholder="Provide a short summary / teaser excerpt..."
-                    className="flex-1 bg-transparent text-white/70 text-sm outline-none placeholder-white/20"
+                    className="flex-1 bg-transparent text-sm outline-none" style={{ color: palette.textSecondary }} placeholder="Provide a short summary / teaser excerpt..."
                   />
                   <button
                     type="button"
                     disabled={aiExcerptGenerating || !title.trim()}
                     onClick={generateAIExcerpt}
                     title="AI Generate Excerpt"
-                    className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/15 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/25 text-xs font-semibold transition disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition disabled:opacity-40 disabled:cursor-not-allowed" style={{ backgroundColor: palette.accentSoft, border: `1px solid ${palette.accentBorder}`, color: palette.accentPrimary }}
                   >
                     {aiExcerptGenerating ? (
-                      <div className="h-3 w-3 animate-spin rounded-full border-2 border-emerald-400 border-t-transparent" />
+                      <div className="h-3 w-3 animate-spin rounded-full border-2 border-t-transparent" style={{ borderColor: palette.accentPrimary, borderTopColor: 'transparent' }} />
                     ) : (
                       <Sparkles size={12} />
                     )}
@@ -961,49 +966,49 @@ export default function CreateBlogPage() {
               </div>
 
               {/* The Jodit-like Visual editor */}
-              <div className="rounded-2xl border border-white/10 bg-white/[0.035] backdrop-blur-xl overflow-hidden flex flex-col shadow-[0_22px_80px_-50px_rgba(0,0,0,0.75)]">
+              <div className="rounded-2xl backdrop-blur-xl overflow-hidden flex flex-col" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.bgSurface, boxShadow: palette.shadowCard }}>
                 
                 {/* TOOLBAR */}
-                <div className="flex flex-wrap items-center gap-1 bg-white/[0.06] border-b border-white/10 p-2 text-white/85">
+                <div className="flex flex-wrap items-center gap-1 p-2" style={{ backgroundColor: palette.bgSurfaceHover, borderBottom: `1px solid ${palette.borderPrimary}`, color: palette.textPrimary }}>
                   {/* Basic styles */}
-                  <button type="button" onClick={() => execCmd('bold')} className="p-2 rounded hover:bg-white/5 transition-colors font-bold" title="Bold"><Bold size={15} /></button>
-                  <button type="button" onClick={() => execCmd('italic')} className="p-2 rounded hover:bg-white/5 transition-colors font-semibold" title="Italic"><Italic size={15} /></button>
-                  <button type="button" onClick={() => execCmd('underline')} className="p-2 rounded hover:bg-white/5 transition-colors" title="Underline"><Underline size={15} /></button>
+                  <button type="button" onClick={() => execCmd('bold')} className="p-2 rounded font-bold" title="Bold" style={{ color: palette.textPrimary }} onMouseEnter={e => e.currentTarget.style.backgroundColor = palette.bgSurface} onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}><Bold size={15} /></button>
+                  <button type="button" onClick={() => execCmd('italic')} className="p-2 rounded font-semibold" title="Italic" style={{ color: palette.textPrimary }} onMouseEnter={e => e.currentTarget.style.backgroundColor = palette.bgSurface} onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}><Italic size={15} /></button>
+                  <button type="button" onClick={() => execCmd('underline')} className="p-2 rounded" title="Underline" style={{ color: palette.textPrimary }} onMouseEnter={e => e.currentTarget.style.backgroundColor = palette.bgSurface} onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}><Underline size={15} /></button>
                   
-                  <span className="w-[1px] h-5 bg-white/10 mx-1" />
+                  <span className="w-[1px] h-5 mx-1" style={{ backgroundColor: palette.borderPrimary }} />
 
                   {/* Lists */}
-                  <button type="button" onClick={() => execCmd('insertUnorderedList')} className="p-2 rounded hover:bg-white/5 transition-colors" title="Bullet List"><List size={15} /></button>
-                  <button type="button" onClick={() => execCmd('insertOrderedList')} className="p-2 rounded hover:bg-white/5 transition-colors" title="Numbered List"><ListOrdered size={15} /></button>
+                  <button type="button" onClick={() => execCmd('insertUnorderedList')} className="p-2 rounded" title="Bullet List" style={{ color: palette.textPrimary }} onMouseEnter={e => e.currentTarget.style.backgroundColor = palette.bgSurface} onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}><List size={15} /></button>
+                  <button type="button" onClick={() => execCmd('insertOrderedList')} className="p-2 rounded" title="Numbered List" style={{ color: palette.textPrimary }} onMouseEnter={e => e.currentTarget.style.backgroundColor = palette.bgSurface} onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}><ListOrdered size={15} /></button>
                   
-                  <span className="w-[1px] h-5 bg-white/10 mx-1" />
+                  <span className="w-[1px] h-5 mx-1" style={{ backgroundColor: palette.borderPrimary }} />
 
                   {/* Headers dropdown style format */}
-                  <button type="button" onClick={() => execCmd('formatBlock', '<h1>')} className="p-2 rounded hover:bg-white/5 transition-colors font-bold text-xs" title="Heading 1"><Heading1 size={15} /></button>
-                  <button type="button" onClick={() => execCmd('formatBlock', '<h2>')} className="p-2 rounded hover:bg-white/5 transition-colors font-bold text-xs" title="Heading 2"><Heading2 size={15} /></button>
-                  <button type="button" onClick={() => execCmd('formatBlock', '<h3>')} className="p-2 rounded hover:bg-white/5 transition-colors font-bold text-xs" title="Heading 3"><Heading3 size={15} /></button>
-                  <button type="button" onClick={() => execCmd('formatBlock', '<p>')} className="p-2 rounded hover:bg-white/5 transition-colors" title="Paragraph"><Text size={15} /></button>
-                  <button type="button" onClick={() => execCmd('formatBlock', '<blockquote>')} className="p-2 rounded hover:bg-white/5 transition-colors" title="Quote"><Quote size={15} /></button>
+                  <button type="button" onClick={() => execCmd('formatBlock', '<h1>')} className="p-2 rounded font-bold text-xs" title="Heading 1" style={{ color: palette.textPrimary }} onMouseEnter={e => e.currentTarget.style.backgroundColor = palette.bgSurface} onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}><Heading1 size={15} /></button>
+                  <button type="button" onClick={() => execCmd('formatBlock', '<h2>')} className="p-2 rounded font-bold text-xs" title="Heading 2" style={{ color: palette.textPrimary }} onMouseEnter={e => e.currentTarget.style.backgroundColor = palette.bgSurface} onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}><Heading2 size={15} /></button>
+                  <button type="button" onClick={() => execCmd('formatBlock', '<h3>')} className="p-2 rounded font-bold text-xs" title="Heading 3" style={{ color: palette.textPrimary }} onMouseEnter={e => e.currentTarget.style.backgroundColor = palette.bgSurface} onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}><Heading3 size={15} /></button>
+                  <button type="button" onClick={() => execCmd('formatBlock', '<p>')} className="p-2 rounded" title="Paragraph" style={{ color: palette.textPrimary }} onMouseEnter={e => e.currentTarget.style.backgroundColor = palette.bgSurface} onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}><Text size={15} /></button>
+                  <button type="button" onClick={() => execCmd('formatBlock', '<blockquote>')} className="p-2 rounded" title="Quote" style={{ color: palette.textPrimary }} onMouseEnter={e => e.currentTarget.style.backgroundColor = palette.bgSurface} onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}><Quote size={15} /></button>
 
-                  <span className="w-[1px] h-5 bg-white/10 mx-1" />
+                  <span className="w-[1px] h-5 mx-1" style={{ backgroundColor: palette.borderPrimary }} />
 
                   {/* Alignments */}
-                  <button type="button" onClick={() => execCmd('justifyLeft')} className="p-2 rounded hover:bg-white/5 transition-colors" title="Align Left"><AlignLeft size={15} /></button>
-                  <button type="button" onClick={() => execCmd('justifyCenter')} className="p-2 rounded hover:bg-white/5 transition-colors" title="Align Center"><AlignCenter size={15} /></button>
-                  <button type="button" onClick={() => execCmd('justifyRight')} className="p-2 rounded hover:bg-white/5 transition-colors" title="Align Right"><AlignRight size={15} /></button>
-                  <button type="button" onClick={() => execCmd('justifyFull')} className="p-2 rounded hover:bg-white/5 transition-colors" title="Align Justify"><AlignJustify size={15} /></button>
+                  <button type="button" onClick={() => execCmd('justifyLeft')} className="p-2 rounded" title="Align Left" style={{ color: palette.textPrimary }} onMouseEnter={e => e.currentTarget.style.backgroundColor = palette.bgSurface} onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}><AlignLeft size={15} /></button>
+                  <button type="button" onClick={() => execCmd('justifyCenter')} className="p-2 rounded" title="Align Center" style={{ color: palette.textPrimary }} onMouseEnter={e => e.currentTarget.style.backgroundColor = palette.bgSurface} onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}><AlignCenter size={15} /></button>
+                  <button type="button" onClick={() => execCmd('justifyRight')} className="p-2 rounded" title="Align Right" style={{ color: palette.textPrimary }} onMouseEnter={e => e.currentTarget.style.backgroundColor = palette.bgSurface} onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}><AlignRight size={15} /></button>
+                  <button type="button" onClick={() => execCmd('justifyFull')} className="p-2 rounded" title="Align Justify" style={{ color: palette.textPrimary }} onMouseEnter={e => e.currentTarget.style.backgroundColor = palette.bgSurface} onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}><AlignJustify size={15} /></button>
 
-                  <span className="w-[1px] h-5 bg-white/10 mx-1" />
+                  <span className="w-[1px] h-5 mx-1" style={{ backgroundColor: palette.borderPrimary }} />
 
                   {/* Insert Actions */}
-                  <button type="button" onClick={insertLink} className="p-2 rounded hover:bg-white/5 transition-colors" title="Insert Link"><LinkIcon size={15} /></button>
+                  <button type="button" onClick={insertLink} className="p-2 rounded" title="Insert Link" style={{ color: palette.textPrimary }} onMouseEnter={e => e.currentTarget.style.backgroundColor = palette.bgSurface} onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}><LinkIcon size={15} /></button>
                   
-                  <span className="w-[1px] h-5 bg-white/10 mx-1" />
+                  <span className="w-[1px] h-5 mx-1" style={{ backgroundColor: palette.borderPrimary }} />
 
                   {/* Utility */}
-                  <button type="button" onClick={() => execCmd('undo')} className="p-2 rounded hover:bg-white/5 transition-colors" title="Undo"><RotateCcw size={15} /></button>
-                  <button type="button" onClick={() => execCmd('redo')} className="p-2 rounded hover:bg-white/5 transition-colors" title="Redo"><RotateCw size={15} /></button>
-                  <button type="button" onClick={() => execCmd('removeFormat')} className="p-2 rounded hover:bg-white/5 text-red-300 transition-colors" title="Clear Formatting"><Eraser size={15} /></button>
+                  <button type="button" onClick={() => execCmd('undo')} className="p-2 rounded" title="Undo" style={{ color: palette.textPrimary }} onMouseEnter={e => e.currentTarget.style.backgroundColor = palette.bgSurface} onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}><RotateCcw size={15} /></button>
+                  <button type="button" onClick={() => execCmd('redo')} className="p-2 rounded" title="Redo" style={{ color: palette.textPrimary }} onMouseEnter={e => e.currentTarget.style.backgroundColor = palette.bgSurface} onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}><RotateCw size={15} /></button>
+                  <button type="button" onClick={() => execCmd('removeFormat')} className="p-2 rounded" title="Clear Formatting" style={{ color: 'rgb(252,165,165)' }} onMouseEnter={e => e.currentTarget.style.backgroundColor = palette.bgSurface} onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}><Eraser size={15} /></button>
                 </div>
 
                 {/* EDITABLE BODY */}
@@ -1021,8 +1026,10 @@ export default function CreateBlogPage() {
                       setSelectedImageNode(null)
                     }
                   }}
-                  className="w-full min-h-[450px] bg-white/[0.03] text-white p-6 leading-relaxed outline-none focus:bg-white/[0.05] transition-all prose prose-invert max-w-none"
+                  className="w-full min-h-[450px] p-6 leading-relaxed outline-none transition-all prose prose-invert max-w-none"
                   style={{
+                    backgroundColor: palette.bgInput,
+                    color: palette.textPrimary,
                     overflowY: 'auto',
                     fontFamily: "'Inter', sans-serif"
                   }}
@@ -1030,15 +1037,15 @@ export default function CreateBlogPage() {
                 />
 
                 {/* EDITOR FOOTER (Dynamic tag path, word count, jodit style logo) */}
-                <div className="flex justify-between items-center bg-white/[0.06] border-t border-white/10 px-4 py-2 text-[10px] text-white/60 font-mono select-none">
+                <div className="flex justify-between items-center px-4 py-2 text-[10px] font-mono select-none" style={{ backgroundColor: palette.bgSurfaceHover, borderTop: `1px solid ${palette.borderPrimary}`, color: palette.textSecondary }}>
                   <div className="flex items-center gap-1">
-                    <FileText size={10} className="text-emerald-400" />
+                    <FileText size={10} style={{ color: palette.accentPrimary }} />
                     <span>{activeTags.join(' › ')}</span>
                   </div>
                   <div className="flex items-center gap-3">
                     <span>CHARS: {charCount}</span>
                     <span>WORDS: {wordCount}</span>
-                    <span className="text-emerald-400/60">POWERED BY QSPHERE EDITOR</span>
+                    <span style={{ color: palette.accentPrimary, opacity: 0.6 }}>POWERED BY QSPHERE EDITOR</span>
                   </div>
                 </div>
 
@@ -1050,17 +1057,17 @@ export default function CreateBlogPage() {
             <motion.div variants={itemVariants} className="space-y-6">
               
               {/* Cover Image Upload (No presets shown!) */}
-              <div className="rounded-3xl border border-white/[0.08] bg-white/[0.035] p-6 space-y-4 shadow-[0_20px_70px_-45px_rgba(0,0,0,0.7)] backdrop-blur-xl">
-                <h2 className="text-white text-sm font-bold tracking-wider uppercase flex items-center justify-between" style={{ fontFamily: "'Syne', sans-serif" }}>
+              <div className="rounded-3xl p-6 space-y-4 backdrop-blur-xl" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.bgSurface, boxShadow: palette.shadowCard }}>
+                <h2 className="text-sm font-bold tracking-wider uppercase flex items-center justify-between" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
                   <span>Cover Banner Image</span>
-                  <Settings size={14} className="text-emerald-400" />
+                  <Settings size={14} style={{ color: palette.accentPrimary }} />
                 </h2>
                 
                 {!coverImageBase64 ? (
-                  <label className="flex flex-col items-center justify-center border-2 border-dashed border-white/10 rounded-2xl p-6 text-center cursor-pointer hover:border-emerald-400/30 hover:bg-emerald-500/[0.02] transition-all">
-                    <Upload size={28} className="text-emerald-400/70 mb-3" />
-                    <span className="text-xs font-bold text-white mb-1">Upload Cover Photo</span>
-                    <span className="text-[10px] text-white/35">PNG, JPG, WebP up to 5MB</span>
+                  <label className="flex flex-col items-center justify-center border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all" style={{ borderColor: palette.borderPrimary, color: palette.textPrimary }} onMouseEnter={e => { e.currentTarget.style.borderColor = palette.accentBorder; e.currentTarget.style.backgroundColor = palette.bgSurface }} onMouseLeave={e => { e.currentTarget.style.borderColor = palette.borderPrimary; e.currentTarget.style.backgroundColor = 'transparent' }}>
+                    <Upload size={28} className="mb-3" style={{ color: palette.accentPrimary, opacity: 0.7 }} />
+                    <span className="text-xs font-bold mb-1" style={{ color: palette.textPrimary }}>Upload Cover Photo</span>
+                    <span className="text-[10px]" style={{ color: palette.textFaint }}>PNG, JPG, WebP up to 5MB</span>
                     <input
                       type="file"
                       required
@@ -1071,31 +1078,31 @@ export default function CreateBlogPage() {
                   </label>
                 ) : (
                   <div className="space-y-3">
-                    <div className="relative rounded-2xl overflow-hidden border border-white/10 aspect-[16/10]">
+                    <div className="relative rounded-2xl overflow-hidden aspect-[16/10]" style={{ border: `1px solid ${palette.borderPrimary}` }}>
                       <img src={coverImageBase64} alt="Uploaded Cover" className="w-full h-full object-cover" />
                       <button
                         type="button"
                         onClick={() => { setCoverImageBase64(''); setImageFileName(''); }}
-                        className="absolute top-2 right-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/80 text-red-400 border border-white/10 hover:bg-black transition-all"
+                        className="absolute top-2 right-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/80 text-red-400 transition-all" style={{ border: `1px solid ${palette.borderPrimary}` }}
                         title="Remove Image"
                       >
                         <Trash2 size={14} />
                       </button>
                     </div>
-                    <div className="text-[10px] text-white/45 truncate font-mono text-center">{imageFileName}</div>
+                    <div className="text-[10px] truncate font-mono text-center" style={{ color: palette.textMuted }}>{imageFileName}</div>
                   </div>
                 )}
               </div>
 
               {/* Image Properties Panel (Only shows when an image is selected in the editor) */}
               {selectedImageNode && (
-                <div className="rounded-3xl border border-emerald-400/30 bg-emerald-950/20 p-6 space-y-4 shadow-[0_20px_70px_-45px_rgba(16,185,129,0.3)] backdrop-blur-xl animate-in slide-in-from-top-4 fade-in">
-                  <h2 className="text-emerald-400 text-sm font-bold tracking-wider uppercase flex items-center justify-between" style={{ fontFamily: "'Syne', sans-serif" }}>
+                <div className="rounded-3xl p-6 space-y-4 backdrop-blur-xl animate-in slide-in-from-top-4 fade-in" style={{ border: `1px solid ${palette.accentBorder}`, backgroundColor: palette.bgTertiary, boxShadow: palette.shadowCard }}>
+                  <h2 className="text-sm font-bold tracking-wider uppercase flex items-center justify-between" style={{ fontFamily: "'Syne', sans-serif", color: palette.accentPrimary }}>
                     <span>Image Properties</span>
                     <Settings size={14} />
                   </h2>
                   <div className="space-y-2">
-                    <label className="block text-xs font-bold text-white/70">Alt Text (SEO)</label>
+                    <label className="block text-xs font-bold" style={{ color: palette.textSecondary }}>Alt Text (SEO)</label>
                     <input
                       type="text"
                       value={imageAltText}
@@ -1106,10 +1113,9 @@ export default function CreateBlogPage() {
                           handleEditorChange()
                         }
                       }}
-                      placeholder="Describe this image..."
-                      className="w-full rounded-xl bg-black/40 border border-emerald-400/20 px-4 py-2.5 text-sm text-white placeholder-white/30 focus:border-emerald-400 focus:outline-none transition-colors"
+                      className="w-full rounded-xl px-4 py-2.5 text-sm focus:outline-none transition-colors" style={{ backgroundColor: palette.bgInput, border: `1px solid ${palette.accentBorder}`, color: palette.textPrimary }} placeholder="Describe this image..."
                     />
-                    <p className="text-[10px] text-white/40 leading-relaxed">
+                    <p className="text-[10px] leading-relaxed" style={{ color: palette.textMuted }}>
                       Alt text improves accessibility and helps search engines understand the image. It is saved automatically as you type.
                     </p>
                   </div>
@@ -1117,13 +1123,13 @@ export default function CreateBlogPage() {
               )}
 
               {/* Auto Save Settings Panel */}
-              <div className="rounded-3xl border border-white/[0.08] bg-white/[0.035] p-6 space-y-4 shadow-[0_20px_70px_-45px_rgba(0,0,0,0.7)] backdrop-blur-xl">
+              <div className="rounded-3xl p-6 space-y-4 backdrop-blur-xl" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.bgSurface, boxShadow: palette.shadowCard }}>
                 <div className="flex items-center justify-between">
-                  <h2 className="text-white text-sm font-bold tracking-wider uppercase" style={{ fontFamily: "'Syne', sans-serif" }}>
+                  <h2 className="text-sm font-bold tracking-wider uppercase" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
                     Auto Save
                   </h2>
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] text-white/40 font-bold uppercase tracking-wider select-none">
+                    <span className="text-[10px] font-bold uppercase tracking-wider select-none" style={{ color: palette.textMuted }}>
                       {autoSaveEnabled ? 'On' : 'Off'}
                     </span>
                     <button
@@ -1133,23 +1139,22 @@ export default function CreateBlogPage() {
                         setAutoSaveEnabled(nextVal)
                         localStorage.setItem('qsphere_autosave_preference', String(nextVal))
                       }}
-                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out outline-none ${
-                        autoSaveEnabled ? 'bg-emerald-400' : 'bg-white/10'
-                      }`}
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out outline-none`}
+                      style={{ backgroundColor: autoSaveEnabled ? palette.btnPrimaryBg : palette.borderPrimary }}
                     >
                       <span
-                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-black shadow ring-0 transition duration-200 ease-in-out ${
+                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full shadow ring-0 transition duration-200 ease-in-out ${
                           autoSaveEnabled ? 'translate-x-4' : 'translate-x-0'
-                        }`}
+                        }`} style={{ backgroundColor: palette.btnPrimaryText }}
                       />
                     </button>
                   </div>
                 </div>
 
-                <div className="text-[10px] text-white/50 leading-relaxed font-mono">
+                <div className="text-[10px] leading-relaxed font-mono" style={{ color: palette.textMuted }}>
                   {autoSaveEnabled ? (
                     lastSavedTime ? (
-                      <span className="text-emerald-400">Draft auto-saved at {lastSavedTime}</span>
+                      <span style={{ color: palette.accentPrimary }}>Draft auto-saved at {lastSavedTime}</span>
                     ) : (
                       <span>Draft auto-saves as you type...</span>
                     )
@@ -1160,14 +1165,14 @@ export default function CreateBlogPage() {
               </div>
 
               {/* Dynamic Categories (Defaults removed!) */}
-              <div className="rounded-3xl border border-white/[0.08] bg-white/[0.035] p-6 space-y-4 shadow-[0_20px_70px_-45px_rgba(0,0,0,0.7)] backdrop-blur-xl">
-                <h2 className="text-white text-sm font-bold tracking-wider uppercase" style={{ fontFamily: "'Syne', sans-serif" }}>
+              <div className="rounded-3xl p-6 space-y-4 backdrop-blur-xl" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.bgSurface, boxShadow: palette.shadowCard }}>
+                <h2 className="text-sm font-bold tracking-wider uppercase" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
                   Categories List
                 </h2>
 
                 {/* List of custom categories */}
                 {customCategories.length === 0 ? (
-                  <div className="text-xs text-white/30 italic">No categories created yet. Add a category below to get started.</div>
+                  <div className="text-xs italic" style={{ color: palette.textFaint }}>No categories created yet. Add a category below to get started.</div>
                 ) : (
                   <div className="flex flex-wrap gap-2 max-h-36 overflow-y-auto pr-1">
                     {customCategories.map((cat) => (
@@ -1175,11 +1180,14 @@ export default function CreateBlogPage() {
                         key={cat}
                         type="button"
                         onClick={() => setCategory(cat)}
-                        className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-all ${
-                          category === cat
-                            ? 'border-emerald-400 bg-emerald-500/10 text-emerald-300'
-                            : 'border-white/10 text-white/50 hover:border-white/35 hover:text-white'
-                        }`}
+                        style={{
+                          border: category === cat ? `1px solid ${palette.accentPrimary}` : `1px solid ${palette.borderPrimary}`,
+                          backgroundColor: category === cat ? palette.accentSoft : 'transparent',
+                          color: category === cat ? palette.accentLight : palette.textMuted,
+                        }}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all`}
+                        onMouseEnter={e => { if (category !== cat) { e.currentTarget.style.borderColor = palette.accentBorder; e.currentTarget.style.color = palette.textPrimary } }}
+                        onMouseLeave={e => { if (category !== cat) { e.currentTarget.style.borderColor = palette.borderPrimary; e.currentTarget.style.color = palette.textMuted } }}
                       >
                         {cat}
                       </button>
@@ -1188,20 +1196,21 @@ export default function CreateBlogPage() {
                 )}
 
                 {/* Inline Category Creation */}
-                <div className="border-t border-white/[0.06] pt-4 space-y-3">
-                  <div className="text-xs font-semibold text-white/70">Create New Category</div>
+                <div className="pt-4 space-y-3" style={{ borderTop: `1px solid ${palette.borderSoft}` }}>
+                  <div className="text-xs font-semibold" style={{ color: palette.textSecondary }}>Create New Category</div>
                   <div className="flex gap-2">
                     <input
                       type="text"
                       value={newCategoryName}
                       onChange={(e) => setNewCategoryName(e.target.value)}
                       placeholder="e.g. THEORY"
-                      className="flex-1 min-w-0 bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-white/20 uppercase tracking-wider focus:border-emerald-400/40 outline-none"
+                      className="flex-1 min-w-0 rounded-xl px-3 py-2 text-xs uppercase tracking-wider focus:outline-none" style={{ backgroundColor: palette.bgInput, border: `1px solid ${palette.borderPrimary}`, color: palette.textPrimary }}
+                      placeholder="e.g. THEORY"
                     />
                     <button
                       type="button"
                       onClick={handleCreateCategory}
-                      className="px-3 py-2 rounded-xl bg-emerald-400 text-black hover:bg-emerald-300 transition-all text-xs font-extrabold uppercase"
+                      className="px-3 py-2 rounded-xl text-xs font-extrabold uppercase transition-all" style={{ backgroundColor: palette.btnPrimaryBg, color: palette.btnPrimaryText }}
                     >
                       Create
                     </button>
@@ -1210,29 +1219,29 @@ export default function CreateBlogPage() {
               </div>
 
               {/* Publish Info Panel */}
-              <div className="rounded-3xl border border-white/[0.08] bg-white/[0.035] p-6 space-y-4 shadow-[0_20px_70px_-45px_rgba(0,0,0,0.7)] backdrop-blur-xl">
-                <h2 className="text-white text-sm font-bold tracking-wider uppercase" style={{ fontFamily: "'Syne', sans-serif" }}>
+              <div className="rounded-3xl p-6 space-y-4 backdrop-blur-xl" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.bgSurface, boxShadow: palette.shadowCard }}>
+                <h2 className="text-sm font-bold tracking-wider uppercase" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
                   Post Metadata
                 </h2>
 
                 <div className="space-y-3">
                   <div>
-                    <label className="block text-[10px] text-white/40 font-bold uppercase tracking-wider mb-1">Author</label>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: palette.textMuted }}>Author</label>
                     <input
                       type="text"
                       value={author}
                       onChange={(e) => setAuthor(e.target.value)}
                       placeholder="Contributor Name"
-                      className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2 text-xs text-white placeholder-white/20 focus:border-emerald-400/40 outline-none"
+                      className="w-full rounded-xl px-3.5 py-2 text-xs outline-none" style={{ backgroundColor: palette.bgInput, border: `1px solid ${palette.borderPrimary}`, color: palette.textPrimary }}
                     />
                   </div>
 
                   <div>
                     <div className="flex items-center justify-between">
-                      <div className="text-xs font-semibold text-white/70">SEO</div>
+                      <div className="text-xs font-semibold" style={{ color: palette.textSecondary }}>SEO</div>
                       <div className="flex items-center gap-2">
                         {seoResults ? (
-                          <div className="text-xs font-mono text-emerald-300">{seoResults.score}%</div>
+                          <div className="text-xs font-mono" style={{ color: palette.accentLight }}>{seoResults.score}%</div>
                         ) : null}
                         <button
                           type="button"
@@ -1241,7 +1250,7 @@ export default function CreateBlogPage() {
                             setSeoResults(res)
                             setSeoOpen((s) => !s)
                           }}
-                          className="px-3 py-1.5 rounded-lg bg-emerald-400 text-black text-xs font-semibold hover:bg-emerald-300 transition"
+                          className="px-3 py-1.5 rounded-lg text-xs font-semibold transition" style={{ backgroundColor: palette.btnPrimaryBg, color: palette.btnPrimaryText }}
                         >
                           SEO Suggestions
                         </button>
@@ -1249,20 +1258,20 @@ export default function CreateBlogPage() {
                     </div>
 
                     {seoOpen && seoResults ? (
-                      <div className="mt-3 rounded-xl border border-white/[0.08] bg-white/[0.04] p-4 text-sm">
+                      <div className="mt-3 rounded-xl p-4 text-sm" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.bgTertiary }}>
                         <div className="mb-3 flex items-center justify-between">
-                          <div className="text-xs text-white/60">SEO Score</div>
-                          <div className="text-sm font-bold text-emerald-300">{seoResults.score}%</div>
+                          <div className="text-xs" style={{ color: palette.textSecondary }}>SEO Score</div>
+                          <div className="text-sm font-bold" style={{ color: palette.accentLight }}>{seoResults.score}%</div>
                         </div>
                         <ul className="space-y-3">
                           {seoResults.checks.map((c) => (
                             <li key={c.key} className="flex items-start gap-3">
-                              <div className={c.passed ? 'text-emerald-300' : 'text-red-400'}>
+                              <div style={{ color: c.passed ? palette.accentLight : 'rgb(248,113,113)' }}>
                                 {c.passed ? '✔' : '✖'}
                               </div>
                               <div>
-                                <div className="text-sm text-white">{c.label}</div>
-                                {!c.passed ? <div className="text-xs text-white/40">{c.advice}</div> : null}
+                                <div className="text-sm" style={{ color: palette.textPrimary }}>{c.label}</div>
+                                {!c.passed ? <div className="text-xs" style={{ color: palette.textMuted }}>{c.advice}</div> : null}
                               </div>
                             </li>
                           ))}
@@ -1283,28 +1292,28 @@ export default function CreateBlogPage() {
       {linkModalOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/55" onClick={cancelLink} />
-          <div className="relative z-60 w-full max-w-xl rounded-2xl border border-white/10 bg-[#0a120c] p-6 shadow-[0_30px_100px_-40px_rgba(0,0,0,0.9)]">
-            <h3 className="text-sm font-bold text-white mb-3">Insert Link</h3>
+          <div className="relative z-60 w-full max-w-xl rounded-2xl p-6" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.bgTertiary, boxShadow: palette.shadowCard }}>
+            <h3 className="text-sm font-bold mb-3" style={{ color: palette.textPrimary }}>Insert Link</h3>
             <div className="space-y-3">
               <div>
-                <label className="block text-xs text-white/50 mb-1">URL</label>
-                <div className="flex items-center w-full bg-white/[0.04] border border-white/10 rounded-xl px-3.5 py-2">
-                  <span className="text-emerald-300 text-xs mr-1 select-none">https://</span>
+                <label className="block text-xs mb-1" style={{ color: palette.textMuted }}>URL</label>
+                <div className="flex items-center w-full rounded-xl px-3.5 py-2" style={{ backgroundColor: palette.bgSurface, border: `1px solid ${palette.borderPrimary}` }}>
+                  <span className="text-xs mr-1 select-none" style={{ color: palette.accentLight }}>https://</span>
                   <input
                     type="text"
                     value={linkUrl.replace(/^https:\/\//, '')}
                     onChange={(e) => setLinkUrl('https://' + e.target.value.replace(/^https?:\/\//, ''))}
                     placeholder="example.com"
-                    className="flex-1 bg-transparent text-xs text-white placeholder-white/35 outline-none"
+                    className="flex-1 bg-transparent text-xs outline-none" style={{ color: palette.textPrimary }}
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs text-white/50 mb-1">Link type</label>
+                <label className="block text-xs mb-1" style={{ color: palette.textMuted }}>Link type</label>
                 <div className="flex gap-2">
-                  <button type="button" onClick={() => setLinkRel('dofollow')} className={`px-3 py-1.5 rounded-xl text-xs ${linkRel === 'dofollow' ? 'bg-emerald-400 text-black' : 'bg-white/[0.06] text-white/70'}`}>Dofollow</button>
-                  <button type="button" onClick={() => setLinkRel('nofollow')} className={`px-3 py-1.5 rounded-xl text-xs ${linkRel === 'nofollow' ? 'bg-emerald-400 text-black' : 'bg-white/[0.06] text-white/70'}`}>Nofollow</button>
+                  <button type="button" onClick={() => setLinkRel('dofollow')} className="px-3 py-1.5 rounded-xl text-xs" style={{ backgroundColor: linkRel === 'dofollow' ? palette.btnPrimaryBg : palette.bgSurfaceHover, color: linkRel === 'dofollow' ? palette.btnPrimaryText : palette.textSecondary }}>Dofollow</button>
+                  <button type="button" onClick={() => setLinkRel('nofollow')} className="px-3 py-1.5 rounded-xl text-xs" style={{ backgroundColor: linkRel === 'nofollow' ? palette.btnPrimaryBg : palette.bgSurfaceHover, color: linkRel === 'nofollow' ? palette.btnPrimaryText : palette.textSecondary }}>Nofollow</button>
                 </div>
               </div>
 
@@ -1313,14 +1322,14 @@ export default function CreateBlogPage() {
                   type="checkbox"
                   checked={linkOpenInNewTab}
                   onChange={(e) => setLinkOpenInNewTab(e.target.checked)}
-                  className="w-3.5 h-3.5 rounded border-white/20 bg-white/[0.06] text-emerald-400 focus:ring-emerald-400/30"
+                  className="w-3.5 h-3.5 rounded" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.bgSurfaceHover, accentColor: palette.accentPrimary }}
                 />
-                <span className="text-xs text-white/60">Open in new tab</span>
+                <span className="text-xs" style={{ color: palette.textSecondary }}>Open in new tab</span>
               </label>
 
               <div className="flex justify-end gap-2 pt-4">
-                <button type="button" onClick={cancelLink} className="px-4 py-2 rounded-xl bg-white/[0.06] text-white/70">Cancel</button>
-                <button type="button" onClick={applyLink} className="px-4 py-2 rounded-xl bg-emerald-400 text-black">Insert</button>
+                <button type="button" onClick={cancelLink} className="px-4 py-2 rounded-xl" style={{ backgroundColor: palette.bgSurfaceHover, color: palette.textSecondary }}>Cancel</button>
+                <button type="button" onClick={applyLink} className="px-4 py-2 rounded-xl" style={{ backgroundColor: palette.btnPrimaryBg, color: palette.btnPrimaryText }}>Insert</button>
               </div>
             </div>
           </div>
@@ -1331,17 +1340,17 @@ export default function CreateBlogPage() {
       {floatingToolbarProps && (
         <div 
           id="qubi-floating-toolbar"
-          className="fixed z-50 flex items-center gap-2 rounded-2xl bg-[#111c16] border border-emerald-400/20 p-2 shadow-2xl backdrop-blur-xl transform -translate-x-1/2 -translate-y-full"
-          style={{ top: floatingToolbarProps.top, left: floatingToolbarProps.left }}
+          className="fixed z-50 flex items-center gap-2 rounded-2xl p-2 shadow-2xl backdrop-blur-xl transform -translate-x-1/2 -translate-y-full"
+          style={{ backgroundColor: palette.bgTertiary, border: `1px solid ${palette.accentBorder}`, top: floatingToolbarProps.top, left: floatingToolbarProps.left }}
         >
-          <div className="flex items-center gap-2 bg-white/[0.04] rounded-xl px-3 py-1.5 border border-white/[0.08]">
-            <Sparkles size={14} className="text-emerald-400" />
+          <div className="flex items-center gap-2 rounded-xl px-3 py-1.5" style={{ backgroundColor: palette.bgSurface, border: `1px solid ${palette.borderPrimary}` }}>
+            <Sparkles size={14} style={{ color: palette.accentPrimary }} />
             <input 
               type="text"
               value={floatingPrompt}
               onChange={(e) => setFloatingPrompt(e.target.value)}
               placeholder="Ask Qubi to modify..."
-              className="bg-transparent text-xs text-white outline-none w-48 placeholder:text-white/40"
+              className="bg-transparent text-xs outline-none w-48" style={{ color: palette.textPrimary }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && floatingPrompt.trim()) {
                   e.preventDefault()
@@ -1353,24 +1362,24 @@ export default function CreateBlogPage() {
               type="button"
               disabled={isModifyingText || !floatingPrompt.trim()}
               onClick={() => modifySelectedText('prompt')}
-              className="p-1 rounded hover:bg-emerald-500/20 text-emerald-300 disabled:opacity-50"
+              className="p-1 rounded disabled:opacity-50" style={{ color: palette.accentLight }} onMouseEnter={e => e.currentTarget.style.backgroundColor = palette.accentSoft} onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
             >
               <CornerDownRight size={14} />
             </button>
           </div>
-          <span className="w-[1px] h-6 bg-white/10" />
+          <span className="w-[1px] h-6" style={{ backgroundColor: palette.borderPrimary }} />
           <button 
             type="button"
             disabled={isModifyingText}
             onClick={() => modifySelectedText('paraphrase')}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 text-xs font-semibold border border-emerald-500/20 disabled:opacity-50 transition"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-50 transition" style={{ backgroundColor: palette.accentSoft, color: palette.accentLight, border: `1px solid ${palette.accentBorder}` }}
           >
             {isModifyingText ? 'Processing...' : 'Paraphrase'}
           </button>
           <button
             type="button"
             onClick={() => { setFloatingToolbarProps(null); setFloatingPrompt(''); }}
-            className="p-1.5 rounded-xl hover:bg-red-500/10 text-red-400/70 hover:text-red-400 transition ml-1"
+            className="p-1.5 rounded-xl transition ml-1" style={{ color: 'rgba(248,113,113,0.7)' }} onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(239,68,68,0.10)'; e.currentTarget.style.color = 'rgb(248,113,113)' }} onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'rgba(248,113,113,0.7)' }}
           >
             <X size={14} />
           </button>
@@ -1381,19 +1390,19 @@ export default function CreateBlogPage() {
       {showTitleSuggestions && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowTitleSuggestions(false)} />
-          <div className="relative z-60 w-full max-w-2xl rounded-3xl border border-emerald-400/20 bg-[#08100c] p-8 shadow-[0_40px_100px_-20px_rgba(16,185,129,0.3)]">
+          <div className="relative z-60 w-full max-w-2xl rounded-3xl p-8" style={{ border: `1px solid ${palette.accentBorder}`, backgroundColor: palette.bgTertiary, boxShadow: `0 40px 100px -20px ${palette.accentGlow}` }}>
             <div className="flex items-center gap-3 mb-6">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ backgroundColor: palette.accentSoft, border: `1px solid ${palette.accentBorder}`, color: palette.accentPrimary }}>
                 <Sparkles size={20} />
               </div>
               <div>
-                <h3 className="text-xl font-black text-white tracking-tight">AI Title Suggestions</h3>
-                <p className="text-xs text-white/50">Highly optimized for SEO and readability</p>
+                <h3 className="text-xl font-black tracking-tight" style={{ color: palette.textPrimary }}>AI Title Suggestions</h3>
+                <p className="text-xs" style={{ color: palette.textMuted }}>Highly optimized for SEO and readability</p>
               </div>
               <button 
                 type="button" 
                 onClick={() => setShowTitleSuggestions(false)}
-                className="ml-auto p-2 rounded-xl border border-white/10 bg-white/[0.05] hover:bg-white/10 text-white/60 transition"
+                className="ml-auto p-2 rounded-xl transition" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.bgSurfaceHover, color: palette.textSecondary }}
               >
                 <X size={16} />
               </button>
@@ -1401,14 +1410,14 @@ export default function CreateBlogPage() {
             
             <div className="space-y-3">
               {suggestedTitles.map((t, i) => (
-                <div key={i} className="flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4 hover:border-emerald-400/30 transition group">
+                <div key={i} className="flex items-center justify-between gap-4 rounded-2xl p-4 transition group" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.bgSurface }} onMouseEnter={e => e.currentTarget.style.borderColor = palette.accentBorder} onMouseLeave={e => e.currentTarget.style.borderColor = palette.borderPrimary}>
                   <div className="flex-1 min-w-0">
-                    <h4 className="text-base font-bold text-white mb-1 truncate">{t.title}</h4>
+                    <h4 className="text-base font-bold mb-1 truncate" style={{ color: palette.textPrimary }}>{t.title}</h4>
                     <div className="flex items-center gap-2">
-                      <div className="h-1.5 w-16 bg-white/10 rounded-full overflow-hidden">
-                        <div className="h-full bg-emerald-400" style={{ width: `${t.rating}%` }} />
+                      <div className="h-1.5 w-16 rounded-full overflow-hidden" style={{ backgroundColor: palette.borderPrimary }}>
+                        <div className="h-full" style={{ width: `${t.rating}%`, backgroundColor: palette.accentPrimary }} />
                       </div>
-                      <span className="text-[10px] font-mono text-emerald-300/70">SEO Score: {t.rating}/100</span>
+                      <span className="text-[10px] font-mono" style={{ color: palette.accentLight, opacity: 0.7 }}>SEO Score: {t.rating}/100</span>
                     </div>
                   </div>
                   <button
@@ -1417,7 +1426,7 @@ export default function CreateBlogPage() {
                       setTitle(t.title)
                       setShowTitleSuggestions(false)
                     }}
-                    className="shrink-0 rounded-xl bg-emerald-400/10 border border-emerald-400/20 text-emerald-300 px-4 py-2 text-xs font-bold opacity-0 group-hover:opacity-100 transition-opacity hover:bg-emerald-400 hover:text-black"
+                    className="shrink-0 rounded-xl px-4 py-2 text-xs font-bold opacity-0 group-hover:opacity-100 transition-opacity" style={{ backgroundColor: palette.accentSoft, border: `1px solid ${palette.accentBorder}`, color: palette.accentLight }} onMouseEnter={e => { e.currentTarget.style.backgroundColor = palette.btnPrimaryBg; e.currentTarget.style.color = palette.btnPrimaryText }} onMouseLeave={e => { e.currentTarget.style.backgroundColor = palette.accentSoft; e.currentTarget.style.color = palette.accentLight }}
                   >
                     Select Title
                   </button>
@@ -1432,16 +1441,16 @@ export default function CreateBlogPage() {
       {showDraftsModal && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowDraftsModal(false)} />
-          <div className="relative z-60 w-full max-w-4xl max-h-[85vh] flex flex-col rounded-3xl border border-white/10 bg-[#0a120c] shadow-[0_40px_100px_-20px_rgba(0,0,0,0.8)]">
-            <div className="flex items-center justify-between border-b border-white/10 p-6">
+          <div className="relative z-60 w-full max-w-4xl max-h-[85vh] flex flex-col rounded-3xl" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.bgTertiary, boxShadow: palette.shadowCard }}>
+            <div className="flex items-center justify-between p-6" style={{ borderBottom: `1px solid ${palette.borderPrimary}` }}>
               <div>
-                <h3 className="text-xl font-black text-white tracking-tight">Your Drafts</h3>
-                <p className="text-xs text-white/50 mt-1">Manage or restore your saved blog drafts</p>
+                <h3 className="text-xl font-black tracking-tight" style={{ color: palette.textPrimary }}>Your Drafts</h3>
+                <p className="text-xs mt-1" style={{ color: palette.textMuted }}>Manage or restore your saved blog drafts</p>
               </div>
               <button 
                 type="button" 
                 onClick={() => setShowDraftsModal(false)}
-                className="p-2 rounded-xl border border-white/10 bg-white/[0.05] hover:bg-white/10 text-white/60 transition"
+                className="p-2 rounded-xl transition" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.bgSurfaceHover, color: palette.textSecondary }}
               >
                 <X size={16} />
               </button>
@@ -1450,24 +1459,24 @@ export default function CreateBlogPage() {
             <div className="p-6 overflow-y-auto flex-1 grid gap-4">
               {draftsList.length === 0 ? (
                 <div className="text-center py-12">
-                  <div className="text-white/40 text-sm">No drafts found.</div>
+                  <div className="text-sm" style={{ color: palette.textMuted }}>No drafts found.</div>
                 </div>
               ) : (
                 draftsList.sort((a, b) => new Date(b.date + ' ' + b.timestamp) - new Date(a.date + ' ' + a.timestamp)).map(draft => (
-                  <div key={draft.id} className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 hover:border-emerald-400/30 transition flex flex-col sm:flex-row gap-4 sm:items-center justify-between">
+                  <div key={draft.id} className="rounded-2xl p-5 transition flex flex-col sm:flex-row gap-4 sm:items-center justify-between" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.bgSurface }} onMouseEnter={e => e.currentTarget.style.borderColor = palette.accentBorder} onMouseLeave={e => e.currentTarget.style.borderColor = palette.borderPrimary}>
                     <div className="flex-1 min-w-0">
-                      <h4 className="text-base font-bold text-white mb-1 truncate">{draft.title || 'Untitled Draft'}</h4>
-                      <p className="text-xs text-white/50 line-clamp-2 leading-relaxed mb-3">
+                      <h4 className="text-base font-bold mb-1 truncate" style={{ color: palette.textPrimary }}>{draft.title || 'Untitled Draft'}</h4>
+                      <p className="text-xs line-clamp-2 leading-relaxed mb-3" style={{ color: palette.textMuted }}>
                         {draft.excerpt || (draft.body ? draft.body.replace(/<[^>]*>?/gm, '') : 'No content yet')}
                       </p>
-                      <div className="flex items-center gap-3 text-[10px] font-mono text-white/40">
+                      <div className="flex items-center gap-3 text-[10px] font-mono" style={{ color: palette.textMuted }}>
                         <span>{draft.date}</span>
                         <span>•</span>
                         <span>{draft.timestamp}</span>
                         {draft.id === currentDraftId && (
                           <>
                             <span>•</span>
-                            <span className="text-emerald-400">CURRENT</span>
+                            <span style={{ color: palette.accentPrimary }}>CURRENT</span>
                           </>
                         )}
                       </div>
@@ -1477,7 +1486,7 @@ export default function CreateBlogPage() {
                       <button
                         type="button"
                         onClick={() => deleteDraft(draft.id)}
-                        className="p-2.5 rounded-xl border border-red-500/20 bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white transition"
+                        className="p-2.5 rounded-xl transition" style={{ border: '1px solid rgba(239,68,68,0.20)', backgroundColor: 'rgba(239,68,68,0.10)', color: 'rgb(248,113,113)' }} onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgb(239,68,68)'; e.currentTarget.style.color = 'white' }} onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'rgba(239,68,68,0.10)'; e.currentTarget.style.color = 'rgb(248,113,113)' }}
                         title="Delete Draft"
                       >
                         <Trash2 size={16} />
@@ -1486,7 +1495,7 @@ export default function CreateBlogPage() {
                         type="button"
                         disabled={draft.id === currentDraftId}
                         onClick={() => restoreSpecificDraft(draft)}
-                        className="px-5 py-2.5 rounded-xl bg-emerald-400/10 border border-emerald-400/20 text-emerald-300 text-sm font-bold transition hover:bg-emerald-400 hover:text-black disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="px-5 py-2.5 rounded-xl text-sm font-bold transition disabled:opacity-50 disabled:cursor-not-allowed" style={{ backgroundColor: palette.accentSoft, border: `1px solid ${palette.accentBorder}`, color: palette.accentLight }} onMouseEnter={e => { if (!e.currentTarget.disabled) { e.currentTarget.style.backgroundColor = palette.btnPrimaryBg; e.currentTarget.style.color = palette.btnPrimaryText } }} onMouseLeave={e => { if (!e.currentTarget.disabled) { e.currentTarget.style.backgroundColor = palette.accentSoft; e.currentTarget.style.color = palette.accentLight } }}
                       >
                         {draft.id === currentDraftId ? 'Active' : 'Restore'}
                       </button>
@@ -1496,11 +1505,11 @@ export default function CreateBlogPage() {
               )}
             </div>
             
-            <div className="border-t border-white/10 p-4 bg-white/[0.02] flex justify-end rounded-b-3xl">
+            <div className="p-4 flex justify-end rounded-b-3xl" style={{ borderTop: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.bgSurface }}>
               <button
                 type="button"
                 onClick={() => setShowDraftsModal(false)}
-                className="px-5 py-2.5 rounded-xl border border-white/10 text-white/70 hover:text-white text-sm font-semibold transition"
+                className="px-5 py-2.5 rounded-xl text-sm font-semibold transition" style={{ border: `1px solid ${palette.borderPrimary}`, color: palette.textSecondary }} onMouseEnter={e => e.currentTarget.style.color = palette.textPrimary} onMouseLeave={e => e.currentTarget.style.color = palette.textSecondary}
               >
                 Close
               </button>
@@ -1512,38 +1521,38 @@ export default function CreateBlogPage() {
       {seoIncompleteModalOpen && (
   <div className="fixed inset-0 z-[70] flex items-center justify-center">
     <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setSeoIncompleteModalOpen(false)} />
-    <div className="relative z-60 w-full max-w-lg rounded-3xl border border-white/[0.08] bg-[#0a120c] p-8 shadow-[0_40px_100px_-40px_rgba(0,0,0,0.8)]">
+    <div className="relative z-60 w-full max-w-lg rounded-3xl p-8" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.bgTertiary, boxShadow: palette.shadowCard }}>
       <div className="flex items-center gap-3 mb-5">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ backgroundColor: palette.accentSoft, border: `1px solid ${palette.accentBorder}`, color: palette.accentPrimary }}>
           <AlertCircle size={20} />
         </div>
         <div>
-          <h3 className="text-xl font-black text-white tracking-tight">SEO Suggestions Incomplete</h3>
-          <p className="text-xs text-white/50">These unfinished tasks could affect the ranking of your blog</p>
+          <h3 className="text-xl font-black tracking-tight" style={{ color: palette.textPrimary }}>SEO Suggestions Incomplete</h3>
+          <p className="text-xs" style={{ color: palette.textMuted }}>These unfinished tasks could affect the ranking of your blog</p>
         </div>
         <button
           type="button"
           onClick={() => setSeoIncompleteModalOpen(false)}
-          className="ml-auto p-2 rounded-xl border border-white/10 bg-white/[0.05] hover:bg-white/10 text-white/60 transition"
+          className="ml-auto p-2 rounded-xl transition" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.bgSurfaceHover, color: palette.textSecondary }}
         >
           <X size={16} />
         </button>
       </div>
 
-      <div className="mb-2 text-xs font-semibold text-white/50 uppercase tracking-wider">Missing checks</div>
+      <div className="mb-2 text-xs font-semibold uppercase tracking-wider" style={{ color: palette.textMuted }}>Missing checks</div>
       <ul className="space-y-2 mb-6">
         {missingSeoChecks.map((c) => (
-          <li key={c.key} className="flex items-start gap-3 rounded-xl border border-white/[0.06] bg-white/[0.03] p-3">
-            <div className="shrink-0 mt-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500/20 text-red-400 text-xs font-bold">✕</div>
+          <li key={c.key} className="flex items-start gap-3 rounded-xl p-3" style={{ border: `1px solid ${palette.borderSoft}`, backgroundColor: palette.bgSurface }}>
+            <div className="shrink-0 mt-0.5 flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold" style={{ backgroundColor: 'rgba(239,68,68,0.20)', color: 'rgb(248,113,113)' }}>✕</div>
             <div className="flex-1">
-              <div className="text-sm font-semibold text-white">{c.label}</div>
-              <div className="text-xs text-white/40 mt-0.5">{c.advice}</div>
+              <div className="text-sm font-semibold" style={{ color: palette.textPrimary }}>{c.label}</div>
+              <div className="text-xs mt-0.5" style={{ color: palette.textMuted }}>{c.advice}</div>
             </div>
           </li>
         ))}
       </ul>
 
-      <div className="text-xs text-white/50 mb-6 p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+      <div className="text-xs mb-6 p-3 rounded-xl" style={{ color: palette.textMuted, backgroundColor: palette.bgSurface, border: `1px solid ${palette.borderSoft}` }}>
         These items help search engines understand and rank your content better. Publishing without them may reduce visibility.
       </div>
 
@@ -1551,7 +1560,7 @@ export default function CreateBlogPage() {
         <button
           type="button"
           onClick={() => setSeoIncompleteModalOpen(false)}
-          className="flex-1 px-4 py-3 rounded-xl border border-white/10 bg-white/[0.05] text-white/70 hover:bg-white/10 hover:text-white text-sm font-semibold transition"
+          className="flex-1 px-4 py-3 rounded-xl text-sm font-semibold transition" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.bgSurfaceHover, color: palette.textSecondary }} onMouseEnter={e => { e.currentTarget.style.color = palette.textPrimary }} onMouseLeave={e => { e.currentTarget.style.color = palette.textSecondary }}
         >
           Edit Blog
         </button>
@@ -1561,7 +1570,7 @@ export default function CreateBlogPage() {
             setSeoIncompleteModalOpen(false);
             await doPublish();
           }}
-          className="flex-1 px-4 py-3 rounded-xl bg-emerald-400 text-black hover:bg-emerald-300 text-sm font-bold transition shadow-[0_0_20px_rgba(16,185,129,0.25)]"
+          className="flex-1 px-4 py-3 rounded-xl text-sm font-bold transition" style={{ backgroundColor: palette.btnPrimaryBg, color: palette.btnPrimaryText, boxShadow: `0 0 20px ${palette.accentGlow}` }}
         >
           Publish Anyway
         </button>

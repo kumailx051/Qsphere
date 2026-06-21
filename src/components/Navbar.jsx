@@ -930,7 +930,7 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
                     <button
                       type="button"
                       className="flex items-center gap-2.5 rounded-full border pl-1.5 pr-4 py-1.5 transition-all duration-300"
-                      style={{ borderColor: isDayMode ? palette.borderPrimary : 'rgba(16,185,129,0.4)', backgroundColor: isDayMode ? 'rgba(255,255,255,0.8)' : 'rgba(16,185,129,0.15)' }}
+                      style={{ borderColor: isDayMode ? palette.accentPrimary : 'rgba(16,185,129,0.4)', backgroundColor: isDayMode ? palette.accentPrimary : 'rgba(16,185,129,0.15)' }}
                       onClick={() => {
                         setNotificationsOpen(false)
                         setDropdownOpen(prev => !prev)
@@ -938,7 +938,7 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
                       aria-haspopup="true"
                       aria-expanded={dropdownOpen}
                     >
-                      <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border" style={{ borderColor: isDayMode ? palette.borderPrimary : 'rgba(16,185,129,0.3)', backgroundColor: isDayMode ? palette.accentSoft : 'rgba(16,185,129,0.2)' }}>
+                      <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border" style={{ borderColor: isDayMode ? 'rgba(255,255,255,0.3)' : 'rgba(16,185,129,0.3)', backgroundColor: isDayMode ? 'rgba(255,255,255,0.2)' : 'rgba(16,185,129,0.2)' }}>
                         {profileAvatar ? (
                           <img
                             src={profileAvatar}
@@ -946,10 +946,10 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
                             className="h-full w-full object-cover"
                           />
                         ) : (
-                          <span className="text-[11px] font-bold leading-none" style={{ color: palette.accentDark }}>{initials}</span>
+                          <span className="text-[11px] font-bold leading-none" style={{ color: '#fff' }}>{initials}</span>
                         )}
                       </div>
-                      <span className="hidden sm:block text-[11px] tracking-[0.12em] font-semibold max-w-[100px] truncate" style={{ color: isDayMode ? palette.textPrimary : '#d1fae5' }}>
+                      <span className="hidden sm:block text-[11px] tracking-[0.12em] font-semibold max-w-[100px] truncate" style={{ color: '#fff' }}>
                         {profile.fullName || 'Profile'}
                       </span>
                       <svg
@@ -962,7 +962,7 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         className={`transition-transform duration-200 ${dropdownOpen ? 'rotate-180' : ''}`}
-                        style={{ color: isDayMode ? palette.textMuted : 'rgba(110,231,183,0.7)' }}
+                        style={{ color: isDayMode ? '#fff' : 'rgba(110,231,183,0.7)' }}
                       >
                         <path d="M6 9l6 6 6-6" />
                       </svg>

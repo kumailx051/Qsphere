@@ -133,7 +133,7 @@ const BlogPage = () => {
   const glowY2 = useTransform(scrollY, [0, 500], [0, -30])
 
   return (
-    <div className="relative overflow-hidden" style={{ minHeight: '100vh', backgroundColor: palette.bgPrimary }}>
+    <div className="relative overflow-hidden" style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', backgroundColor: palette.bgPrimary }}>
       <Navbar currentPage="blogs" />
 
       <div className="fixed inset-0 pointer-events-none" style={{ zIndex: 0 }}>
@@ -151,7 +151,7 @@ const BlogPage = () => {
         />
       </div>
 
-      <main className="relative z-10 w-full px-6 pb-32 pt-32 md:px-10 lg:px-14 xl:px-20">
+      <main className="flex-1 relative z-10 w-full px-6 pb-32 pt-32 md:px-10 lg:px-14 xl:px-20">
         <motion.section
           variants={heroVariants}
           initial="hidden"
@@ -168,111 +168,58 @@ const BlogPage = () => {
           <div className="absolute -left-12 top-0 h-72 w-72 rounded-full blur-3xl" style={{ backgroundColor: isDayMode ? 'rgba(46,197,138,0.12)' : 'rgba(16,185,129,0.1)' }} />
           <div className="absolute -right-12 top-10 h-72 w-72 rounded-full blur-3xl" style={{ backgroundColor: isDayMode ? 'rgba(255,224,163,0.2)' : 'rgba(6,182,212,0.1)' }} />
 
-          <div className="relative z-10 grid gap-10 xl:grid-cols-[1.1fr_0.9fr] xl:items-start">
-            <div>
-              <div className="flex flex-wrap items-center gap-3 mb-6">
-                <span className="inline-flex items-center gap-3 rounded-full px-4 py-2 text-[10px] font-bold uppercase tracking-[0.34em]" style={{ border: `1px solid ${palette.accentBorder}`, backgroundColor: palette.accentSoft, color: palette.accentDark }}>
-                  <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: palette.accentPrimary, boxShadow: isDayMode ? '0 0 18px rgba(46,197,138,0.45)' : '0 0 18px rgba(16,185,129,0.8)' }} />
-                  Our Journal
-                </span>
-                <span className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.24em]" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: isDayMode ? 'rgba(255,255,255,0.72)' : 'rgba(255,255,255,0.03)', color: palette.textMuted }}>
-                  <Sparkles size={14} style={{ color: palette.accentPrimary }} />
-                  Editorial transmission
-                </span>
-              </div>
-
-              <h1
-                className="max-w-5xl text-5xl font-bold leading-[0.9] md:text-6xl xl:text-[5.4rem]"
-                style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary, textShadow: isDayMode ? '0 12px 36px rgba(255,255,255,0.6)' : '0 0 40px rgba(16,185,129,0.08)' }}
-              >
-                Quantum thinking,
-                <br />
-                <span style={{ color: palette.accentPrimary }}>written with weight.</span>
-              </h1>
-
-              <p className="mt-7 max-w-3xl text-base leading-8 md:text-lg xl:text-[1.12rem]" style={{ color: palette.textSecondary }}>
-                Research notes, frontier ideas, technical breakdowns, and stories from people building at the edge of quantum science.
-              </p>
-
-              <div className="mt-8 flex flex-wrap gap-4">
-                <Link
-                  to="/blogs/new"
-                  className="inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold no-underline transition-all"
-                  style={{ border: `1px solid ${isDayMode ? 'transparent' : palette.btnPrimaryBorder}`, backgroundColor: palette.btnPrimaryBg, color: palette.btnPrimaryText, boxShadow: isDayMode ? '0 20px 45px rgba(30,158,107,0.18)' : 'none' }}
-                >
-                  Write an article
-                  <ArrowUpRight size={16} />
-                </Link>
-                <a
-                  href="#blog-grid"
-                  className="inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold no-underline transition-all"
-                  style={{ border: `1px solid ${palette.btnSecondaryBorder}`, backgroundColor: palette.btnSecondaryBg, color: palette.btnSecondaryText }}
-                >
-                  Browse articles
-                  <ArrowUpRight size={16} />
-                </a>
-              </div>
-
-              <motion.div variants={containerVariants} initial="hidden" whileInView="visible" viewport={{ once: true }} className="mt-10 grid gap-4 md:grid-cols-3">
-                {[
-                  { label: 'Published pieces', value: String(sortedBlogs.length).padStart(2, '0') },
-                  { label: 'Categories', value: String(categoryCount).padStart(2, '0') },
-                  { label: 'Your articles', value: String(authoredCount).padStart(2, '0') },
-                ].map((item) => (
-                  <motion.div key={item.label} variants={itemVariants} className="rounded-[28px] p-5 backdrop-blur-xl" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: isDayMode ? 'rgba(255,255,255,0.72)' : 'rgba(0,0,0,0.2)' }}>
-                    <div className="text-[10px] font-bold uppercase tracking-[0.24em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.8)' }}>{item.label}</div>
-                    <div className="mt-4 text-4xl font-bold" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>{item.value}</div>
-                  </motion.div>
-                ))}
-              </motion.div>
+          <div>
+            <div className="flex flex-wrap items-center gap-3 mb-6">
+              <span className="inline-flex items-center gap-3 rounded-full px-4 py-2 text-[10px] font-bold uppercase tracking-[0.34em]" style={{ border: `1px solid ${palette.accentBorder}`, backgroundColor: palette.accentSoft, color: palette.accentDark }}>
+                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: palette.accentPrimary, boxShadow: isDayMode ? '0 0 18px rgba(46,197,138,0.45)' : '0 0 18px rgba(16,185,129,0.8)' }} />
+                Our Journal
+              </span>
             </div>
 
-            <div
-              className="relative overflow-hidden rounded-[34px] p-6 md:p-7"
-              style={{
-                border: `1px solid ${palette.borderPrimary}`,
-                background: isDayMode ? 'linear-gradient(180deg, rgba(255,255,255,0.95), rgba(247,247,245,0.85))' : 'linear-gradient(180deg, rgba(5,10,8,0.92), rgba(4,8,7,0.74))',
-                boxShadow: isDayMode ? '0 24px 90px rgba(15,23,42,0.1)' : '0 24px 90px rgba(0,0,0,0.42)',
-              }}
+            <h1
+              className="max-w-5xl text-5xl font-bold leading-[0.9] md:text-6xl xl:text-[5.4rem]"
+              style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary, textShadow: isDayMode ? '0 12px 36px rgba(255,255,255,0.6)' : '0 0 40px rgba(16,185,129,0.08)' }}
             >
-              <div className="absolute inset-x-8 top-0 h-px" style={{ background: isDayMode ? 'linear-gradient(to right, transparent, rgba(46,197,138,0.45), transparent)' : 'linear-gradient(to right, transparent, rgba(110,231,183,0.4), transparent)' }} />
-              <div className="absolute right-0 top-0 h-48 w-48 rounded-full blur-3xl" style={{ backgroundColor: isDayMode ? 'rgba(46,197,138,0.15)' : 'rgba(16,185,129,0.1)' }} />
+              Quantum thinking,
+              <br />
+              <span style={{ color: palette.accentPrimary }}>written with weight.</span>
+            </h1>
 
-              <video
-                ref={videoRef}
-                className="absolute inset-0 h-full w-full object-cover"
-                style={{ opacity: isDayMode ? 0.15 : 0.25 }}
-                muted
-                loop
-                playsInline
+            <p className="mt-7 max-w-3xl text-base leading-8 md:text-lg xl:text-[1.12rem]" style={{ color: palette.textSecondary }}>
+              Research notes, frontier ideas, technical breakdowns, and stories from people building at the edge of quantum science.
+            </p>
+
+            <div className="mt-8 flex flex-wrap gap-4">
+              <Link
+                to="/blogs/new"
+                className="inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold no-underline transition-all"
+                style={{ border: `1px solid ${isDayMode ? 'transparent' : palette.btnPrimaryBorder}`, backgroundColor: palette.btnPrimaryBg, color: palette.btnPrimaryText, boxShadow: isDayMode ? '0 20px 45px rgba(30,158,107,0.18)' : 'none' }}
               >
-                <source src={videoBackground} type="video/mp4" />
-              </video>
-
-              <div className="absolute inset-0" style={{ background: isDayMode ? 'linear-gradient(180deg, rgba(255,255,255,0.4), rgba(255,255,255,0.98))' : 'linear-gradient(180deg, rgba(4,8,7,0.2), rgba(4,8,7,0.95))' }} />
-
-              <div className="relative z-10">
-                <div className="text-[10px] font-bold uppercase tracking-[0.28em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.8)' }}>Publishing direction</div>
-                <h2 className="mt-4 text-3xl font-bold" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
-                  Built to feel more editorial than generic.
-                </h2>
-                <p className="mt-5 text-sm leading-7" style={{ color: palette.textSecondary }}>
-                  The journal now previews ideas with stronger rhythm, clearer content signals, and a richer visual frame before readers even open an article.
-                </p>
-
-                <div className="mt-6 grid gap-3">
-                  {[
-                    'Sharper reading hierarchy and cleaner article scanning.',
-                    'Feature-first layout for your strongest or newest story.',
-                    'A journal surface that matches the premium depth of your new detail pages.',
-                  ].map((note) => (
-                    <div key={note} className="rounded-2xl px-4 py-3.5 text-sm" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: isDayMode ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.2)', color: palette.textSecondary }}>
-                      {note}
-                    </div>
-                  ))}
-                </div>
-              </div>
+                Write an article
+                <ArrowUpRight size={16} />
+              </Link>
+              <a
+                href="#blog-grid"
+                className="inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold no-underline transition-all"
+                style={{ border: `1px solid ${palette.btnSecondaryBorder}`, backgroundColor: palette.btnSecondaryBg, color: palette.btnSecondaryText }}
+              >
+                Browse articles
+                <ArrowUpRight size={16} />
+              </a>
             </div>
+
+            <motion.div variants={containerVariants} initial="hidden" whileInView="visible" viewport={{ once: true }} className="mt-10 grid gap-4 md:grid-cols-3">
+              {[
+                { label: 'Published pieces', value: String(sortedBlogs.length).padStart(2, '0') },
+                { label: 'Categories', value: String(categoryCount).padStart(2, '0') },
+                { label: 'Your articles', value: String(authoredCount).padStart(2, '0') },
+              ].map((item) => (
+                <motion.div key={item.label} variants={itemVariants} className="rounded-[28px] p-5 backdrop-blur-xl" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: isDayMode ? 'rgba(255,255,255,0.72)' : 'rgba(0,0,0,0.2)' }}>
+                  <div className="text-[10px] font-bold uppercase tracking-[0.24em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.8)' }}>{item.label}</div>
+                  <div className="mt-4 text-4xl font-bold" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>{item.value}</div>
+                </motion.div>
+              ))}
+            </motion.div>
           </div>
         </motion.section>
 
@@ -377,7 +324,7 @@ const BlogPage = () => {
                   </div>
 
                   <div className="relative p-7 md:p-10 xl:p-12">
-                    <div className="text-[10px] font-bold uppercase tracking-[0.32em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.78)' }}>Featured story</div>
+                    <span className="inline-flex items-center rounded-full px-4 py-2 text-[11px] font-extrabold uppercase tracking-[0.28em]" style={{ backgroundColor: palette.accentPrimary, color: '#ffffff', boxShadow: isDayMode ? '0 10px 25px -5px rgba(16,185,129,0.3)' : '0 0 22px rgba(16,185,129,0.35)' }}>Featured Article</span>
                     <h2 className="mt-5 max-w-3xl text-4xl font-bold leading-[0.94] transition-colors duration-300 md:text-5xl" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
                       {featuredPost.title}
                     </h2>
@@ -434,9 +381,6 @@ const BlogPage = () => {
                     Stories with more editorial gravity.
                   </h2>
                 </div>
-                <p className="max-w-xl text-sm leading-7" style={{ color: palette.textSecondary }}>
-                  Below the featured story, every article card is designed to feel cleaner, richer, and easier to scan before readers dive into the full piece.
-                </p>
               </div>
 
               <motion.div variants={containerVariants} initial="hidden" whileInView="visible" viewport={{ once: true }} className="grid gap-8 md:grid-cols-2 xl:grid-cols-3 lg:gap-10">
@@ -548,7 +492,9 @@ const BlogPage = () => {
           )}
       </main>
 
-      <Footer />
+      <div style={{ position: 'relative', zIndex: 1 }}>
+        <Footer />
+      </div>
 
       <style>{`
         @keyframes blogFadeUp {

@@ -381,8 +381,8 @@ const HomePage = () => {
   return (
     <>
       {showLoader && (
-        <div 
-          className={`fixed inset-0 z-[9999] flex items-center justify-center transition-opacity duration-500 pointer-events-none ${isFading ? 'opacity-0' : 'opacity-100'}`} 
+        <div
+          className={`fixed inset-0 z-[9999] flex items-center justify-center transition-opacity duration-500 pointer-events-none ${isFading ? 'opacity-0' : 'opacity-100'}`}
           style={{ backgroundColor: palette.bgPrimary }}
         >
           <div className="loader"></div>

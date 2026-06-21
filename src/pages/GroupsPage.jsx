@@ -219,17 +219,14 @@ const GroupsPage = () => {
             <div className="absolute -left-12 top-0 h-72 w-72 rounded-full blur-3xl" style={{ backgroundColor: isDayMode ? 'rgba(46,197,138,0.12)' : 'rgba(16,185,129,0.1)' }} />
             <div className="absolute -right-12 top-10 h-72 w-72 rounded-full blur-3xl" style={{ backgroundColor: isDayMode ? 'rgba(255,224,163,0.2)' : 'rgba(6,182,212,0.1)' }} />
 
-            <div className="relative z-10 grid gap-10 xl:grid-cols-[1.1fr_0.9fr] xl:items-start">
+            <div>
               <div>
                 <div className="flex flex-wrap items-center gap-3 mb-6">
                   <span className="inline-flex items-center gap-3 rounded-full px-4 py-2 text-[10px] font-bold uppercase tracking-[0.34em]" style={{ border: `1px solid ${palette.accentBorder}`, backgroundColor: palette.accentSoft, color: palette.accentDark }}>
                     <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: palette.accentPrimary, boxShadow: isDayMode ? '0 0 18px rgba(46,197,138,0.45)' : '0 0 18px rgba(16,185,129,0.8)' }} />
                     Community
                   </span>
-                  <span className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.24em]" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: isDayMode ? 'rgba(255,255,255,0.72)' : 'rgba(255,255,255,0.03)', color: palette.textMuted }}>
-                    <Sparkles size={14} style={{ color: palette.accentPrimary }} />
-                    Collaboration network
-                  </span>
+
                 </div>
 
                 <h1
@@ -280,73 +277,6 @@ const GroupsPage = () => {
                   ))}
                 </motion.div>
               </div>
-
-              {featuredGroup && (
-                <div
-                  className="relative overflow-hidden rounded-[34px] p-6 md:p-7"
-                  style={{
-                    border: `1px solid ${palette.borderPrimary}`,
-                    background: isDayMode ? 'linear-gradient(180deg, rgba(255,255,255,0.95), rgba(247,247,245,0.88))' : 'linear-gradient(180deg, rgba(5,10,8,0.92), rgba(4,8,7,0.74))',
-                    boxShadow: isDayMode ? '0 24px 90px rgba(15,23,42,0.06)' : '0 24px 90px rgba(0,0,0,0.42)',
-                  }}
-                >
-                  <div className="absolute inset-x-8 top-0 h-px" style={{ background: isDayMode ? 'linear-gradient(to right, transparent, rgba(46,197,138,0.4), transparent)' : 'linear-gradient(to right, transparent, rgba(110,231,183,0.4), transparent)' }} />
-                  <div className="absolute right-0 top-0 h-48 w-48 rounded-full blur-3xl" style={{ backgroundColor: isDayMode ? 'rgba(46,197,138,0.1)' : 'rgba(16,185,129,0.1)' }} />
-
-                  <div className="relative z-10">
-                    <div className="text-[10px] font-bold uppercase tracking-[0.28em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.8)' }}>Featured group</div>
-
-                    <div className="mt-6 flex items-start justify-between gap-4">
-                      <div>
-                        <div
-                          className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em]"
-                          style={{ border: `1px solid ${palette.accentBorder}`, backgroundColor: palette.accentSoft, color: isDayMode ? palette.accentDark : palette.accentLight }}
-                        >
-                          {featuredGroup.groupType || 'Research Group'}
-                        </div>
-                        <h2 className="mt-5 text-3xl font-bold leading-tight" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
-                          {featuredGroup.groupTitle}
-                        </h2>
-                      </div>
-                      <div
-                        className="h-16 w-16 overflow-hidden rounded-full p-1"
-                        style={{ border: `1px solid ${palette.accentBorder}`, backgroundColor: isDayMode ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.3)', boxShadow: isDayMode ? '0 0 18px rgba(46,197,138,0.1)' : '0 0 18px rgba(16,185,129,0.18)' }}
-                      >
-                        <img
-                          src={buildOwnerAvatar(featuredGroup)}
-                          alt={featuredGroup.owner || 'Group owner'}
-                          className="h-full w-full rounded-full object-cover"
-                        />
-                      </div>
-                    </div>
-
-                    <p className="mt-5 text-sm leading-7" style={{ color: palette.textSecondary }}>
-                      {featuredGroup.groupDescription || 'A focused space for quantum collaboration, shared research direction, and ambitious problem-solving.'}
-                    </p>
-
-                    <div className="mt-6 grid gap-3">
-                      <div className="flex items-center gap-3 rounded-2xl px-4 py-3" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: isDayMode ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.2)' }}>
-                        <Shield size={15} style={{ color: palette.accentPrimary }} />
-                        <span className="text-sm font-medium" style={{ color: palette.textSecondary }}>Owner: {featuredGroup.owner || 'Community lead'}</span>
-                      </div>
-                      <div className="flex items-center gap-3 rounded-2xl px-4 py-3" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: isDayMode ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.2)' }}>
-                        <Layers3 size={15} style={{ color: palette.accentPrimary }} />
-                        <span className="text-sm font-medium" style={{ color: palette.textSecondary }}>Scope: {featuredGroup.groupScope || 'Scope coming soon'}</span>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => navigate(`/groups/${featuredGroup.id}`)}
-                      className="mt-7 inline-flex items-center gap-2 text-sm font-semibold transition-all hover:gap-3"
-                      style={{ color: palette.accentPrimary }}
-                    >
-                      Open featured group
-                      <ArrowUpRight size={16} />
-                    </button>
-                  </div>
-                </div>
-              )}
             </div>
           </motion.section>
 
@@ -355,20 +285,10 @@ const GroupsPage = () => {
             initial="hidden"
             whileInView="visible"
             viewport={{ once: true, margin: '-60px' }}
-            className="mt-8 grid gap-4 lg:grid-cols-[1.05fr_1.95fr]"
+            className="mt-8"
           >
-            <div className="rounded-[30px] p-6 backdrop-blur-xl" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: isDayMode ? 'rgba(255,255,255,0.72)' : 'rgba(255,255,255,0.03)' }}>
-              <div className="text-[10px] font-bold uppercase tracking-[0.28em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.8)' }}>Filtering layer</div>
-              <h2 className="mt-4 text-2xl font-bold" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
-                Narrow the field fast.
-              </h2>
-              <p className="mt-4 text-sm leading-7" style={{ color: palette.textSecondary }}>
-                Use these toggles to move between the full network, groups you already belong to, and requests still waiting for approval.
-              </p>
-            </div>
-
-            <div className="rounded-[30px] p-6 backdrop-blur-xl" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: isDayMode ? 'rgba(255,255,255,0.72)' : 'rgba(255,255,255,0.03)' }}>
-              <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+            <div className="rounded-[30px] p-4 backdrop-blur-xl" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: isDayMode ? 'rgba(255,255,255,0.72)' : 'rgba(255,255,255,0.03)' }}>
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <div className="flex flex-wrap items-center gap-3">
                   {filterConfig.map((filter) => {
                     const count =
@@ -489,9 +409,6 @@ const GroupsPage = () => {
                     Collaborative rooms worth stepping into.
                   </h2>
                 </div>
-                <p className="max-w-xl text-sm leading-7" style={{ color: palette.textSecondary }}>
-                  Each card gives you faster context on what the group does, who leads it, and whether you can join immediately or already have a request in motion.
-                </p>
               </div>
 
               <motion.div
@@ -702,7 +619,9 @@ const GroupsPage = () => {
         </div>
       </main>
 
-      <Footer />
+      <div style={{ position: 'relative', zIndex: 1 }}>
+        <Footer />
+      </div>
 
       <style>{`
         @keyframes fadeUp {

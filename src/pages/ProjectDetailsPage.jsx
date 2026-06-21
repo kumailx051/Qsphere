@@ -5,6 +5,8 @@ import {
   ArrowLeft, CheckCircle2, Clock, Download, FileText, LayoutGrid, MessageSquare, MoreVertical,
   Plus, Send, Sparkles, Trash2, Upload, Users2, X, Calendar, ClipboardList, FolderOpen, Edit3, UserPlus, Eye
 } from 'lucide-react'
+import { useTheme } from '../contexts/ThemeContext'
+import { darkTheme, dayTheme } from '../themeColors'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 
@@ -66,6 +68,10 @@ export default function ProjectDetailsPage() {
   const profile = useMemo(() => readStoredProfile(), [])
   const userEmail = profile?.emailAddress || ''
   const normalizedUserEmail = useMemo(() => userEmail.trim().toLowerCase(), [userEmail])
+
+  const { theme } = useTheme()
+  const isDayMode = theme === 'light'
+  const palette = isDayMode ? dayTheme : darkTheme
 
   const { scrollY } = useScroll()
   const glowY1 = useTransform(scrollY, [0, 500], [0, -60])
@@ -511,46 +517,48 @@ export default function ProjectDetailsPage() {
   const readReceiptEntries = (readReceiptMessage?.readBy || []).filter(reader => reader.emailAddress?.toLowerCase() !== normalizedUserEmail)
 
   if (loading) return (
-    <div className="relative overflow-hidden bg-[#060a06] text-white" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div className="relative overflow-hidden" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: palette.bgPrimary, color: palette.textPrimary }}>
       <Navbar currentPage="groups" />
       <div className="fixed inset-0 pointer-events-none" style={{ zIndex: 0 }}>
-        <div className="absolute inset-0 bg-[#060a06]" />
-        <motion.div className="absolute inset-0 opacity-40" style={{ background: 'radial-gradient(circle at 18% 0%, rgba(16,185,129,0.18) 0%, transparent 42%)', y: glowY1 }} />
-        <motion.div className="absolute inset-0 opacity-20" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(6,182,212,0.12) 0%, transparent 36%)', y: glowY2 }} />
+        <div className="absolute inset-0" style={{ backgroundColor: palette.bgPrimary }} />
+        <motion.div className="absolute inset-0 opacity-40" style={{ background: `radial-gradient(circle at 18% 0%, ${palette.accentGlow} 0%, transparent 42%)`, y: glowY1 }} />
+        <motion.div className="absolute inset-0 opacity-20" style={{ background: `radial-gradient(circle at 100% 0%, ${palette.accentSecondaryGlow} 0%, transparent 36%)`, y: glowY2 }} />
       </div>
       <div className="relative z-10 flex min-h-screen items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-400 border-t-transparent" />
+        <div className="h-8 w-8 animate-spin rounded-full border-2" style={{ borderColor: palette.accentPrimary, borderTopColor: 'transparent' }} />
       </div>
     </div>
   )
 
   if (!project) return (
-    <div className="relative overflow-hidden bg-[#060a06] text-white" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div className="relative overflow-hidden" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: palette.bgPrimary, color: palette.textPrimary }}>
       <Navbar currentPage="groups" />
       <div className="fixed inset-0 pointer-events-none" style={{ zIndex: 0 }}>
-        <div className="absolute inset-0 bg-[#060a06]" />
-        <motion.div className="absolute inset-0 opacity-40" style={{ background: 'radial-gradient(circle at 18% 0%, rgba(16,185,129,0.18) 0%, transparent 42%)', y: glowY1 }} />
-        <motion.div className="absolute inset-0 opacity-20" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(6,182,212,0.12) 0%, transparent 36%)', y: glowY2 }} />
+        <div className="absolute inset-0" style={{ backgroundColor: palette.bgPrimary }} />
+        <motion.div className="absolute inset-0 opacity-40" style={{ background: `radial-gradient(circle at 18% 0%, ${palette.accentGlow} 0%, transparent 42%)`, y: glowY1 }} />
+        <motion.div className="absolute inset-0 opacity-20" style={{ background: `radial-gradient(circle at 100% 0%, ${palette.accentSecondaryGlow} 0%, transparent 36%)`, y: glowY2 }} />
       </div>
       <main className="relative z-10 flex flex-1 items-center justify-center px-6 pt-28 pb-24">
         <motion.div
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
-          className="w-full max-w-2xl rounded-[36px] border border-white/[0.08] bg-[linear-gradient(145deg,rgba(255,255,255,0.055),rgba(255,255,255,0.015))] p-8 text-center shadow-[0_40px_120px_rgba(0,0,0,0.45)] md:p-10"
-        >
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[24px] border border-emerald-400/18 bg-emerald-400/10 text-emerald-300 shadow-[0_0_30px_rgba(16,185,129,0.12)]">
-            <ClipboardList size={28} />
-          </div>
-          <div className="mt-6 text-[10px] font-bold uppercase tracking-[0.3em] text-emerald-300/78">Project not found</div>
-          <h1 className="mt-4 text-4xl font-bold leading-[0.95] text-white md:text-5xl" style={{ fontFamily: "'Syne', sans-serif" }}>
-            This project does not exist.
-          </h1>
-          <button
-            type="button"
-            onClick={() => navigate(-1)}
-            className="mt-8 inline-flex items-center gap-2 rounded-full border border-emerald-400/18 bg-emerald-400/12 px-6 py-3 text-sm font-semibold text-emerald-300 transition-all hover:border-emerald-300/30 hover:bg-emerald-400/16 hover:text-emerald-200"
+          className="w-full max-w-2xl rounded-[36px] p-8 text-center md:p-10"
+          style={{ borderColor: palette.borderPrimary, background: `linear-gradient(145deg, ${palette.bgSurface}, ${palette.bgPrimary})`, boxShadow: palette.shadowCard }}
           >
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[24px]" style={{ backgroundColor: palette.accentPrimary, color: '#fff', boxShadow: `0 0 30px rgba(16,185,129,0.3)` }}>
+              <ClipboardList size={28} />
+            </div>
+            <div className="mt-6 text-[10px] font-bold uppercase tracking-[0.3em]" style={{ color: palette.accentPrimary }}>Project not found</div>
+            <h1 className="mt-4 text-4xl font-bold leading-[0.95] md:text-5xl" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
+              This project does not exist.
+            </h1>
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              className="mt-8 inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold transition-all border-0"
+              style={{ backgroundColor: palette.accentPrimary, color: '#fff' }}
+            >
             <ArrowLeft size={16} />
             Go back
           </button>
@@ -561,13 +569,13 @@ export default function ProjectDetailsPage() {
   )
 
   return (
-    <div className="relative overflow-hidden bg-[#060a06] text-white" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div className="relative overflow-hidden" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: palette.bgPrimary, color: palette.textPrimary }}>
       <Navbar currentPage="groups" />
 
       <div className="fixed inset-0 pointer-events-none" style={{ zIndex: 0 }}>
-        <div className="absolute inset-0 bg-[#060a06]" />
-        <motion.div className="absolute inset-0 opacity-40" style={{ background: 'radial-gradient(circle at 18% 0%, rgba(16,185,129,0.18) 0%, transparent 42%)', y: glowY1 }} />
-        <motion.div className="absolute inset-0 opacity-20" style={{ background: 'radial-gradient(circle at 100% 0%, rgba(6,182,212,0.12) 0%, transparent 36%)', y: glowY2 }} />
+        <div className="absolute inset-0" style={{ backgroundColor: palette.bgPrimary }} />
+        <motion.div className="absolute inset-0 opacity-40" style={{ background: `radial-gradient(circle at 18% 0%, ${palette.accentGlow} 0%, transparent 42%)`, y: glowY1 }} />
+        <motion.div className="absolute inset-0 opacity-20" style={{ background: `radial-gradient(circle at 100% 0%, ${palette.accentSecondaryGlow} 0%, transparent 36%)`, y: glowY2 }} />
         <div
           className="absolute inset-0 opacity-[0.14]"
           style={{
@@ -588,55 +596,55 @@ export default function ProjectDetailsPage() {
               whileInView="visible"
               viewport={{ once: true }}
               onClick={() => navigate(-1)}
-              className="mb-8 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-4 py-2 text-sm text-white/80 hover:border-emerald-400/30 hover:text-emerald-300 transition"
+              className="mb-8 inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm transition"
+              style={{ borderColor: palette.borderInput, backgroundColor: palette.bgSurface, color: palette.textSecondary }}
             >
               <ArrowLeft size={16} /> Back
             </motion.button>
 
-            <motion.section
-              variants={heroVariants}
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true, margin: '-80px' }}
-              className="relative overflow-hidden rounded-[40px] border border-white/[0.08] bg-[linear-gradient(145deg,rgba(255,255,255,0.055),rgba(255,255,255,0.015))] shadow-[0_40px_120px_rgba(0,0,0,0.45)]"
-            >
-              <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-emerald-300/50 to-transparent" />
-              <div className="absolute -left-12 top-0 h-72 w-72 rounded-full blur-3xl bg-emerald-500/10" />
-              <div className="absolute -right-12 top-10 h-72 w-72 rounded-full blur-3xl bg-cyan-500/10" />
-
-              <div className="relative z-10 p-7 md:p-10 xl:p-12">
-                <div className="flex flex-wrap items-start justify-between gap-6">
-                  <div className="max-w-3xl">
-                    <div className="mb-5 flex flex-wrap items-center gap-3">
-                      <span className="inline-flex items-center gap-3 rounded-full border border-emerald-400/16 bg-emerald-400/10 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.34em] text-emerald-300">
-                        <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 shadow-[0_0_18px_rgba(16,185,129,0.8)]" />
-                        {project.groupTitle || 'Project'}
-                      </span>
-                    </div>
-                    <h1
-                      className="text-5xl font-bold leading-[0.9] text-white md:text-6xl xl:text-[5rem]"
-                      style={{ fontFamily: "'Syne', sans-serif", textShadow: '0 0 40px rgba(16,185,129,0.08)' }}
-                    >
-                      {project.title}
-                    </h1>
-                    <p className="mt-4 max-w-2xl text-base leading-8 text-white/58 md:text-lg">{project.description}</p>
-                  </div>
-                  <span className={`rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] ${statusBadge(project.status)}`}>{project.status}</span>
-                </div>
+            {/* ═══ TABS ───── */}
+            <div className="rounded-[20px] border p-2 mb-6" style={{ borderColor: palette.borderSoft, backgroundColor: palette.bgSurface }}>
+              <div className="flex flex-wrap gap-2">
+                {TABS.map(t => (
+                  <button key={t.key} onClick={() => setActiveTab(t.key)}
+                    className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition`}
+                    style={activeTab === t.key ? { backgroundColor: palette.accentPrimary, color: '#fff' } : { color: palette.textSecondary }}>
+                    <t.icon size={15} /> {t.label}
+                  </button>
+                ))}
               </div>
+            </div>
 
-              <div className="border-t border-white/[0.06] px-7 py-5 md:px-10 xl:px-12">
-                <div className="flex flex-wrap gap-3">
-                  {TABS.map(t => (
-                    <button key={t.key} onClick={() => setActiveTab(t.key)}
-                      className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition ${activeTab === t.key ? 'border-emerald-400/35 bg-emerald-500/15 text-emerald-200' : 'border-white/10 bg-white/[0.03] text-white/65 hover:border-white/20 hover:text-white'}`}>
-                      <t.icon size={15} /> {t.label}
-                    </button>
-                  ))}
+            {/* ═══ PROJECT TITLE + DESCRIPTION (only in details tab) ───── */}
+            {activeTab === 'details' && (
+              <motion.div
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4 }}
+                className="rounded-[28px] border p-7 mb-6 md:p-9"
+                style={{ borderColor: palette.borderSoft, backgroundColor: palette.bgSurface }}
+              >
+                <h1
+                  className="text-4xl font-bold leading-[0.95] md:text-5xl"
+                  style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}
+                >
+                  {project.title}
+                </h1>
+                <p className="mt-4 max-w-3xl text-base leading-7 md:text-lg" style={{ color: palette.textMuted }}>
+                  {project.description}
+                </p>
+                <div className="mt-6 flex flex-wrap gap-3">
+                  <span className="rounded-full border px-4 py-1.5 text-xs font-semibold" style={{ borderColor: palette.accentBorder, backgroundColor: palette.accentSoft, color: palette.accentPrimary }}>
+                    Research in quantum computing
+                  </span>
+                  <span className="rounded-full border px-4 py-1.5 text-xs font-semibold" style={{ borderColor: palette.accentBorder, backgroundColor: palette.accentSoft, color: palette.accentPrimary }}>
+                    Planning
+                  </span>
                 </div>
-              </div>
+              </motion.div>
+            )}
 
-          <div className="px-6 pb-8 md:px-8">
+          <div className="pb-8">
             {/* ═══ SECTION 1: PROJECT DETAILS ═══ */}
             {activeTab === 'details' && (
               <div className="mt-4 space-y-8">
@@ -649,12 +657,13 @@ export default function ProjectDetailsPage() {
 
                 {/* Reference Material */}
                 {project.referenceMaterialUrl && (
-                  <div className="rounded-[28px] border border-white/[0.06] bg-white/[0.03] p-6">
-                    <div className="flex items-center gap-3 text-emerald-300 mb-4">
+                  <div className="rounded-[28px] p-6" style={{ borderColor: palette.borderSoft, backgroundColor: palette.bgSurface }}>
+                    <div className="flex items-center gap-3 mb-4" style={{ color: palette.accentPrimary }}>
                       <FileText size={18} />
                       <span className="text-xs font-semibold uppercase tracking-[0.28em]">Reference Material</span>
                     </div>
-                    <a href={project.referenceMaterialUrl} download className="inline-flex items-center gap-3 rounded-2xl border border-emerald-400/20 bg-emerald-500/10 px-5 py-3 text-sm text-emerald-300 hover:bg-emerald-500/20 transition">
+                    <a href={project.referenceMaterialUrl} download className="inline-flex items-center gap-3 rounded-2xl px-5 py-3 text-sm transition"
+                      style={{ backgroundColor: palette.accentPrimary, color: '#fff' }}>
                       <Download size={16} /> Download Reference File
                     </a>
                   </div>
@@ -662,41 +671,45 @@ export default function ProjectDetailsPage() {
 
                 {/* Task Section */}
                 <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-                  <div className="rounded-[28px] border border-white/[0.06] bg-white/[0.03] p-6">
+                  <div className="rounded-[28px] p-6" style={{ borderColor: palette.borderSoft, backgroundColor: palette.bgSurface }}>
                     <div className="flex items-center justify-between mb-5">
-                      <div className="flex items-center gap-3 text-emerald-300">
+                      <div className="flex items-center gap-3" style={{ color: palette.accentPrimary }}>
                         <ClipboardList size={18} />
                         <span className="text-xs font-semibold uppercase tracking-[0.28em]">Project Tasks</span>
                       </div>
                       {isOwner && (
                         <button onClick={() => { setTaskForm({ taskName: '', taskType: 'Research', startDate: today, targetDate: '', details: '', assignedToEmail: '' }); setTaskFile(null); setShowTaskModal(true) }}
-                          className="inline-flex items-center gap-2 rounded-xl border border-emerald-400/25 bg-emerald-500/15 px-4 py-2 text-sm font-semibold text-emerald-300 hover:bg-emerald-500/25 transition">
+                          className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition"
+                          style={{ backgroundColor: palette.accentPrimary, color: '#fff' }}>
                           <Plus size={14} /> Add Task
                         </button>
                       )}
                     </div>
 
                     {tasks.length === 0 ? (
-                      <p className="text-sm text-white/40 text-center py-8">No tasks created yet.</p>
+                      <p className="text-sm text-center py-8" style={{ color: palette.textFaint }}>No tasks created yet.</p>
                     ) : (
                       <div className="space-y-3">
                         {tasks.map(task => (
-                          <div key={task.id} className="relative flex items-center gap-4 rounded-2xl border border-white/[0.06] bg-black/20 p-4 hover:border-emerald-400/15 transition group">
+                          <div key={task.id} className="relative flex items-center gap-4 rounded-2xl border p-4 transition group"
+                            style={{ borderColor: palette.borderSoft, backgroundColor: palette.bgInput }}>
                             <div className="h-3 w-3 rounded-full flex-shrink-0" style={{ backgroundColor: task.status === 'Completed' ? '#10b981' : taskTypeColors[task.taskType] || '#666' }} />
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2">
-                                <span className="text-sm font-semibold text-white truncate">{task.taskName}</span>
+                                <span className="text-sm font-semibold truncate" style={{ color: palette.textPrimary }}>{task.taskName}</span>
                                 <span className={`rounded-full border px-2 py-0.5 text-[9px] uppercase tracking-wider ${statusBadge(task.status)}`}>{task.status}</span>
                               </div>
-                              <div className="mt-1 text-xs text-white/40">{task.assigneeName || 'Unassigned'} · {task.taskType || 'General'}</div>
+                              <div className="mt-1 text-xs" style={{ color: palette.textFaint }}>{task.assigneeName || 'Unassigned'} · {task.taskType || 'General'}</div>
                             </div>
                             <div className="relative">
                               <button onClick={(e) => { e.stopPropagation(); setOpenDropdown(openDropdown === task.id ? null : task.id) }}
-                                className="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-white/50 hover:text-white transition">
+                                className="flex h-8 w-8 items-center justify-center rounded-full border transition"
+                                style={{ borderColor: palette.borderInput, backgroundColor: palette.bgSurface, color: palette.textMuted }}>
                                 <MoreVertical size={14} />
                               </button>
                               {openDropdown === task.id && (
-                                <div className="absolute right-0 top-10 z-30 w-44 rounded-2xl border border-white/10 bg-[#0a120c] p-1.5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                                <div className="absolute right-0 top-10 z-30 w-44 rounded-2xl border p-1.5 shadow-2xl" onClick={(e) => e.stopPropagation()}
+                                  style={{ borderColor: palette.borderInput, backgroundColor: palette.bgTertiary }}>
                                   <DropItem icon={Eye} label="Details" onClick={() => { setViewTask(task); setOpenDropdown(null) }} />
                                   {isOwner && <DropItem icon={UserPlus} label="Assign" onClick={() => { const email = window.prompt('Enter member email:'); if (email) assignTask(task.id, email); setOpenDropdown(null) }} />}
                                   {isOwner && <DropItem icon={Trash2} label="Remove" danger onClick={() => { deleteTask(task.id); setOpenDropdown(null) }} />}
@@ -711,61 +724,67 @@ export default function ProjectDetailsPage() {
                   </div>
 
                   {/* Team Members */}
-                  <div className="rounded-[28px] border border-white/[0.06] bg-white/[0.03] p-6">
-                    <div className="flex items-center gap-3 text-emerald-300 mb-5">
+                  <div className="rounded-[28px] p-6" style={{ borderColor: palette.borderSoft, backgroundColor: palette.bgSurface }}>
+                    <div className="flex items-center gap-3 mb-5" style={{ color: palette.accentPrimary }}>
                       <Users2 size={18} />
                       <span className="text-xs font-semibold uppercase tracking-[0.28em]">Team ({members.length})</span>
                     </div>
                     <div className="space-y-2">
                       {members.map(m => (
-                        <div key={m.email} className="flex items-center gap-2.5 rounded-xl border border-white/[0.06] bg-black/20 px-3 py-2">
-                          <div className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full border border-emerald-400/20 bg-white/5">
+                        <div key={m.email} className="flex items-center gap-2.5 rounded-xl border px-3 py-2"
+                          style={{ borderColor: palette.borderSoft, backgroundColor: palette.bgInput }}>
+                          <div className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full border"
+                            style={{ borderColor: palette.accentBorder, backgroundColor: palette.bgSurface }}>
                             {m.avatar ? (
                               <img src={m.avatar} alt={m.name || 'Member'} className="h-full w-full rounded-full object-cover" />
                             ) : (
-                              <span className="text-[10px] font-bold text-emerald-300 uppercase">{(m.name || m.email || '?').charAt(0)}</span>
+                              <span className="text-[10px] font-bold uppercase" style={{ color: palette.accentPrimary }}>{(m.name || m.email || '?').charAt(0)}</span>
                             )}
                           </div>
                           <div className="min-w-0 flex-1 flex items-center gap-2">
-                            <span className="text-sm font-semibold text-white truncate">{m.name || m.email}</span>
+                            <span className="text-sm font-semibold truncate" style={{ color: palette.textPrimary }}>{m.name || m.email}</span>
                             {m.isAdmin ? (
-                              <span className="rounded-full border border-amber-400/20 bg-amber-500/10 px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-[0.16em] text-amber-300">Owner</span>
+                              <span className="rounded-full px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-[0.16em]"
+                                style={isDayMode ? { backgroundColor: '#d97706', color: '#fff' } : { border: '1px solid rgba(251,191,36,0.20)', backgroundColor: 'rgba(245,158,11,0.10)', color: '#fbbf24' }}>Owner</span>
                             ) : null}
                             {m.isCurrentUser ? (
-                              <span className="rounded-full border border-cyan-400/20 bg-cyan-500/10 px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-[0.16em] text-cyan-200">Me</span>
+                              <span className="rounded-full px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-[0.16em]"
+                                style={isDayMode ? { backgroundColor: '#0891b2', color: '#fff' } : { border: '1px solid rgba(34,211,238,0.20)', backgroundColor: 'rgba(6,182,212,0.10)', color: '#a5f3fc' }}>Me</span>
                             ) : null}
-                            <span className="rounded-full border px-1.5 py-0.5 text-[8px] font-semibold leading-none text-white/60 border-white/10 bg-white/[0.04]">{m.position || 'Member'}</span>
+                            <span className="rounded-full border px-1.5 py-0.5 text-[8px] font-semibold leading-none"
+                              style={{ borderColor: palette.borderInput, backgroundColor: palette.bgSurface, color: palette.textMuted }}>{m.position || 'Member'}</span>
                           </div>
                         </div>
                       ))}
-                      {members.length === 0 && <p className="text-sm text-white/40 text-center py-4">No members yet.</p>}
+                      {members.length === 0 && <p className="text-sm text-center py-4" style={{ color: palette.textFaint }}>No members yet.</p>}
                     </div>
                   </div>
                 </div>
 
                 {/* Weekly Progress */}
-                <div className="rounded-[28px] border border-white/[0.06] bg-white/[0.03] p-6">
-                  <div className="flex items-center gap-3 text-emerald-300 mb-6">
+                <div className="rounded-[28px] p-6" style={{ borderColor: palette.borderSoft, backgroundColor: palette.bgSurface }}>
+                  <div className="flex items-center gap-3 mb-6" style={{ color: palette.accentPrimary }}>
                     <LayoutGrid size={18} />
                     <span className="text-xs font-semibold uppercase tracking-[0.28em]">Weekly Progress</span>
                   </div>
                   <div className="grid gap-4 sm:grid-cols-4">
                     {weeklyData.map((week, i) => (
-                      <div key={i} className="rounded-2xl border border-white/[0.06] bg-black/20 p-4">
-                        <div className="text-xs font-semibold text-emerald-300/70 uppercase tracking-wider">{week.label}</div>
+                      <div key={i} className="rounded-2xl border p-4"
+                        style={{ borderColor: palette.borderSoft, backgroundColor: palette.bgInput }}>
+                        <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: palette.accentPrimary, opacity: 0.7 }}>{week.label}</div>
                         <div className="mt-3 flex items-end gap-2">
-                          <span className="text-2xl font-black text-white">{week.completed}</span>
-                          <span className="text-sm text-white/40">/ {week.total}</span>
+                          <span className="text-2xl font-black" style={{ color: palette.textPrimary }}>{week.completed}</span>
+                          <span className="text-sm" style={{ color: palette.textFaint }}>/ {week.total}</span>
                         </div>
-                        <div className="mt-3 h-2 rounded-full bg-white/[0.06] overflow-hidden">
-                          <div className="h-full rounded-full bg-emerald-400 transition-all duration-500" style={{ width: week.total ? `${(week.completed / week.total) * 100}%` : '0%' }} />
+                        <div className="mt-3 h-2 rounded-full overflow-hidden" style={{ backgroundColor: palette.borderSoft }}>
+                          <div className="h-full rounded-full transition-all duration-500" style={{ width: week.total ? `${(week.completed / week.total) * 100}%` : '0%', backgroundColor: palette.accentPrimary }} />
                         </div>
                         <div className="mt-3 space-y-1">
                           {week.tasks.map(t => (
                             <div key={t.id} className="flex items-center gap-2 text-[10px]">
                               <span className="h-2 w-2 rounded-full flex-shrink-0" style={{ backgroundColor: t.status === 'Completed' ? '#10b981' : '#555' }} />
-                              <span className={t.status === 'Completed' ? 'text-emerald-300' : 'text-white/50'}>{t.taskName}</span>
-                              <span className="text-white/30 ml-auto">{t.assigneeName || '—'}</span>
+                              <span style={{ color: t.status === 'Completed' ? palette.accentPrimary : palette.textMuted }}>{t.taskName}</span>
+                              <span className="ml-auto" style={{ color: palette.textFaint }}>{t.assigneeName || '—'}</span>
                             </div>
                           ))}
                         </div>
@@ -779,16 +798,17 @@ export default function ProjectDetailsPage() {
             {/* ═══ SECTION 2: MY TASKS ═══ */}
             {activeTab === 'myTasks' && (
               <div className="mt-4">
-                <div className="flex items-center gap-3 text-emerald-300 mb-6">
+                <div className="flex items-center gap-3 mb-6" style={{ color: palette.accentPrimary }}>
                   <CheckCircle2 size={18} />
                   <span className="text-xs font-semibold uppercase tracking-[0.28em]">My Assigned Tasks</span>
                 </div>
                 {myTasks.length === 0 ? (
-                  <p className="text-sm text-white/40 text-center py-12">No tasks assigned to you.</p>
+                  <p className="text-sm text-center py-12" style={{ color: palette.textFaint }}>No tasks assigned to you.</p>
                 ) : (
                   <div className="space-y-3">
                     {myTasks.map(task => (
-                      <div key={task.id} className="rounded-2xl border border-white/[0.06] bg-black/20 p-5 hover:border-emerald-400/15 transition cursor-pointer"
+                      <div key={task.id} className="rounded-2xl border p-5 transition cursor-pointer"
+                        style={{ borderColor: palette.borderSoft, backgroundColor: palette.bgInput }}
                         onClick={() => {
                           if (task.status === 'Pending' || task.status === 'Rework') {
                             setSubmitTask(task); setSubmitNotes(''); setSubmitFile(null)
@@ -799,19 +819,20 @@ export default function ProjectDetailsPage() {
                         <div className="flex items-center justify-between gap-4">
                           <div>
                             <div className="flex items-center gap-2">
-                              <span className="text-sm font-semibold text-white">{task.taskName}</span>
+                              <span className="text-sm font-semibold" style={{ color: palette.textPrimary }}>{task.taskName}</span>
                               <span className={`rounded-full border px-2 py-0.5 text-[9px] uppercase tracking-wider ${statusBadge(task.status)}`}>{task.status}</span>
                             </div>
-                            <div className="mt-1 text-xs text-white/40">{task.taskType || 'General'} · Due: {formatDisplayDate(task.targetDate, 'N/A')}</div>
+                            <div className="mt-1 text-xs" style={{ color: palette.textFaint }}>{task.taskType || 'General'} · Due: {formatDisplayDate(task.targetDate, 'N/A')}</div>
                           </div>
                           {(task.status === 'Pending' || task.status === 'Rework') && (
-                            <span className="text-xs text-emerald-300/70 border border-emerald-400/20 rounded-full px-3 py-1">Submit Work →</span>
+                            <span className="text-xs rounded-full border px-3 py-1"
+                              style={{ color: palette.accentPrimary, opacity: 0.7, borderColor: palette.accentBorder }}>Submit Work →</span>
                           )}
                           {task.status === 'Review' && isOwner && (
                             <span className="text-xs text-purple-300/70 border border-purple-400/20 rounded-full px-3 py-1">Review →</span>
                           )}
                           {task.status === 'Completed' && (
-                            <CheckCircle2 size={18} className="text-emerald-400" />
+                            <CheckCircle2 size={18} style={{ color: palette.accentPrimary }} />
                           )}
                         </div>
                       </div>
@@ -824,13 +845,13 @@ export default function ProjectDetailsPage() {
             {/* ═══ SECTION 3: DISCUSSION ═══ */}
             {activeTab === 'discussion' && (
               <div className="mt-4">
-                <div className="rounded-[28px] border border-white/[0.06] bg-white/[0.03] overflow-hidden flex flex-col" style={{ height: '520px' }}>
-                  <div className="border-b border-white/[0.06] px-5 py-3 flex items-center gap-3">
-                    <MessageSquare size={16} className="text-emerald-300" />
-                    <span className="text-xs font-semibold uppercase tracking-[0.28em] text-emerald-300">Group Discussion</span>
-                    <span className="ml-auto text-xs text-white/30">{chatMessages.length} messages</span>
+                <div className="rounded-[28px] overflow-hidden flex flex-col" style={{ height: '520px', borderColor: palette.borderSoft, backgroundColor: palette.bgSurface }}>
+                  <div className="border-b px-5 py-3 flex items-center gap-3" style={{ borderColor: palette.borderSoft }}>
+                    <MessageSquare size={16} style={{ color: palette.accentPrimary }} />
+                    <span className="text-xs font-semibold uppercase tracking-[0.28em]" style={{ color: palette.accentPrimary }}>Group Discussion</span>
+                    <span className="ml-auto text-xs" style={{ color: palette.textFaint }}>{chatMessages.length} messages</span>
                   </div>
-                  <div className="border-b border-white/[0.04] px-5 py-2 text-[10px] uppercase tracking-[0.24em] text-white/30">
+                  <div className="border-b px-5 py-2 text-[10px] uppercase tracking-[0.24em]" style={{ borderColor: palette.borderSoft, color: palette.textFaint }}>
                     Long press or right click a message for actions
                   </div>
                   <div ref={chatListRef} onScroll={handleChatScroll} className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
@@ -846,11 +867,12 @@ export default function ProjectDetailsPage() {
                             onPointerMove={cancelChatLongPress}
                             onPointerCancel={cancelChatLongPress}
                             onContextMenu={(e) => { e.preventDefault(); openChatActions(msg) }}
-                            className={`max-w-[75%] rounded-2xl px-4 py-3 transition ${isMine ? 'bg-emerald-500/20 border border-emerald-400/20' : 'bg-white/[0.06] border border-white/[0.06]'} ${canEditChatMessage(msg) || canDeleteChatForMe(msg) || canDeleteChatForEveryone(msg) || canSeeChatReadBy(msg) ? 'cursor-pointer active:scale-[0.99]' : ''}`}
+                            className={`max-w-[75%] rounded-2xl px-4 py-3 transition ${canEditChatMessage(msg) || canDeleteChatForMe(msg) || canDeleteChatForEveryone(msg) || canSeeChatReadBy(msg) ? 'cursor-pointer active:scale-[0.99]' : ''}`}
+                            style={isMine ? { backgroundColor: isDayMode ? `${palette.accentPrimary}33` : 'rgba(16,185,129,0.20)', borderColor: palette.accentBorder, borderWidth: 1 } : { backgroundColor: isDayMode ? palette.bgTertiary : 'rgba(255,255,255,0.06)', borderColor: palette.borderSoft, borderWidth: 1 }}
                           >
-                            {!isMine && <div className="text-[10px] font-semibold text-emerald-300/70 mb-1">{msg.senderName || msg.senderEmail}</div>}
-                            <div className={`text-sm ${msg.deletedForEveryone ? 'italic text-white/45' : 'text-white/85'}`}>{msg.message}</div>
-                            <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[9px] text-white/25">
+                            {!isMine && <div className="text-[10px] font-semibold mb-1" style={{ color: palette.accentPrimary, opacity: 0.7 }}>{msg.senderName || msg.senderEmail}</div>}
+                            <div className={`text-sm ${msg.deletedForEveryone ? 'italic' : ''}`} style={{ color: msg.deletedForEveryone ? palette.textMuted : palette.textPrimary }}>{msg.message}</div>
+                            <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[9px]" style={{ color: palette.textFaint }}>
                               <span>{new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                               {msg.editedAt && !msg.deletedForEveryone && <span>· edited</span>}
                               {isMine && readByOthers.length > 0 && <span>· seen by {readByOthers.length}</span>}
@@ -861,10 +883,12 @@ export default function ProjectDetailsPage() {
                     })}
                     <div ref={chatEndRef} />
                   </div>
-                  <form onSubmit={sendChat} className="border-t border-white/[0.06] px-5 py-3 flex items-center gap-3">
+                  <form onSubmit={sendChat} className="border-t px-5 py-3 flex items-center gap-3" style={{ borderColor: palette.borderSoft }}>
                     <input value={chatInput} onChange={(e) => setChatInput(e.target.value)} placeholder="Type a message..."
-                      className="flex-1 rounded-xl border border-white/10 bg-white/[0.05] px-4 py-2.5 text-sm text-white placeholder:text-white/30 outline-none focus:border-emerald-400/40" />
-                    <button type="submit" className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-400 text-black hover:bg-emerald-300 transition">
+                      className="flex-1 rounded-xl border px-4 py-2.5 text-sm outline-none"
+                      style={{ borderColor: palette.borderInput, backgroundColor: palette.bgSurface, color: palette.textPrimary }} />
+                    <button type="submit" className="flex h-10 w-10 items-center justify-center rounded-xl transition"
+                      style={{ backgroundColor: palette.accentPrimary, color: '#fff' }}>
                       <Send size={16} />
                     </button>
                   </form>
@@ -875,24 +899,26 @@ export default function ProjectDetailsPage() {
             {/* ═══ SECTION 4: DOCUMENTS ═══ */}
             {activeTab === 'documents' && (
               <div className="mt-4">
-                <div className="flex items-center gap-3 text-emerald-300 mb-6">
+                <div className="flex items-center gap-3 mb-6" style={{ color: palette.accentPrimary }}>
                   <FolderOpen size={18} />
                   <span className="text-xs font-semibold uppercase tracking-[0.28em]">All Documents</span>
                 </div>
                 {documents.length === 0 ? (
-                  <p className="text-sm text-white/40 text-center py-12">No documents uploaded yet.</p>
+                  <p className="text-sm text-center py-12" style={{ color: palette.textFaint }}>No documents uploaded yet.</p>
                 ) : (
                   <div className="space-y-3">
                     {documents.map((doc, i) => (
-                      <div key={i} className="flex items-center justify-between gap-4 rounded-2xl border border-white/[0.06] bg-black/20 p-4">
+                      <div key={i} className="flex items-center justify-between gap-4 rounded-2xl border p-4"
+                        style={{ borderColor: palette.borderSoft, backgroundColor: palette.bgInput }}>
                         <div className="flex items-center gap-3 min-w-0">
-                          <FileText size={18} className="text-emerald-300/60 flex-shrink-0" />
+                          <FileText size={18} className="flex-shrink-0" style={{ color: palette.accentPrimary, opacity: 0.6 }} />
                           <div className="min-w-0">
-                            <div className="text-sm font-semibold text-white truncate">{doc.title}</div>
-                            <div className="text-[10px] text-white/40">{doc.source} · {doc.ownerEmail || 'Unknown'}</div>
+                            <div className="text-sm font-semibold truncate" style={{ color: palette.textPrimary }}>{doc.title}</div>
+                            <div className="text-[10px]" style={{ color: palette.textFaint }}>{doc.source} · {doc.ownerEmail || 'Unknown'}</div>
                           </div>
                         </div>
-                        <a href={doc.referenceMaterialUrl} download className="flex h-9 w-9 items-center justify-center rounded-xl border border-emerald-400/20 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 transition flex-shrink-0">
+                        <a href={doc.referenceMaterialUrl} download className="flex h-9 w-9 items-center justify-center rounded-xl flex-shrink-0"
+                          style={{ backgroundColor: palette.accentPrimary, color: '#fff' }}>
                           <Download size={14} />
                         </a>
                       </div>
@@ -902,7 +928,6 @@ export default function ProjectDetailsPage() {
               </div>
             )}
           </div>
-        </motion.section>
           </div>
         </div>
       </main>
@@ -911,69 +936,77 @@ export default function ProjectDetailsPage() {
 
       <style>{`
         select option {
-          background: #0a120c;
-          color: #e2e8f0;
+          background: ${palette.bgTertiary};
+          color: ${palette.textSecondary};
         }
         select option:hover,
         select option:focus,
         select option:checked {
-          background: rgba(16,185,129,0.15);
-          color: #6ee7b7;
+          background: ${palette.accentSoft};
+          color: ${palette.accentPrimary};
         }
       `}</style>
 
       {/* ═══ ADD TASK MODAL ═══ */}
       {showTaskModal && (
         <ModalOverlay onClose={() => setShowTaskModal(false)}>
-          <div className="text-[10px] uppercase tracking-[0.3em] text-emerald-300/70">New Task</div>
-          <h3 className="mt-2 text-2xl font-black text-white">Create Task</h3>
+          <div className="text-[10px] uppercase tracking-[0.3em]" style={{ color: palette.accentPrimary, opacity: 0.7 }}>New Task</div>
+          <h3 className="mt-2 text-2xl font-black" style={{ color: palette.textPrimary }}>Create Task</h3>
           <form onSubmit={createTask} className="mt-5 grid gap-4 md:grid-cols-2">
             <ModalInput label="Task Name" value={taskForm.taskName} onChange={(v) => setTaskForm(f => ({ ...f, taskName: v }))} placeholder="Enter task name" required />
             <div>
-              <label className="mb-2 block text-sm text-white/80">Task Type</label>
+              <label className="mb-2 block text-sm" style={{ color: palette.textSecondary }}>Task Type</label>
               <select value={taskForm.taskType} onChange={(e) => setTaskForm(f => ({ ...f, taskType: e.target.value }))}
-                className="w-full rounded-2xl border border-white/10 bg-[#1a2a22] px-4 py-3 text-sm text-white outline-none" style={{ colorScheme: 'dark' }}>
-                {['Research', 'Development', 'Design', 'Analysis', 'Review'].map(t => <option key={t} value={t} className="bg-[#1a2a22] text-white">{t}</option>)}
+                className="w-full rounded-2xl border px-4 py-3 text-sm outline-none"
+                style={{ borderColor: palette.borderInput, backgroundColor: palette.bgTertiary, color: palette.textPrimary, colorScheme: isDayMode ? 'light' : 'dark' }}>
+                {['Research', 'Development', 'Design', 'Analysis', 'Review'].map(t => <option key={t} value={t} style={{ backgroundColor: palette.bgTertiary, color: palette.textPrimary }}>{t}</option>)}
               </select>
             </div>
             <div>
-              <label className="mb-2 block text-sm text-white/80">Start Date</label>
+              <label className="mb-2 block text-sm" style={{ color: palette.textSecondary }}>Start Date</label>
               <input type="date" value={taskForm.startDate || today} onChange={(e) => setTaskForm(f => ({ ...f, startDate: e.target.value }))}
                 min={project?.startDate ? new Date(project.startDate).toISOString().split('T')[0] : today}
                 max={project?.dueDate ? new Date(project.dueDate).toISOString().split('T')[0] : ''}
-                className="w-full rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 text-sm text-white outline-none transition focus:border-emerald-400/40 [color-scheme:dark]" />
+                className="w-full rounded-2xl border px-4 py-3 text-sm outline-none transition"
+                style={{ borderColor: palette.borderInput, backgroundColor: palette.bgSurface, color: palette.textPrimary, colorScheme: isDayMode ? 'light' : 'dark' }} />
             </div>
             <div>
-              <label className="mb-2 block text-sm text-white/80">Target Date</label>
+              <label className="mb-2 block text-sm" style={{ color: palette.textSecondary }}>Target Date</label>
               <input type="date" value={taskForm.targetDate} onChange={(e) => setTaskForm(f => ({ ...f, targetDate: e.target.value }))}
                 min={today}
                 max={project?.dueDate ? new Date(project.dueDate).toISOString().split('T')[0] : ''}
-                className="w-full rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 text-sm text-white outline-none transition focus:border-emerald-400/40 [color-scheme:dark]" />
+                className="w-full rounded-2xl border px-4 py-3 text-sm outline-none transition"
+                style={{ borderColor: palette.borderInput, backgroundColor: palette.bgSurface, color: palette.textPrimary, colorScheme: isDayMode ? 'light' : 'dark' }} />
             </div>
             <div className="md:col-span-2">
-              <label className="mb-2 block text-sm text-white/80">Details</label>
+              <label className="mb-2 block text-sm" style={{ color: palette.textSecondary }}>Details</label>
               <textarea value={taskForm.details} onChange={(e) => setTaskForm(f => ({ ...f, details: e.target.value }))} rows={3}
-                className="w-full rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 text-sm text-white placeholder:text-white/35 outline-none focus:border-emerald-400/40" placeholder="Task details..." />
+                className="w-full rounded-2xl border px-4 py-3 text-sm outline-none" placeholder="Task details..."
+                style={{ borderColor: palette.borderInput, backgroundColor: palette.bgSurface, color: palette.textPrimary }} />
             </div>
             <div>
-              <label className="mb-2 block text-sm text-white/80">Assign To</label>
+              <label className="mb-2 block text-sm" style={{ color: palette.textSecondary }}>Assign To</label>
               <select value={taskForm.assignedToEmail} onChange={(e) => setTaskForm(f => ({ ...f, assignedToEmail: e.target.value }))}
-                className="w-full rounded-2xl border border-white/10 bg-[#1a2a22] px-4 py-3 text-sm text-white outline-none" style={{ colorScheme: 'dark' }}>
-                <option value="" className="bg-[#1a2a22] text-white">Unassigned</option>
-                {members.filter(m => m.status === 'Active' && !m.isAdmin).map(m => <option key={m.email} value={m.email} className="bg-[#1a2a22] text-white">{m.name || m.email}</option>)}
+                className="w-full rounded-2xl border px-4 py-3 text-sm outline-none"
+                style={{ borderColor: palette.borderInput, backgroundColor: palette.bgTertiary, color: palette.textPrimary, colorScheme: isDayMode ? 'light' : 'dark' }}>
+                <option value="" style={{ backgroundColor: palette.bgTertiary, color: palette.textPrimary }}>Unassigned</option>
+                {members.filter(m => m.status === 'Active' && !m.isAdmin).map(m => <option key={m.email} value={m.email} style={{ backgroundColor: palette.bgTertiary, color: palette.textPrimary }}>{m.name || m.email}</option>)}
               </select>
             </div>
             <div>
-              <label className="mb-2 block text-sm text-white/80">Reference File</label>
-              <div onClick={() => taskFileRef.current?.click()} className="flex cursor-pointer items-center gap-3 rounded-2xl border border-dashed border-emerald-400/25 bg-emerald-500/[0.06] px-4 py-3 hover:border-emerald-400/50 transition">
-                <Upload size={16} className="text-emerald-300" />
-                <span className="text-sm text-white/60 truncate">{taskFile ? taskFile.name : 'Upload...'}</span>
+              <label className="mb-2 block text-sm" style={{ color: palette.textSecondary }}>Reference File</label>
+              <div onClick={() => taskFileRef.current?.click()} className="flex cursor-pointer items-center gap-3 rounded-2xl border border-dashed px-4 py-3 transition"
+                style={{ borderColor: palette.accentBorder, backgroundColor: 'rgba(16,185,129,0.06)' }}>
+                <Upload size={16} style={{ color: palette.accentPrimary }} />
+                <span className="text-sm truncate" style={{ color: palette.textMuted }}>{taskFile ? taskFile.name : 'Upload...'}</span>
               </div>
               <input ref={taskFileRef} type="file" className="hidden" onChange={(e) => setTaskFile(e.target.files[0] || null)} />
             </div>
             <div className="md:col-span-2 flex justify-end gap-3 pt-2">
-              <button type="button" onClick={() => setShowTaskModal(false)} className="rounded-xl border border-white/10 bg-white/[0.04] px-5 py-3 text-sm font-semibold text-white/75">Cancel</button>
-              <button type="submit" className="inline-flex items-center gap-2 rounded-xl bg-emerald-400 px-5 py-3 text-sm font-semibold text-black"><Plus size={14} /> Create Task</button>
+              <button type="button" onClick={() => setShowTaskModal(false)} className="rounded-xl border px-5 py-3 text-sm font-semibold"
+                style={{ borderColor: palette.borderInput, backgroundColor: palette.bgSurface, color: palette.textSecondary }}>Cancel</button>
+              <button type="submit" className="inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold"
+                style={{ backgroundColor: palette.accentPrimary, color: '#fff' }}><Plus size={14} /> Create Task</button>
             </div>
           </form>
         </ModalOverlay>
@@ -982,8 +1015,8 @@ export default function ProjectDetailsPage() {
       {/* ═══ VIEW TASK DETAILS ═══ */}
       {viewTask && (
         <ModalOverlay onClose={() => setViewTask(null)}>
-          <div className="text-[10px] uppercase tracking-[0.3em] text-emerald-300/70">Task Details</div>
-          <h3 className="mt-2 text-2xl font-black text-white">{viewTask.taskName}</h3>
+          <div className="text-[10px] uppercase tracking-[0.3em]" style={{ color: palette.accentPrimary, opacity: 0.7 }}>Task Details</div>
+          <h3 className="mt-2 text-2xl font-black" style={{ color: palette.textPrimary }}>{viewTask.taskName}</h3>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <DetailRow label="Type" value={viewTask.taskType || 'General'} />
             <DetailRow label="Status" value={viewTask.status} />
@@ -991,9 +1024,10 @@ export default function ProjectDetailsPage() {
             <DetailRow label="Target" value={formatDisplayDate(viewTask.targetDate, 'N/A')} />
             <DetailRow label="Assigned To" value={viewTask.assigneeName || viewTask.assignedToEmail || 'Unassigned'} />
           </div>
-          {viewTask.details && <p className="mt-4 text-sm text-white/60 leading-6">{viewTask.details}</p>}
+          {viewTask.details && <p className="mt-4 text-sm leading-6" style={{ color: palette.textMuted }}>{viewTask.details}</p>}
           {viewTask.referenceMaterialUrl && (
-            <a href={viewTask.referenceMaterialUrl} download className="mt-4 inline-flex items-center gap-2 rounded-xl border border-emerald-400/20 bg-emerald-500/10 px-4 py-2 text-sm text-emerald-300 hover:bg-emerald-500/20 transition">
+            <a href={viewTask.referenceMaterialUrl} download className="mt-4 inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm transition"
+              style={{ backgroundColor: palette.accentPrimary, color: '#fff' }}>
               <Download size={14} /> Download Reference
             </a>
           )}
@@ -1003,25 +1037,29 @@ export default function ProjectDetailsPage() {
       {/* ═══ SUBMIT WORK ═══ */}
       {submitTask && (
         <ModalOverlay onClose={() => setSubmitTask(null)}>
-          <div className="text-[10px] uppercase tracking-[0.3em] text-emerald-300/70">Submit Work</div>
-          <h3 className="mt-2 text-2xl font-black text-white">{submitTask.taskName}</h3>
+          <div className="text-[10px] uppercase tracking-[0.3em]" style={{ color: palette.accentPrimary, opacity: 0.7 }}>Submit Work</div>
+          <h3 className="mt-2 text-2xl font-black" style={{ color: palette.textPrimary }}>{submitTask.taskName}</h3>
           <form onSubmit={submitWork} className="mt-5 space-y-4">
             <div>
-              <label className="mb-2 block text-sm text-white/80">Notes</label>
+              <label className="mb-2 block text-sm" style={{ color: palette.textSecondary }}>Notes</label>
               <textarea value={submitNotes} onChange={(e) => setSubmitNotes(e.target.value)} rows={3}
-                className="w-full rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 text-sm text-white placeholder:text-white/35 outline-none focus:border-emerald-400/40" placeholder="Describe your work..." />
+                className="w-full rounded-2xl border px-4 py-3 text-sm outline-none" placeholder="Describe your work..."
+                style={{ borderColor: palette.borderInput, backgroundColor: palette.bgSurface, color: palette.textPrimary }} />
             </div>
             <div>
-              <label className="mb-2 block text-sm text-white/80">Upload File</label>
-              <div onClick={() => submitFileRef.current?.click()} className="flex cursor-pointer items-center gap-3 rounded-2xl border border-dashed border-emerald-400/25 bg-emerald-500/[0.06] px-4 py-3 hover:border-emerald-400/50 transition">
-                <Upload size={16} className="text-emerald-300" />
-                <span className="text-sm text-white/60 truncate">{submitFile ? submitFile.name : 'Upload...'}</span>
+              <label className="mb-2 block text-sm" style={{ color: palette.textSecondary }}>Upload File</label>
+              <div onClick={() => submitFileRef.current?.click()} className="flex cursor-pointer items-center gap-3 rounded-2xl border border-dashed px-4 py-3 transition"
+                style={{ borderColor: palette.accentBorder, backgroundColor: 'rgba(16,185,129,0.06)' }}>
+                <Upload size={16} style={{ color: palette.accentPrimary }} />
+                <span className="text-sm truncate" style={{ color: palette.textMuted }}>{submitFile ? submitFile.name : 'Upload...'}</span>
               </div>
               <input ref={submitFileRef} type="file" className="hidden" onChange={(e) => setSubmitFile(e.target.files[0] || null)} />
             </div>
             <div className="flex justify-end gap-3">
-              <button type="button" onClick={() => setSubmitTask(null)} className="rounded-xl border border-white/10 bg-white/[0.04] px-5 py-3 text-sm font-semibold text-white/75">Cancel</button>
-              <button type="submit" className="inline-flex items-center gap-2 rounded-xl bg-emerald-400 px-5 py-3 text-sm font-semibold text-black"><Send size={14} /> Submit</button>
+              <button type="button" onClick={() => setSubmitTask(null)} className="rounded-xl border px-5 py-3 text-sm font-semibold"
+                style={{ borderColor: palette.borderInput, backgroundColor: palette.bgSurface, color: palette.textSecondary }}>Cancel</button>
+              <button type="submit" className="inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold"
+                style={{ backgroundColor: palette.accentPrimary, color: '#fff' }}><Send size={14} /> Submit</button>
             </div>
           </form>
         </ModalOverlay>
@@ -1031,22 +1069,24 @@ export default function ProjectDetailsPage() {
       {reviewSubmission && (
         <ModalOverlay onClose={() => { setReviewSubmission(null); setTaskSubmissions([]) }}>
           <div className="text-[10px] uppercase tracking-[0.3em] text-purple-300/70">Review Submission</div>
-          <h3 className="mt-2 text-2xl font-black text-white">{reviewSubmission.taskName}</h3>
+          <h3 className="mt-2 text-2xl font-black" style={{ color: palette.textPrimary }}>{reviewSubmission.taskName}</h3>
           <div className="mt-5 space-y-3 max-h-64 overflow-y-auto">
-            {taskSubmissions.length === 0 ? <p className="text-sm text-white/40">No submissions yet.</p> : taskSubmissions.map(sub => (
-              <div key={sub.id} className="rounded-2xl border border-white/[0.06] bg-black/20 p-4">
+            {taskSubmissions.length === 0 ? <p className="text-sm" style={{ color: palette.textFaint }}>No submissions yet.</p> : taskSubmissions.map(sub => (
+              <div key={sub.id} className="rounded-2xl border p-4" style={{ borderColor: palette.borderSoft, backgroundColor: palette.bgInput }}>
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <div className="text-sm font-semibold text-white">{sub.submitterName || sub.submittedByEmail}</div>
-                    <div className="text-xs text-white/40 mt-1">{sub.notes || 'No notes'}</div>
+                    <div className="text-sm font-semibold" style={{ color: palette.textPrimary }}>{sub.submitterName || sub.submittedByEmail}</div>
+                    <div className="text-xs mt-1" style={{ color: palette.textFaint }}>{sub.notes || 'No notes'}</div>
                   </div>
                   <span className={`rounded-full border px-2 py-0.5 text-[9px] uppercase ${statusBadge(sub.status)}`}>{sub.status}</span>
                 </div>
-                {sub.fileUrl && <a href={sub.fileUrl} download className="mt-2 inline-flex items-center gap-2 text-xs text-emerald-300"><Download size={12} /> Download</a>}
+                {sub.fileUrl && <a href={sub.fileUrl} download className="mt-2 inline-flex items-center gap-2 text-xs" style={{ color: palette.accentPrimary }}><Download size={12} /> Download</a>}
                 {sub.status === 'Review' && (
                   <div className="mt-3 flex gap-2">
-                    <button onClick={() => reviewWork(sub.id, 'Accepted')} className="rounded-lg bg-emerald-500/20 border border-emerald-400/30 px-3 py-1.5 text-xs text-emerald-300 hover:bg-emerald-500/30">Accept</button>
-                    <button onClick={() => reviewWork(sub.id, 'Rework')} className="rounded-lg bg-orange-500/20 border border-orange-400/30 px-3 py-1.5 text-xs text-orange-300 hover:bg-orange-500/30">Rework</button>
+                    <button onClick={() => reviewWork(sub.id, 'Accepted')} className="rounded-lg px-3 py-1.5 text-xs"
+                      style={{ backgroundColor: palette.accentPrimary, color: '#fff' }}>Accept</button>
+                    <button onClick={() => reviewWork(sub.id, 'Rework')} className="rounded-lg px-3 py-1.5 text-xs"
+                      style={{ backgroundColor: 'rgba(245,158,11,0.20)', borderColor: 'rgba(251,146,60,0.30)', color: '#fdba74', borderWidth: 1 }}>Rework</button>
                   </div>
                 )}
               </div>
@@ -1058,26 +1098,30 @@ export default function ProjectDetailsPage() {
       {/* ═══ MODIFY TASK ═══ */}
       {modifyTask && (
         <ModalOverlay onClose={() => setModifyTask(null)}>
-          <div className="text-[10px] uppercase tracking-[0.3em] text-emerald-300/70">Modify Task</div>
-          <h3 className="mt-2 text-2xl font-black text-white">Edit Task</h3>
+          <div className="text-[10px] uppercase tracking-[0.3em]" style={{ color: palette.accentPrimary, opacity: 0.7 }}>Modify Task</div>
+          <h3 className="mt-2 text-2xl font-black" style={{ color: palette.textPrimary }}>Edit Task</h3>
           <form onSubmit={modifyTaskSave} className="mt-5 space-y-4">
             <ModalInput label="Task Name" value={modifyForm.taskName || ''} onChange={(v) => setModifyForm(f => ({ ...f, taskName: v }))} />
             <div>
-              <label className="mb-2 block text-sm text-white/80">Task Type</label>
+              <label className="mb-2 block text-sm" style={{ color: palette.textSecondary }}>Task Type</label>
               <select value={modifyForm.taskType || ''} onChange={(e) => setModifyForm(f => ({ ...f, taskType: e.target.value }))}
-                className="w-full rounded-2xl border border-white/10 bg-[#1a2a22] px-4 py-3 text-sm text-white outline-none" style={{ colorScheme: 'dark' }}>
-                {['Research', 'Development', 'Design', 'Analysis', 'Review'].map(t => <option key={t} value={t} className="bg-[#1a2a22] text-white">{t}</option>)}
+                className="w-full rounded-2xl border px-4 py-3 text-sm outline-none"
+                style={{ borderColor: palette.borderInput, backgroundColor: palette.bgTertiary, color: palette.textPrimary, colorScheme: isDayMode ? 'light' : 'dark' }}>
+                {['Research', 'Development', 'Design', 'Analysis', 'Review'].map(t => <option key={t} value={t} style={{ backgroundColor: palette.bgTertiary, color: palette.textPrimary }}>{t}</option>)}
               </select>
             </div>
             <ModalInput label="Target Date" type="date" value={modifyForm.targetDate || ''} onChange={(v) => setModifyForm(f => ({ ...f, targetDate: v }))} />
             <div>
-              <label className="mb-2 block text-sm text-white/80">Details</label>
+              <label className="mb-2 block text-sm" style={{ color: palette.textSecondary }}>Details</label>
               <textarea value={modifyForm.details || ''} onChange={(e) => setModifyForm(f => ({ ...f, details: e.target.value }))} rows={3}
-                className="w-full rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 text-sm text-white outline-none focus:border-emerald-400/40" />
+                className="w-full rounded-2xl border px-4 py-3 text-sm outline-none"
+                style={{ borderColor: palette.borderInput, backgroundColor: palette.bgSurface, color: palette.textPrimary }} />
             </div>
             <div className="flex justify-end gap-3">
-              <button type="button" onClick={() => setModifyTask(null)} className="rounded-xl border border-white/10 bg-white/[0.04] px-5 py-3 text-sm font-semibold text-white/75">Cancel</button>
-              <button type="submit" className="inline-flex items-center gap-2 rounded-xl bg-emerald-400 px-5 py-3 text-sm font-semibold text-black"><CheckCircle2 size={14} /> Save Changes</button>
+              <button type="button" onClick={() => setModifyTask(null)} className="rounded-xl border px-5 py-3 text-sm font-semibold"
+                style={{ borderColor: palette.borderInput, backgroundColor: palette.bgSurface, color: palette.textSecondary }}>Cancel</button>
+              <button type="submit" className="inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold"
+                style={{ backgroundColor: palette.accentPrimary, color: '#fff' }}><CheckCircle2 size={14} /> Save Changes</button>
             </div>
           </form>
         </ModalOverlay>
@@ -1085,9 +1129,10 @@ export default function ProjectDetailsPage() {
 
       {chatActionMessage && (
         <ModalOverlay onClose={closeChatActionMessage} maxWidthClassName="max-w-md">
-          <div className="text-[10px] uppercase tracking-[0.3em] text-emerald-300/70">Message Actions</div>
-          <h3 className="mt-2 text-2xl font-black text-white">Choose an action</h3>
-          <p className="mt-3 rounded-2xl border border-white/[0.06] bg-black/20 px-4 py-3 text-sm text-white/65">
+          <div className="text-[10px] uppercase tracking-[0.3em]" style={{ color: palette.accentPrimary, opacity: 0.7 }}>Message Actions</div>
+          <h3 className="mt-2 text-2xl font-black" style={{ color: palette.textPrimary }}>Choose an action</h3>
+          <p className="mt-3 rounded-2xl border px-4 py-3 text-sm"
+            style={{ borderColor: palette.borderSoft, backgroundColor: palette.bgInput, color: palette.textSecondary }}>
             {chatActionMessage.deletedForEveryone ? 'This message was deleted for everyone.' : chatActionMessage.message}
           </p>
           <div className="mt-5 space-y-2">
@@ -1109,15 +1154,18 @@ export default function ProjectDetailsPage() {
 
       {chatEditMessage && (
         <ModalOverlay onClose={() => { setChatEditMessage(null); setChatEditValue('') }} maxWidthClassName="max-w-xl">
-          <div className="text-[10px] uppercase tracking-[0.3em] text-emerald-300/70">Edit Message</div>
-          <h3 className="mt-2 text-2xl font-black text-white">Update your message</h3>
+          <div className="text-[10px] uppercase tracking-[0.3em]" style={{ color: palette.accentPrimary, opacity: 0.7 }}>Edit Message</div>
+          <h3 className="mt-2 text-2xl font-black" style={{ color: palette.textPrimary }}>Update your message</h3>
           <form onSubmit={saveEditedChatMessage} className="mt-5 space-y-4">
             <textarea value={chatEditValue} onChange={(e) => setChatEditValue(e.target.value)} rows={4}
-              className="w-full rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 text-sm text-white placeholder:text-white/35 outline-none focus:border-emerald-400/40"
+              className="w-full rounded-2xl border px-4 py-3 text-sm outline-none"
+              style={{ borderColor: palette.borderInput, backgroundColor: palette.bgSurface, color: palette.textPrimary }}
               placeholder="Edit your message..." />
             <div className="flex justify-end gap-3">
-              <button type="button" onClick={() => { setChatEditMessage(null); setChatEditValue('') }} className="rounded-xl border border-white/10 bg-white/[0.04] px-5 py-3 text-sm font-semibold text-white/75">Cancel</button>
-              <button type="submit" className="inline-flex items-center gap-2 rounded-xl bg-emerald-400 px-5 py-3 text-sm font-semibold text-black"><CheckCircle2 size={14} /> Save Message</button>
+              <button type="button" onClick={() => { setChatEditMessage(null); setChatEditValue('') }} className="rounded-xl border px-5 py-3 text-sm font-semibold"
+                style={{ borderColor: palette.borderInput, backgroundColor: palette.bgSurface, color: palette.textSecondary }}>Cancel</button>
+              <button type="submit" className="inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold"
+                style={{ backgroundColor: palette.accentPrimary, color: '#fff' }}><CheckCircle2 size={14} /> Save Message</button>
             </div>
           </form>
         </ModalOverlay>
@@ -1125,15 +1173,15 @@ export default function ProjectDetailsPage() {
 
       {chatReadMessage && (
         <ModalOverlay onClose={() => setChatReadMessage(null)} maxWidthClassName="max-w-lg">
-          <div className="text-[10px] uppercase tracking-[0.3em] text-emerald-300/70">Read Receipts</div>
-          <h3 className="mt-2 text-2xl font-black text-white">Seen by</h3>
+          <div className="text-[10px] uppercase tracking-[0.3em]" style={{ color: palette.accentPrimary, opacity: 0.7 }}>Read Receipts</div>
+          <h3 className="mt-2 text-2xl font-black" style={{ color: palette.textPrimary }}>Seen by</h3>
           <div className="mt-5 space-y-3 max-h-72 overflow-y-auto pr-1">
             {readReceiptEntries.length === 0 ? (
-              <p className="rounded-2xl border border-white/[0.06] bg-black/20 px-4 py-4 text-sm text-white/45">No one else has read this message yet.</p>
+              <p className="rounded-2xl border px-4 py-4 text-sm" style={{ borderColor: palette.borderSoft, backgroundColor: palette.bgInput, color: palette.textMuted }}>No one else has read this message yet.</p>
             ) : readReceiptEntries.map((reader) => (
-              <div key={`${reader.emailAddress}-${reader.readAt}`} className="rounded-2xl border border-white/[0.06] bg-black/20 px-4 py-3">
-                <div className="text-sm font-semibold text-white">{reader.fullName || reader.emailAddress}</div>
-                <div className="mt-1 text-xs text-white/40">{new Date(reader.readAt).toLocaleString()}</div>
+              <div key={`${reader.emailAddress}-${reader.readAt}`} className="rounded-2xl border px-4 py-3" style={{ borderColor: palette.borderSoft, backgroundColor: palette.bgInput }}>
+                <div className="text-sm font-semibold" style={{ color: palette.textPrimary }}>{reader.fullName || reader.emailAddress}</div>
+                <div className="mt-1 text-xs" style={{ color: palette.textFaint }}>{new Date(reader.readAt).toLocaleString()}</div>
               </div>
             ))}
           </div>
@@ -1145,54 +1193,90 @@ export default function ProjectDetailsPage() {
 
 // ─── Small Components ───
 
-const InfoCard = ({ label, value, icon: Icon, accent }) => (
-  <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-5">
-    <div className="flex items-center gap-3">
-      <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-emerald-400/15 bg-emerald-500/10 text-emerald-300"><Icon size={16} /></span>
-      <div>
-        <div className="text-[10px] uppercase tracking-[0.28em] text-white/35">{label}</div>
-        <div className={`mt-1 text-lg font-bold ${accent ? 'text-red-400' : 'text-white'}`}>{value}</div>
+const InfoCard = ({ label, value, icon: Icon, accent }) => {
+  const { theme } = useTheme()
+  const isDayMode = theme === 'light'
+  const p = isDayMode ? dayTheme : darkTheme
+  return (
+    <div className="rounded-2xl border p-5" style={{ borderColor: p.borderSoft, backgroundColor: p.bgSurface }}>
+      <div className="flex items-center gap-3">
+        <span className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ backgroundColor: p.accentPrimary, color: '#fff' }}><Icon size={16} /></span>
+        <div>
+          <div className="text-[10px] uppercase tracking-[0.28em]" style={{ color: p.textFaint }}>{label}</div>
+          <div className="mt-1 text-lg font-bold" style={{ color: accent ? p.error : p.textPrimary }}>{value}</div>
+        </div>
       </div>
     </div>
-  </div>
-)
+  )
+}
 
-const DetailRow = ({ label, value }) => (
-  <div className="rounded-xl border border-white/[0.06] bg-black/20 px-4 py-3">
-    <div className="text-[10px] uppercase tracking-[0.24em] text-white/35">{label}</div>
-    <div className="mt-1 text-sm font-semibold text-white">{value}</div>
-  </div>
-)
-
-const DropItem = ({ icon: Icon, label, onClick, danger }) => (
-  <button type="button" onClick={onClick}
-    className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-sm transition ${danger ? 'text-red-400 hover:bg-red-500/10' : 'text-white/75 hover:bg-emerald-500/10 hover:text-emerald-200'}`}>
-    <Icon size={14} /> {label}
-  </button>
-)
-
-const ModalOverlay = ({ children, onClose, maxWidthClassName = 'max-w-2xl' }) => (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 py-8 backdrop-blur-md" onClick={onClose}>
-    <div className={`relative w-full ${maxWidthClassName} max-h-[90vh] overflow-y-auto rounded-[30px] border border-white/[0.09] bg-[#0a120c] p-6 shadow-[0_30px_120px_-40px_rgba(0,0,0,0.95)]`} onClick={(e) => e.stopPropagation()}>
-      <button type="button" onClick={onClose} className="absolute top-4 right-4 flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-white/60 hover:text-white">
-        <X size={16} />
-      </button>
-      {children}
+const DetailRow = ({ label, value }) => {
+  const { theme } = useTheme()
+  const isDayMode = theme === 'light'
+  const p = isDayMode ? dayTheme : darkTheme
+  return (
+    <div className="rounded-xl border px-4 py-3" style={{ borderColor: p.borderSoft, backgroundColor: p.bgInput }}>
+      <div className="text-[10px] uppercase tracking-[0.24em]" style={{ color: p.textFaint }}>{label}</div>
+      <div className="mt-1 text-sm font-semibold" style={{ color: p.textPrimary }}>{value}</div>
     </div>
-  </div>
-)
+  )
+}
 
-const SheetAction = ({ icon: Icon, label, onClick, danger = false }) => (
-  <button type="button" onClick={onClick}
-    className={`flex w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left text-sm font-semibold transition ${danger ? 'border-red-500/20 bg-red-500/10 text-red-300 hover:bg-red-500/15' : 'border-white/[0.06] bg-white/[0.03] text-white/80 hover:border-emerald-400/20 hover:bg-emerald-500/10 hover:text-emerald-200'}`}>
-    <Icon size={16} /> {label}
-  </button>
-)
+const DropItem = ({ icon: Icon, label, onClick, danger }) => {
+  const { theme } = useTheme()
+  const isDayMode = theme === 'light'
+  const p = isDayMode ? dayTheme : darkTheme
+  return (
+    <button type="button" onClick={onClick}
+      className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-sm transition"
+      style={{ color: danger ? p.error : p.textSecondary }}>
+      <Icon size={14} /> {label}
+    </button>
+  )
+}
 
-const ModalInput = ({ label, type = 'text', value, onChange, placeholder = '', required = false }) => (
-  <div>
-    <label className="mb-2 block text-sm text-white/80">{label}</label>
-    <input type={type} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} required={required}
-      className="w-full rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 text-sm text-white placeholder:text-white/35 outline-none transition focus:border-emerald-400/40" />
-  </div>
-)
+const ModalOverlay = ({ children, onClose, maxWidthClassName = 'max-w-2xl' }) => {
+  const { theme } = useTheme()
+  const isDayMode = theme === 'light'
+  const p = isDayMode ? dayTheme : darkTheme
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 py-8 backdrop-blur-md" onClick={onClose}>
+      <div className={`relative w-full ${maxWidthClassName} max-h-[90vh] overflow-y-auto rounded-[30px] border p-6`}
+        style={{ borderColor: p.borderPrimary, backgroundColor: p.bgTertiary, boxShadow: p.shadowDropdown }}
+        onClick={(e) => e.stopPropagation()}>
+        <button type="button" onClick={onClose} className="absolute top-4 right-4 flex h-8 w-8 items-center justify-center rounded-full border"
+          style={{ borderColor: p.borderInput, backgroundColor: p.bgSurface, color: p.textMuted }}>
+          <X size={16} />
+        </button>
+        {children}
+      </div>
+    </div>
+  )
+}
+
+const SheetAction = ({ icon: Icon, label, onClick, danger = false }) => {
+  const { theme } = useTheme()
+  const isDayMode = theme === 'light'
+  const p = isDayMode ? dayTheme : darkTheme
+  return (
+    <button type="button" onClick={onClick}
+      className="flex w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left text-sm font-semibold transition"
+      style={danger ? { borderColor: 'rgba(239,68,68,0.20)', backgroundColor: 'rgba(239,68,68,0.10)', color: '#fca5a5' } : { borderColor: p.borderSoft, backgroundColor: p.bgSurface, color: p.textSecondary }}>
+      <Icon size={16} /> {label}
+    </button>
+  )
+}
+
+const ModalInput = ({ label, type = 'text', value, onChange, placeholder = '', required = false }) => {
+  const { theme } = useTheme()
+  const isDayMode = theme === 'light'
+  const p = isDayMode ? dayTheme : darkTheme
+  return (
+    <div>
+      <label className="mb-2 block text-sm" style={{ color: p.textSecondary }}>{label}</label>
+      <input type={type} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} required={required}
+        className="w-full rounded-2xl border px-4 py-3 text-sm outline-none"
+        style={{ borderColor: p.borderInput, backgroundColor: p.bgSurface, color: p.textPrimary }} />
+    </div>
+  )
+}

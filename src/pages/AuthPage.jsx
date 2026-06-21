@@ -449,7 +449,11 @@ const AuthPage = () => {
       const redirectTo = location?.state?.redirectTo || '/dashboard'
       setTimeout(() => navigate(redirectTo), 500)
     } catch (error) {
-      setLoginFormError(error.message || 'An error occurred during login. Please try again.')
+      if (error instanceof TypeError && error.message === 'Failed to fetch') {
+        setLoginFormError('Server is not responding. Please try again later.')
+      } else {
+        setLoginFormError(error.message || 'An error occurred during login. Please try again.')
+      }
     } finally {
       setLoginBusy(false)
     }
@@ -522,7 +526,11 @@ const AuthPage = () => {
       showInlineMessage('Registration successful! Verification code sent to your email.', 'success')
       navigate('/otp')
     } catch (error) {
-      showInlineMessage(error.message || 'An error occurred during registration.', 'error')
+      if (error instanceof TypeError && error.message === 'Failed to fetch') {
+        showInlineMessage('Server is not responding. Please try again later.', 'error')
+      } else {
+        showInlineMessage(error.message || 'An error occurred during registration.', 'error')
+      }
     } finally {
       setRegisterBusy(false)
     }
@@ -561,7 +569,11 @@ const AuthPage = () => {
       showInlineMessage(result.message || 'Reset code sent. Redirecting to OTP verification.', 'success')
       navigate('/otp')
     } catch (error) {
-      setLoginFormError(error.message || 'Unable to start password reset.')
+      if (error instanceof TypeError && error.message === 'Failed to fetch') {
+        setLoginFormError('Server is not responding. Please try again later.')
+      } else {
+        setLoginFormError(error.message || 'Unable to start password reset.')
+      }
     } finally {
       setLoginBusy(false)
     }

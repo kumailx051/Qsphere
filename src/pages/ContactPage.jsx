@@ -245,17 +245,6 @@ export default function ContactPage() {
                     />
                     Contact Us
                   </span>
-                  <span
-                    className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.24em]"
-                    style={{
-                      border: `1px solid ${palette.borderPrimary}`,
-                      backgroundColor: isDayMode ? 'rgba(255,255,255,0.72)' : 'rgba(255,255,255,0.03)',
-                      color: palette.textMuted,
-                    }}
-                  >
-                    <Sparkles size={14} style={{ color: palette.accentPrimary }} />
-                    Open channel
-                  </span>
                 </div>
 
                 <h1
@@ -650,7 +639,9 @@ export default function ContactPage() {
         </div>
       </main>
 
-      <Footer />
+      <div style={{ position: 'relative', zIndex: 1 }}>
+        <Footer />
+      </div>
 
       <style>{`
         @keyframes contactFadeUp {

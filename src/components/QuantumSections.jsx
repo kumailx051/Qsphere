@@ -333,8 +333,7 @@ export default function QuantumSections({ quoteEntered = false }) {
                 left: '6vw',
                 right: '6vw',
                 height: 1,
-                background:
-                  'linear-gradient(90deg,transparent,rgba(16,185,129,0.15),transparent)',
+                background: `linear-gradient(90deg,transparent,${isDayMode ? 'rgba(46,197,138,0.35)' : 'rgba(16,185,129,0.15)'},transparent)`,
               }}
             />
           )}

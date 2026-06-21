@@ -1022,7 +1022,7 @@ const AccountManagementPage = () => {
 
   if (!profile || Object.keys(profile).length === 0) {
     return (
-      <div className="qs-account-theme qs-account-empty-root relative min-h-screen overflow-hidden" style={{ ...accountThemeVars, background: pageBg }}>
+      <div className="qs-account-theme qs-account-empty-root relative min-h-screen flex flex-col overflow-hidden" style={{ ...accountThemeVars, background: pageBg }}>
         <style>{accountThemeStyles}</style>
         <Navbar currentPage="dashboard" />
         <div className="fixed inset-0 pointer-events-none" style={{ zIndex: 0 }}>
@@ -1031,7 +1031,7 @@ const AccountManagementPage = () => {
           <div className="absolute inset-0 opacity-20" style={{ background: `radial-gradient(circle at 100% 0%, ${ambientSecondary} 0%, transparent 36%)` }} />
         </div>
 
-        <main className="relative z-10 mx-auto flex min-h-screen w-full max-w-3xl flex-col justify-center px-6 py-28 sm:px-8">
+        <main className="relative z-10 mx-auto flex w-full max-w-3xl flex-1 flex-col justify-center px-6 py-28 sm:px-8">
           <motion.div
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
@@ -1066,7 +1066,7 @@ const AccountManagementPage = () => {
   }
 
   return (
-    <div className="qs-account-theme qs-account-root relative min-h-screen overflow-hidden" style={{ ...accountThemeVars, background: pageBg }}>
+    <div className="qs-account-theme qs-account-root relative min-h-screen flex flex-col overflow-hidden" style={{ ...accountThemeVars, background: pageBg }}>
       <style>{accountThemeStyles}</style>
       <Navbar currentPage="dashboard" />
 
@@ -1087,7 +1087,7 @@ const AccountManagementPage = () => {
         />
       </div>
 
-      <main className="relative z-10 w-full px-6 py-28 sm:px-8 lg:px-12 xl:px-20">
+      <main className="flex-1 relative z-10 w-full px-6 py-28 sm:px-8 lg:px-12 xl:px-20">
         <button
           type="button"
           onClick={() => navigate('/dashboard')}
