@@ -148,7 +148,6 @@ export default function ProjectDetailsPage() {
   const [mentionOpen, setMentionOpen] = useState(false)
   const [mentionQuery, setMentionQuery] = useState('')
   const [mentionIndex, setMentionIndex] = useState(-1)
-  const [displayedMessages, setDisplayedMessages] = useState([])
   const inputRef = useRef(null)
   const [dmTarget, setDmTarget] = useState(null)
   const [emojiCategory, setEmojiCategory] = useState(0)
@@ -629,19 +628,16 @@ export default function ProjectDetailsPage() {
   const sharedDocs = useMemo(() => documents.slice(0, 3), [documents])
   const currentDiscussionName = dmTarget ? dmTarget.name || dmTarget.email : (project?.groupTitle || 'General Discussion')
 
-  useEffect(() => {
-    if (!dmTarget) {
-      setDisplayedMessages(chatMessages)
-      return
-    }
+  const displayedMessages = useMemo(() => {
+    if (!dmTarget) return chatMessages
     const targetEmail = (dmTarget.email || '').toLowerCase()
     const targetName = (dmTarget.name || '').toLowerCase()
-    setDisplayedMessages(chatMessages.filter(msg => {
+    return chatMessages.filter(msg => {
       const senderEmail = (msg.senderEmail || '').toLowerCase()
       if (senderEmail === normalizedUserEmail || senderEmail === targetEmail) return true
       const senderName = (msg.senderName || '').toLowerCase()
       return senderName === targetName && senderName !== ''
-    }))
+    })
   }, [chatMessages, dmTarget, normalizedUserEmail])
 
   const filteredMentions = useMemo(() => {
@@ -996,16 +992,16 @@ export default function ProjectDetailsPage() {
                         <button
                           key={channel.name}
                           type="button"
+                          onClick={() => setDmTarget(null)}
                           className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-semibold transition"
-                          style={channel.active
+                          style={!dmTarget
                             ? {
                                 background: isDayMode
                                   ? `linear-gradient(135deg, ${palette.accentPrimary}, ${palette.accentDark})`
                                   : 'linear-gradient(135deg, rgba(16,185,129,0.30), rgba(5,150,105,0.45))',
                                 color: '#fff'
                               }
-                            : { color: palette.textSecondary }}
-                        >
+                            : { color: palette.textSecondary }}>
                           <Hash size={16} />
                           <span>{channel.name}</span>
                         </button>
@@ -1028,19 +1024,19 @@ export default function ProjectDetailsPage() {
                               ) : (
                                 <div className="flex h-full w-full items-center justify-center text-xs font-bold" style={{ color: palette.accentPrimary }}>{getInitials(member.name || member.email)}</div>
                               )}
-                              <span
-                                className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2"
-                                style={{
-                                  borderColor: palette.bgSurface,
-                                  backgroundColor: member.status === 'Active' ? palette.accentPrimary : '#a3a3a3'
-                                }}
-                              />
+                              {member.status === 'Active' && (
+                                <span
+                                  className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2"
+                                  style={{
+                                    borderColor: palette.bgSurface,
+                                    backgroundColor: palette.accentPrimary
+                                  }}
+                                />
+                              )}
                             </div>
                             <div className="min-w-0">
                               <div className="truncate text-sm font-semibold" style={{ color: palette.textPrimary }}>{member.name || member.email}{member.isCurrentUser ? <span className="ml-1 text-xs font-normal" style={{ color: palette.textMuted }}>(you)</span> : null}</div>
-                              <div className="text-xs" style={{ color: member.status === 'Active' ? palette.accentPrimary : palette.textMuted }}>
-                                {member.status === 'Active' ? 'Online' : 'Offline'}
-                              </div>
+                              {member.status === 'Active' && <div className="text-xs" style={{ color: palette.accentPrimary }}>Online</div>}
                             </div>
                           </button>
                         ))}
@@ -1053,13 +1049,6 @@ export default function ProjectDetailsPage() {
                     <div className="flex flex-wrap items-start justify-between gap-4 border-b px-5 py-5 md:px-6 shrink-0" style={{ borderColor: palette.borderSoft }}>
                       <div>
                         <div className="flex items-center gap-2">
-                          {dmTarget && (
-                            <button type="button" onClick={() => setDmTarget(null)}
-                              className="mr-1 rounded-lg px-2 py-1 text-xs font-semibold transition"
-                              style={{ backgroundColor: palette.bgTertiary, color: palette.textSecondary }}>
-                              back
-                            </button>
-                          )}
                           <Hash size={18} style={{ color: palette.textPrimary }} />
                           <h3 className="text-[1.35rem] font-bold" style={{ color: palette.textPrimary }}>{currentDiscussionName}</h3>
                           <ChevronRight size={16} style={{ color: palette.textMuted }} />

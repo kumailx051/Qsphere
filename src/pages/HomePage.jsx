@@ -467,14 +467,14 @@ const HomePage = () => {
 
             <div className="relative z-10 h-full w-full flex flex-col justify-between p-8 md:p-14">
               <div className="max-w-5xl pointer-events-auto mt-12 md:mt-20">
-                <div className="text-emerald-400 text-[11px] tracking-[0.4em] mb-6 font-semibold">
+                <div className="text-emerald-400 text-[11px] tracking-[0.4em] mb-6 font-semibold" style={{ fontFamily: "'Syne', 'Inter', sans-serif" }}>
                   — BEYOND THE GRID
                 </div>
                 <h2
                   className="text-white font-bold leading-[0.95] tracking-tight"
                   style={{
                     fontSize: 'clamp(2.1rem, 5.6vw, 5.4rem)',
-                    fontFamily: "'Archivo Black', 'Inter', sans-serif",
+                    fontFamily: "'Syne', 'Inter', sans-serif",
                     letterSpacing: '-0.03em',
                     maxWidth: 'fit-content',
                   }}
@@ -492,7 +492,7 @@ const HomePage = () => {
                   </span>
                   <span className="block">Science</span>
                 </h2>
-                <p className="text-white/60 mt-8 max-w-xl text-base md:text-lg leading-relaxed">
+                <p className="text-white/60 mt-8 max-w-xl text-lg md:text-xl leading-relaxed" style={{ fontFamily: "'Syne', 'Inter', sans-serif" }}>
                   A global community of students, researchers, and innovators collaborating to
                   advance quantum technologies and turn breakthrough ideas into real-world impact.
                 </p>

@@ -91,7 +91,7 @@ const TextPanel = ({ section, palette }) => {
           color: '#10b981',
           fontWeight: 700,
           textTransform: 'uppercase',
-          fontFamily: "'Inter', sans-serif",
+          fontFamily: "'Syne', 'Inter', sans-serif",
         }}
       >
         — {section.tag}
@@ -100,7 +100,7 @@ const TextPanel = ({ section, palette }) => {
         <motion.h2
           variants={itemVariants}
           style={{
-            fontFamily: "'Archivo Black', 'Inter', sans-serif",
+            fontFamily: "'Syne', 'Inter', sans-serif",
             fontSize: 'clamp(2rem, 3.5vw, 3.2rem)',
             fontWeight: 900,
             lineHeight: 1.05,
@@ -123,7 +123,7 @@ const TextPanel = ({ section, palette }) => {
             color: palette.textSecondary,
             fontSize: 'clamp(0.85rem, 1.1vw, 1rem)',
             lineHeight: 1.8,
-            fontFamily: "'Inter', sans-serif",
+            fontFamily: "'Syne', 'Inter', sans-serif",
           }}
         >
           {section.body}
