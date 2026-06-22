@@ -1205,7 +1205,6 @@ export default function CreateBlogPage() {
                       onChange={(e) => setNewCategoryName(e.target.value)}
                       placeholder="e.g. THEORY"
                       className="flex-1 min-w-0 rounded-xl px-3 py-2 text-xs uppercase tracking-wider focus:outline-none" style={{ backgroundColor: palette.bgInput, border: `1px solid ${palette.borderPrimary}`, color: palette.textPrimary }}
-                      placeholder="e.g. THEORY"
                     />
                     <button
                       type="button"
@@ -1578,7 +1577,9 @@ export default function CreateBlogPage() {
     </div>
   </div>
 )}
-<Footer />
+<div style={{ position: 'relative', zIndex: 1 }}>
+        <Footer />
+      </div>
     </div>
   )
 }

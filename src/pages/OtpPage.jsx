@@ -6,6 +6,8 @@ import Navbar from '../components/Navbar'
 const OTP_FLOW_KEY = 'qsphere_otp_flow'
 const OTP_FLOW_VERIFY_EMAIL = 'verify-email'
 const OTP_FLOW_RESET_PASSWORD = 'reset-password'
+const OTP_FLOW_ADMIN_FIRST_LOGIN = 'admin-first-login'
+const ADMIN_SETUP_STAGE_KEY = 'qsphere_admin_setup_stage'
 
 const ARR = (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -41,6 +43,9 @@ const OtpPage = () => {
   const [cooldown, setCooldown] = useState(0)
   const [emailToVerify] = useState(() => localStorage.getItem('qsphere_email_to_verify') || '')
   const [otpFlow] = useState(() => localStorage.getItem(OTP_FLOW_KEY) || OTP_FLOW_VERIFY_EMAIL)
+  const [adminSetupStage, setAdminSetupStage] = useState(
+    () => localStorage.getItem(ADMIN_SETUP_STAGE_KEY) || 'otp'
+  )
   const [errorMessage, setErrorMessage] = useState('')
   const [statusMessage, setStatusMessage] = useState('')
   const [statusType, setStatusType] = useState('info')
@@ -68,15 +73,26 @@ const OtpPage = () => {
     return () => clearInterval(timer)
   }, [cooldown])
 
-  const otpHelper = useMemo(
-    () => ({
+  const otpHelper = useMemo(() => {
+    if (otpFlow === OTP_FLOW_ADMIN_FIRST_LOGIN) {
+      return adminSetupStage === 'password'
+        ? {
+            title: 'Administrator Security',
+            subtitle: 'Choose a private password to replace your temporary administrator password.',
+          }
+        : {
+            title: 'Administrator Verification',
+            subtitle: 'Enter the verification code sent to your administrator email.',
+          }
+    }
+
+    return {
       title: otpFlow === OTP_FLOW_RESET_PASSWORD ? 'Password Recovery Node' : 'Secure Access Portal',
       subtitle: otpFlow === OTP_FLOW_RESET_PASSWORD
         ? 'Enter the reset code and choose a new password for your account.'
         : 'Enter the verification code sent to your email.'
-    }),
-    [otpFlow]
-  )
+    }
+  }, [adminSetupStage, otpFlow])
 
   const showPageMessage = (message, type = 'info') => {
     setStatusMessage(message)
@@ -314,7 +330,8 @@ const OtpPage = () => {
 
   const handleVerify = async () => {
     const normalized = otp.join('')
-    if (normalized.length !== otpLength) return
+    const isAdminPasswordStage = otpFlow === OTP_FLOW_ADMIN_FIRST_LOGIN && adminSetupStage === 'password'
+    if (!isAdminPasswordStage && normalized.length !== otpLength) return
     if (!emailToVerify) {
       showPageMessage('Email address missing. Please try signing up again.', 'error')
       navigate('/auth')
@@ -327,7 +344,7 @@ const OtpPage = () => {
     showPageMessage('Verifying code...', 'info')
     try {
       let response
-      if (otpFlow === OTP_FLOW_RESET_PASSWORD) {
+      if (otpFlow === OTP_FLOW_RESET_PASSWORD || isAdminPasswordStage) {
         const nextPasswordErrors = {
           password: resetPassword.trim() ? '' : 'Enter a new password.',
           confirm: confirmResetPassword.trim() ? '' : 'Confirm your new password.',
@@ -351,12 +368,12 @@ const OtpPage = () => {
         }
 
         showPageMessage('Updating your password...', 'info')
-        response = await fetch('/api/auth/reset-password', {
+        response = await fetch(isAdminPasswordStage ? '/api/auth/complete-admin-setup' : '/api/auth/reset-password', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             emailAddress: emailToVerify,
-            otp: normalized,
+            ...(isAdminPasswordStage ? {} : { otp: normalized }),
             password: resetPassword,
             confirmPassword: confirmResetPassword,
           })
@@ -386,6 +403,28 @@ const OtpPage = () => {
             authMessageType: 'success',
           }
         })
+      } else if (otpFlow === OTP_FLOW_ADMIN_FIRST_LOGIN) {
+        if (!isAdminPasswordStage && result.requiresPasswordChange) {
+          setAdminSetupStage('password')
+          localStorage.setItem(ADMIN_SETUP_STAGE_KEY, 'password')
+          setOtp(Array(otpLength).fill(''))
+          setErrorMessage('')
+          showPageMessage('OTP verified. Now create your new administrator password.', 'success')
+          return
+        }
+
+        const user = result.user
+        localStorage.removeItem('qsphere_email_to_verify')
+        localStorage.removeItem(OTP_FLOW_KEY)
+        localStorage.removeItem(ADMIN_SETUP_STAGE_KEY)
+        localStorage.setItem('qsphere_logged_in', '1')
+        localStorage.setItem('qsphere_onboarding_profile', JSON.stringify(user))
+        localStorage.setItem('qsphere_login_time', Date.now().toString())
+        window.dispatchEvent(new Event('qsphere-auth-changed'))
+        window.dispatchEvent(new CustomEvent('qsphere-snackbar', {
+          detail: { message: 'Administrator setup completed.', type: 'success' }
+        }))
+        navigate('/admin')
       } else {
         localStorage.setItem(OTP_FLOW_KEY, OTP_FLOW_VERIFY_EMAIL)
         showPageMessage('Email verified successfully! Proceeding to Onboarding.', 'success')
@@ -402,6 +441,7 @@ const OtpPage = () => {
 
   const handleResend = async () => {
     if (!emailToVerify) return
+    if (otpFlow === OTP_FLOW_ADMIN_FIRST_LOGIN && adminSetupStage === 'password') return
 
     setBusy(true)
     setErrorMessage('')
@@ -418,6 +458,13 @@ const OtpPage = () => {
       const result = await response.json()
       if (!response.ok) {
         throw new Error(result.error || 'Failed to resend code')
+      }
+
+      if (result.requiresPasswordChange) {
+        setAdminSetupStage('password')
+        localStorage.setItem(ADMIN_SETUP_STAGE_KEY, 'password')
+        showPageMessage('Email already verified. Create your new administrator password.', 'success')
+        return
       }
 
       showPageMessage(
@@ -437,13 +484,30 @@ const OtpPage = () => {
   }
 
   const isResetFlow = otpFlow === OTP_FLOW_RESET_PASSWORD
-  const statusText = isResetFlow ? 'QSPHERE · Recovery Verification Active' : 'QSPHERE · Verification Node Active'
+  const isAdminFlow = otpFlow === OTP_FLOW_ADMIN_FIRST_LOGIN
+  const isAdminPasswordStage = isAdminFlow && adminSetupStage === 'password'
+  const isPasswordStage = isResetFlow || isAdminPasswordStage
+  const statusText = isResetFlow
+    ? 'QSPHERE · Recovery Verification Active'
+    : isAdminFlow
+      ? 'QSPHERE · Administrator Setup Active'
+      : 'QSPHERE · Verification Node Active'
   const heading = isResetFlow
     ? <>Reset your <span>Quantum</span><br />password.</>
-    : <>Verify your <span>Quantum</span><br />access.</>
-  const submitLabel = isResetFlow ? 'Reset Password' : 'Verify'
-  const canSubmit = isResetFlow
-    ? otp.join('').length === otpLength && resetPassword.trim().length >= 6 && confirmResetPassword.trim().length >= 6
+    : isAdminPasswordStage
+      ? <>Secure your <span>Admin</span><br />account.</>
+      : isAdminFlow
+        ? <>Verify your <span>Admin</span><br />access.</>
+        : <>Verify your <span>Quantum</span><br />access.</>
+  const submitLabel = isResetFlow
+    ? 'Reset Password'
+    : isAdminPasswordStage
+      ? 'Set Password & Continue'
+      : 'Verify'
+  const canSubmit = isPasswordStage
+    ? (isResetFlow ? otp.join('').length === otpLength : true)
+      && resetPassword.trim().length >= 6
+      && confirmResetPassword.trim().length >= 6
     : otp.join('').length === otpLength
 
   return (
@@ -897,7 +961,8 @@ const OtpPage = () => {
             {statusMessage ? <div className={`banner ${statusType}`}>{statusMessage}</div> : null}
 
             <div className="fstack">
-              <div className="fi">
+              {!isAdminPasswordStage ? (
+                <div className="fi">
                 <div
                   style={{
                     display: 'flex',
@@ -1009,9 +1074,10 @@ const OtpPage = () => {
                     {errorMessage}
                   </div>
                 )}
-              </div>
+                </div>
+              ) : null}
 
-              {isResetFlow ? (
+              {isPasswordStage ? (
                 <>
                   <div className={`fi ${passwordErrors.password ? 'err' : ''}`}>
                     <input
@@ -1053,18 +1119,20 @@ const OtpPage = () => {
                 </span>
               </button>
 
-              <div style={{ textAlign: 'center', fontSize: '13px', color: 'rgba(255,255,255,.5)' }}>
-                Didn’t receive it?{' '}
-                <button
-                  className="ghost"
-                  type="button"
-                  disabled={cooldown > 0 || busy}
-                  style={{ fontWeight: 600, opacity: cooldown > 0 ? 0.5 : 1, cursor: cooldown > 0 ? 'default' : 'pointer' }}
-                  onClick={handleResend}
-                >
-                  {cooldown > 0 ? `Resend (${cooldown}s)` : 'Resend'}
-                </button>
-              </div>
+              {!isAdminPasswordStage ? (
+                <div style={{ textAlign: 'center', fontSize: '13px', color: 'rgba(255,255,255,.5)' }}>
+                  Didn’t receive it?{' '}
+                  <button
+                    className="ghost"
+                    type="button"
+                    disabled={cooldown > 0 || busy}
+                    style={{ fontWeight: 600, opacity: cooldown > 0 ? 0.5 : 1, cursor: cooldown > 0 ? 'default' : 'pointer' }}
+                    onClick={handleResend}
+                  >
+                    {cooldown > 0 ? `Resend (${cooldown}s)` : 'Resend'}
+                  </button>
+                </div>
+              ) : null}
 
               <div style={{ textAlign: 'center', fontSize: '13px', color: 'rgba(255,255,255,.5)' }}>
                 <button

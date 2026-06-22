@@ -336,7 +336,11 @@ const HomePage = () => {
         orbitalWrapRef.current.style.opacity = `${orbitOpacity}`
       }
 
-      if (galleryWrapRef.current) galleryWrapRef.current.style.opacity = galleryFade
+      if (galleryWrapRef.current) {
+        const galleryTranslateY = (1 - galleryFade) * 80
+        galleryWrapRef.current.style.opacity = galleryFade
+        galleryWrapRef.current.style.transform = `translateY(${galleryTranslateY}px)`
+      }
       if (crosshairRef.current) crosshairRef.current.style.opacity = galleryFade * 0.5
 
       const elapsed = (timestamp - startTimeRef.current) / 1000
@@ -590,6 +594,8 @@ const HomePage = () => {
       <span className="sr-only">QSphere</span>
 
       <CurvedCarousel />
+
+      <div style={{ height: '1px', background: `linear-gradient(to right, transparent, ${palette.accentPrimary}, transparent)` }} />
 
       <QuantumSections quoteEntered={quoteVisible} />
 

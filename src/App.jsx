@@ -21,6 +21,10 @@ import EventDetailPage from './pages/EventDetailPage'
 import PositionsPage from './pages/PositionsPage'
 import PositionDetailPage from './pages/PositionDetailPage'
 import NotFoundPage from './pages/NotFoundPage'
+import AdminGuard from './pages/admin/AdminGuard'
+import AdminDashboardPage from './pages/admin/AdminDashboardPage'
+import AdminUsersPage from './pages/admin/AdminUsersPage'
+import AdminUserDetailPage from './pages/admin/AdminUserDetailPage'
 
 import ScrollToTop from './components/ScrollToTop'
 import GlobalSnackbar from './components/GlobalSnackbar'
@@ -108,6 +112,9 @@ function App() {
               <Route path="/positions" element={<PositionsPage />} />
               <Route path="/positions/:id" element={<PositionDetailPage />} />
               <Route path="/projects/:id" element={<ProjectDetailsPage />} />
+              <Route path="/admin" element={<AdminGuard><AdminDashboardPage /></AdminGuard>} />
+              <Route path="/admin/users" element={<AdminGuard><AdminUsersPage /></AdminGuard>} />
+              <Route path="/admin/users/:id" element={<AdminGuard><AdminUserDetailPage /></AdminGuard>} />
               <Route path="*" element={<NotFoundPage />} />
             </Routes>
           </AuthProvider>

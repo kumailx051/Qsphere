@@ -561,7 +561,9 @@ const CreateGroupPage = () => {
         </div>
       )}
 
-      <Footer />
+      <div style={{ position: 'relative', zIndex: 1 }}>
+        <Footer />
+      </div>
 
       <style>{`
         select option {

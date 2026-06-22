@@ -1,10 +1,3 @@
--- QSphere manual database setup
--- Run the CREATE DATABASE statement from an admin database such as postgres.
-
-CREATE DATABASE qsphere;
-
--- After creating the database, connect to qsphere and run the table queries below.
-
 CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
   "fullName" VARCHAR(255) NOT NULL,
@@ -214,58 +207,3 @@ CREATE TABLE IF NOT EXISTS project_chat_reads (
   "readAt" TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE("messageId", "userEmail")
 );
-
--- Admin user bootstrap
--- Change the name, email, and password below before running this query.
--- pgcrypto is used to produce the SHA-256 password format expected by the backend.
--- The first successful login sends an OTP and then forces a new password.
--- If this email already belongs to a regular user, the query stops instead of
--- silently converting that account into an administrator.
-
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
-ALTER TABLE users ADD COLUMN IF NOT EXISTS "mustChangePassword" BOOLEAN DEFAULT FALSE;
-
-DO $$
-BEGIN
-  IF EXISTS (
-    SELECT 1
-    FROM users
-    WHERE LOWER("emailAddress") = LOWER('admin@qsphere.com')
-      AND LOWER(COALESCE(role, 'user')) <> 'admin'
-  ) THEN
-    RAISE EXCEPTION 'Email already exists as a user. Change the administrator email.';
-  END IF;
-
-  INSERT INTO users (
-    "fullName",
-    "emailAddress",
-    password,
-    role,
-    "isVerified",
-    "isOnboarded",
-    "isActive",
-    "mustChangePassword",
-    updated_at
-  )
-  VALUES (
-    'QSphere Administrator',
-    'admin@qsphere.com',
-    encode(digest('ChangeMe123!', 'sha256'), 'hex'),
-    'admin',
-    FALSE,
-    TRUE,
-    TRUE,
-    TRUE,
-    NOW()
-  )
-  ON CONFLICT ("emailAddress") DO UPDATE SET
-    "fullName" = EXCLUDED."fullName",
-    password = EXCLUDED.password,
-    "isVerified" = FALSE,
-    "isOnboarded" = TRUE,
-    "isActive" = TRUE,
-    "mustChangePassword" = TRUE,
-    updated_at = NOW()
-  WHERE LOWER(COALESCE(users.role, '')) = 'admin';
-END
-$$;

@@ -1,4 +1,6 @@
 import { useEffect, useRef } from 'react'
+import { useTheme } from '../contexts/ThemeContext'
+import { darkTheme, dayTheme } from '../themeColors'
 import quantariumImg from '../assets/quantarium.png'
 import qubionImg from '../assets/qubion.png'
 import quantamnonicsImg from '../assets/quantamonics.png'
@@ -13,6 +15,10 @@ const CURVE_ANGLE = 22
 const CURVE_DEPTH = 180
 
 export default function CurvedCarousel() {
+  const { theme } = useTheme()
+  const isDayMode = theme === 'light'
+  const palette = isDayMode ? dayTheme : darkTheme
+
   const wrapperRef      = useRef(null)
   const trackRef        = useRef(null)
   const trackFillRef    = useRef(null)
@@ -202,6 +208,7 @@ export default function CurvedCarousel() {
           perspective: 1800px;
           perspective-origin: 50% 50%;
           z-index: 10;
+          background: var(--cs-bg);
         }
 
         /* ── Top progress bar ── */
@@ -220,7 +227,7 @@ export default function CurvedCarousel() {
           font-size: 0.6rem;
           letter-spacing: 0.18em;
           text-transform: uppercase;
-          color: #555049;
+          color: var(--cs-label-color, #555049);
           white-space: nowrap;
           font-family: 'Inter', sans-serif;
         }
@@ -229,14 +236,14 @@ export default function CurvedCarousel() {
           flex: 1;
           max-width: 180px;
           height: 1px;
-          background: rgba(255,255,255,0.08);
+          background: var(--cs-track-line-bg, rgba(255,255,255,0.08));
           position: relative;
           overflow: hidden;
         }
 
         .cs-track-fill {
           height: 100%;
-          background: #c4a265;
+          background: var(--cs-track-fill-bg, #c4a265);
           width: 0%;
           will-change: width;
         }
@@ -272,16 +279,16 @@ export default function CurvedCarousel() {
           width: 100%; height: 100%;
           object-fit: cover;
           display: block;
-          filter: grayscale(100%) contrast(1.08) brightness(0.7);
+          filter: var(--cs-img-filter-default, grayscale(100%) contrast(1.08) brightness(0.7));
           transform: scale(1.12);
           transition: filter 0.5s ease, transform 0.5s ease;
         }
         .cs-item.cs-near img {
-          filter: grayscale(100%) contrast(1.12) brightness(0.85);
+          filter: var(--cs-img-filter-near, grayscale(100%) contrast(1.12) brightness(0.85));
           transform: scale(1.05);
         }
         .cs-item.cs-center img {
-          filter: grayscale(75%) contrast(1.08) brightness(0.95) sepia(6%);
+          filter: var(--cs-img-filter-center, grayscale(75%) contrast(1.08) brightness(0.95) sepia(6%));
           transform: scale(1);
         }
 
@@ -312,7 +319,7 @@ export default function CurvedCarousel() {
           bottom: 2rem; right: 3.5rem;
           z-index: 10;
           font-size: 0.7rem;
-          color: #555049;
+          color: var(--cs-counter-color, #555049);
           font-weight: 300;
           letter-spacing: 0.05em;
           display: flex;
@@ -322,7 +329,7 @@ export default function CurvedCarousel() {
           font-family: 'Inter', sans-serif;
         }
         .cs-counter-current {
-          color: #e8e4de;
+          color: var(--cs-counter-current-color, #e8e4de);
           font-weight: 500;
           font-size: 1.4rem;
           line-height: 1;
@@ -350,7 +357,19 @@ export default function CurvedCarousel() {
         │  └──────────────────────────────────────────────────────── ┘  │
         └───────────────────────────────────────────────────────────────┘
       */}
-      <div className="cs-wrapper" ref={wrapperRef}>
+      <div className="cs-wrapper" ref={wrapperRef}
+        style={{
+          '--cs-bg': isDayMode ? palette.bgPrimary : '#000000',
+          '--cs-label-color': isDayMode ? palette.textMuted : '#555049',
+          '--cs-track-line-bg': isDayMode ? palette.borderSoft : 'rgba(255,255,255,0.08)',
+          '--cs-track-fill-bg': isDayMode ? palette.accentPrimary : '#c4a265',
+          '--cs-counter-color': isDayMode ? palette.textMuted : '#555049',
+          '--cs-counter-current-color': isDayMode ? palette.textPrimary : '#e8e4de',
+          '--cs-img-filter-default': isDayMode ? 'grayscale(60%) contrast(1.02) brightness(0.9)' : 'grayscale(100%) contrast(1.08) brightness(0.7)',
+          '--cs-img-filter-near': isDayMode ? 'grayscale(40%) contrast(1.04) brightness(1.0)' : 'grayscale(100%) contrast(1.12) brightness(0.85)',
+          '--cs-img-filter-center': isDayMode ? 'grayscale(20%) contrast(1.02) brightness(1.05)' : 'grayscale(75%) contrast(1.08) brightness(0.95) sepia(6%)',
+        }}
+      >
         <div className="cs-sticky">          <div className="cs-top-bar">
             <span className="cs-label">Scroll Horizontally</span>
             <div className="cs-track-line">

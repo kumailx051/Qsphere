@@ -2,13 +2,16 @@ import { useEffect, useMemo, useState, useRef, useCallback } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { motion, useScroll, useTransform } from 'framer-motion'
 import {
-  ArrowLeft, CheckCircle2, Clock, Download, FileText, LayoutGrid, MessageSquare, MoreVertical,
-  Plus, Send, Sparkles, Trash2, Upload, Users2, X, Calendar, ClipboardList, FolderOpen, Edit3, UserPlus, Eye
+  ArrowLeft, Calendar, CheckCircle2, ChevronRight, ClipboardList, Clock, Download,
+  Edit3, Eye, FileText, FolderOpen, Hash, LayoutGrid, MessageSquare, MoreVertical,
+  Paperclip, Pin, Plus, Search, Send, SmilePlus, Sparkles, Trash2, Upload, Users2, X, UserPlus
 } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { darkTheme, dayTheme } from '../themeColors'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
+import chatDoodleDay from '../assets/chatDoodleDay.png'
+import chatDoodleNight from '../assets/chatDoodleNight.png'
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -33,7 +36,7 @@ const readStoredProfile = () => {
 }
 
 const statusColors = {
-  Pending: 'border-yellow-400/30 bg-yellow-500/10 text-yellow-300',
+  Pending: 'bg-yellow-500 text-white border-yellow-500/30',
   'In Progress': 'border-blue-400/30 bg-blue-500/10 text-blue-300',
   Review: 'border-purple-400/30 bg-purple-500/10 text-purple-300',
   Rework: 'border-orange-400/30 bg-orange-500/10 text-orange-300',
@@ -58,6 +61,33 @@ const formatDisplayDate = (value, fallback = 'N/A') => {
   if (typeof value === 'string') return value.includes('T') ? value.split('T')[0] : value
   const parsed = new Date(value)
   return Number.isNaN(parsed.getTime()) ? String(value) : parsed.toISOString().split('T')[0]
+}
+
+const formatMessageTime = (value) => {
+  if (!value) return ''
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime())
+    ? ''
+    : parsed.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+}
+
+const formatChatDateLabel = (value) => {
+  if (!value) return ''
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return ''
+  const today = new Date()
+  const inputDate = new Date(Date.UTC(parsed.getFullYear(), parsed.getMonth(), parsed.getDate()))
+  const todayDate = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()))
+  const diffDays = Math.round((todayDate - inputDate) / 86400000)
+  if (diffDays === 0) return 'Today'
+  if (diffDays === 1) return 'Yesterday'
+  return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+const getInitials = (name = '') => {
+  const parts = String(name).trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return '?'
+  return parts.slice(0, 2).map(part => part[0]).join('').toUpperCase()
 }
 
 export default function ProjectDetailsPage() {
@@ -109,7 +139,76 @@ export default function ProjectDetailsPage() {
 
   // Chat
   const [chatInput, setChatInput] = useState('')
+  const [chatEmojiOpen, setChatEmojiOpen] = useState(false)
+  const [chatReactionOpen, setChatReactionOpen] = useState(null)
+  const [chatActionPos, setChatActionPos] = useState(null)
+  const [pinnedMessageIds, setPinnedMessageIds] = useState(new Set())
+  const [showAllPinned, setShowAllPinned] = useState(false)
+  const [scrollToMessageId, setScrollToMessageId] = useState(null)
+  const [mentionOpen, setMentionOpen] = useState(false)
+  const [mentionQuery, setMentionQuery] = useState('')
+  const [mentionIndex, setMentionIndex] = useState(-1)
+  const [displayedMessages, setDisplayedMessages] = useState([])
+  const inputRef = useRef(null)
+  const [dmTarget, setDmTarget] = useState(null)
+  const [emojiCategory, setEmojiCategory] = useState(0)
+  const [messageReactions, setMessageReactions] = useState({})
+  const [myReactions, setMyReactions] = useState({})
   const chatEndRef = useRef(null)
+  const chatEmojiRef = useRef(null)
+
+  const addReaction = (msgId, emoji) => {
+    const key = `${msgId}-${emoji}`
+    const myPrevKey = Object.keys(myReactions).find(k => k.startsWith(`${msgId}-`))
+    setMyReactions(prev => {
+      const current = { ...prev }
+      if (current[key]) {
+        delete current[key]
+      } else {
+        if (myPrevKey) delete current[myPrevKey]
+        current[key] = true
+      }
+      return current
+    })
+    setMessageReactions(prev => {
+      const current = { ...prev }
+      if (current[key]) {
+        current[key] = (current[key] || 1) - 1
+        if (current[key] <= 0) delete current[key]
+      } else {
+        if (myPrevKey) {
+          current[myPrevKey] = (current[myPrevKey] || 1) - 1
+          if (current[myPrevKey] <= 0) delete current[myPrevKey]
+        }
+        current[key] = (current[key] || 0) + 1
+      }
+      return current
+    })
+    setChatReactionOpen(null)
+  }
+
+  const quickReactions = ['👍', '❤️', '😂', '😮', '😢']
+
+  const emojiCategories = [
+    { icon: '😀', emojis: ['😀','😁','😂','🤣','😊','😇','🙂','😉','😌','😍','🥰','😘','😋','😛','😜','🤪','😎','🤩','😏','😒','😞','😔','😟','😕','🙁','😣','😖','😫','😤','😡','😠','🤬','😈','👿','💀','☠️','💩','🤡','👹','👺','👻','👽','👾','🤖','🎃','😺','😸','😹','😻','😼','😽','🙀','😿','😾'] },
+    { icon: '✋', emojis: ['👋','🤚','🖐','✋','🖖','👌','🤌','🤏','✌️','🤞','🤟','🤘','🤙','👈','👉','👆','🖕','👇','☝️','👍','👎','✊','👊','🤛','🤜','👏','🙌','👐','🤲','🤝','🙏','✍️','💅','🤳','💪','🦵','🦶','👂','🦻','👃','🧠','🦷','🦴','👀','👁','👅','👄','💋'] },
+    { icon: '❤️', emojis: ['❤️','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💔','❣️','💕','💞','💓','💗','💖','💘','💝','💟','♥️','🫶','💑','💏','👩‍❤️‍👨','👨‍❤️‍👨','👩‍❤️‍👩'] },
+    { icon: '🎉', emojis: ['🎉','🎊','🥳','🎈','🎁','🎀','🪅','🪩','🎄','🎃','🎆','🎇','✨','🎯','🏆','🥇','🥈','🥈','🥉','🏅','🎖','🏵','🎗','🎟','🎫','🎬','🎭','🎨','🎪','🎤','🎧','🎶','🎵','🎼','🎹','🥁'] },
+    { icon: '🚀', emojis: ['🚀','✈️','🛩','🛫','🛬','🚁','🚂','🚃','🚄','🚅','🚆','🚇','🚈','🚉','🚊','🚝','🚞','🚋','🚌','🚍','🚎','🚐','🚑','🚒','🚓','🚔','🚕','🚖','🚗','🚘','🚙','🛻','🚚','🚛','🚜','🛴','🛵','🛺','🚲','🛹','🛼','🚏','⛽','🛣','🛤'] },
+    { icon: '💡', emojis: ['💡','🔦','🔋','🔌','🔪','🗡','🪓','🪚','🔨','🪛','🔧','🪜','🛠','⚙️','🪤','🧰','💻','🖥','🖨','🖱','🖲','🕹','🗄','📀','💿','📀','📷','📸','📹','🎥','📽','🎞','📞','☎️','📟','📠','📺','📻','🎙','🎚','🎛','🧭','⏱','⏲','⏰','🕰'] },
+  ]
+  useEffect(() => {
+    if (!chatEmojiOpen) return
+    const handler = (e) => { if (chatEmojiRef.current && !chatEmojiRef.current.contains(e.target)) setChatEmojiOpen(false) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [chatEmojiOpen])
+  useEffect(() => {
+    if (!mentionOpen) return
+    const handler = (e) => { if (inputRef.current && !inputRef.current.closest('.relative')?.contains(e.target)) setMentionOpen(false) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [mentionOpen])
   const chatListRef = useRef(null)
   const chatPollRef = useRef(null)
   const chatLongPressRef = useRef(null)
@@ -257,24 +356,26 @@ export default function ProjectDetailsPage() {
 
   useEffect(() => {
     if (activeTab !== 'discussion') return
-    const nextLength = chatMessages.length
-    const previousLength = previousChatLengthRef.current
-    const lastMessage = chatMessages[nextLength - 1]
-    const hasCountChanged = nextLength !== previousLength
-    const appendedMine = nextLength > previousLength && lastMessage?.senderEmail?.toLowerCase() === normalizedUserEmail
-    const shouldScroll = !initialChatLoadedRef.current || (hasCountChanged && (shouldStickToBottomRef.current || appendedMine))
-
-    if (shouldScroll) {
-      chatEndRef.current?.scrollIntoView({ behavior: initialChatLoadedRef.current ? 'smooth' : 'auto' })
+    const prevLen = previousChatLengthRef.current
+    const newLen = chatMessages.length
+    const isNewMessage = newLen > prevLen
+    if (isNewMessage || prevLen === 0) {
+      const el = chatListRef.current
+      if (el) el.scrollTop = el.scrollHeight
     }
-
-    initialChatLoadedRef.current = true
-    previousChatLengthRef.current = nextLength
-  }, [activeTab, chatMessages, normalizedUserEmail])
+    previousChatLengthRef.current = newLen
+  }, [activeTab, chatMessages])
 
   useEffect(() => () => {
     if (chatLongPressRef.current) window.clearTimeout(chatLongPressRef.current)
   }, [])
+
+  useEffect(() => {
+    if (!scrollToMessageId || activeTab !== 'discussion') return
+    const el = document.querySelector(`[data-msg-id="${scrollToMessageId}"]`)
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    setScrollToMessageId(null)
+  }, [scrollToMessageId, activeTab])
 
   // ─── Handlers ───
   const createTask = async (e) => {
@@ -406,12 +507,13 @@ export default function ProjectDetailsPage() {
   const canEditChatMessage = useCallback((msg) => isMyMessage(msg) && !msg.deletedForEveryone, [isMyMessage])
   const canDeleteChatForEveryone = useCallback((msg) => (isMyMessage(msg) || isOwner) && !msg.deletedForEveryone, [isMyMessage, isOwner])
   const canDeleteChatForMe = useCallback((msg) => Boolean(msg?.id), [])
-  const canSeeChatReadBy = useCallback(() => true, [])
+  const canSeeChatReadBy = useCallback((msg) => isMyMessage(msg), [isMyMessage])
 
-  const openChatActions = useCallback((msg) => {
-    const hasActions = canEditChatMessage(msg) || canDeleteChatForMe(msg) || canDeleteChatForEveryone(msg) || canSeeChatReadBy(msg)
+  const openChatActions = useCallback((msg, clientX, clientY) => {
+    const hasActions = canEditChatMessage(msg) || canDeleteChatForMe(msg) || canDeleteChatForEveryone(msg) || canSeeChatReadBy(msg) || true
     if (!hasActions) return
     setChatActionMessage(msg)
+    setChatActionPos({ x: clientX, y: clientY })
   }, [canDeleteChatForEveryone, canDeleteChatForMe, canEditChatMessage, canSeeChatReadBy])
 
   const cancelChatLongPress = useCallback(() => {
@@ -424,13 +526,14 @@ export default function ProjectDetailsPage() {
   const startChatLongPress = useCallback((msg) => (event) => {
     if (event.pointerType === 'mouse' && event.button !== 0) return
     cancelChatLongPress()
+    const e = event
     chatLongPressRef.current = window.setTimeout(() => {
-      openChatActions(msg)
+      openChatActions(msg, e.clientX || 0, e.clientY || 0)
       chatLongPressRef.current = null
     }, 500)
   }, [cancelChatLongPress, openChatActions])
 
-  const closeChatActionMessage = useCallback(() => setChatActionMessage(null), [])
+  const closeChatActionMessage = useCallback(() => { setChatActionMessage(null); setChatActionPos(null) }, [])
 
   const showSnackbar = useCallback((message, type = 'success') => {
     window.dispatchEvent(new CustomEvent('qsphere-snackbar', { detail: { message, type } }))
@@ -515,6 +618,37 @@ export default function ProjectDetailsPage() {
   }, [tasks])
   const readReceiptMessage = chatMessages.find(msg => msg.id === chatReadMessage?.id) || chatReadMessage
   const readReceiptEntries = (readReceiptMessage?.readBy || []).filter(reader => reader.emailAddress?.toLowerCase() !== normalizedUserEmail)
+  const discussionChannels = useMemo(() => {
+    const groupLabel = project?.groupTitle || 'General Discussion'
+    return [{ name: groupLabel, active: true }]
+  }, [project?.groupTitle])
+  const directMessages = useMemo(() => members.slice(0, 5), [members])
+  const pinnedMessages = useMemo(() => chatMessages.filter(msg => pinnedMessageIds.has(msg.id) && !msg.deletedForEveryone), [chatMessages, pinnedMessageIds])
+  const visiblePinned = useMemo(() => pinnedMessages.slice(0, 2), [pinnedMessages])
+  const sidebarTasks = useMemo(() => tasks.slice(0, 3), [tasks])
+  const sharedDocs = useMemo(() => documents.slice(0, 3), [documents])
+  const currentDiscussionName = dmTarget ? dmTarget.name || dmTarget.email : (project?.groupTitle || 'General Discussion')
+
+  useEffect(() => {
+    if (!dmTarget) {
+      setDisplayedMessages(chatMessages)
+      return
+    }
+    const targetEmail = (dmTarget.email || '').toLowerCase()
+    const targetName = (dmTarget.name || '').toLowerCase()
+    setDisplayedMessages(chatMessages.filter(msg => {
+      const senderEmail = (msg.senderEmail || '').toLowerCase()
+      if (senderEmail === normalizedUserEmail || senderEmail === targetEmail) return true
+      const senderName = (msg.senderName || '').toLowerCase()
+      return senderName === targetName && senderName !== ''
+    }))
+  }, [chatMessages, dmTarget, normalizedUserEmail])
+
+  const filteredMentions = useMemo(() => {
+    if (!mentionQuery) return members
+    const q = mentionQuery.toLowerCase()
+    return members.filter(m => (m.name || m.email || '').toLowerCase().includes(q))
+  }, [mentionQuery, members])
 
   if (loading) return (
     <div className="relative overflow-hidden" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: palette.bgPrimary, color: palette.textPrimary }}>
@@ -526,6 +660,9 @@ export default function ProjectDetailsPage() {
       </div>
       <div className="relative z-10 flex min-h-screen items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-2" style={{ borderColor: palette.accentPrimary, borderTopColor: 'transparent' }} />
+      </div>
+      <div style={{ position: 'relative', zIndex: 1 }}>
+        <Footer />
       </div>
     </div>
   )
@@ -564,7 +701,9 @@ export default function ProjectDetailsPage() {
           </button>
         </motion.div>
       </main>
-      <Footer />
+      <div style={{ position: 'relative', zIndex: 1 }}>
+        <Footer />
+      </div>
     </div>
   )
 
@@ -845,53 +984,433 @@ export default function ProjectDetailsPage() {
             {/* ═══ SECTION 3: DISCUSSION ═══ */}
             {activeTab === 'discussion' && (
               <div className="mt-4">
-                <div className="rounded-[28px] overflow-hidden flex flex-col" style={{ height: '520px', borderColor: palette.borderSoft, backgroundColor: palette.bgSurface }}>
-                  <div className="border-b px-5 py-3 flex items-center gap-3" style={{ borderColor: palette.borderSoft }}>
-                    <MessageSquare size={16} style={{ color: palette.accentPrimary }} />
-                    <span className="text-xs font-semibold uppercase tracking-[0.28em]" style={{ color: palette.accentPrimary }}>Group Discussion</span>
-                    <span className="ml-auto text-xs" style={{ color: palette.textFaint }}>{chatMessages.length} messages</span>
-                  </div>
-                  <div className="border-b px-5 py-2 text-[10px] uppercase tracking-[0.24em]" style={{ borderColor: palette.borderSoft, color: palette.textFaint }}>
-                    Long press or right click a message for actions
-                  </div>
-                  <div ref={chatListRef} onScroll={handleChatScroll} className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
-                    {chatMessages.map(msg => {
-                      const isMine = isMyMessage(msg)
-                      const readByOthers = (msg.readBy || []).filter(reader => reader.emailAddress?.toLowerCase() !== normalizedUserEmail)
-                      return (
-                        <div key={msg.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
-                          <div
-                            onPointerDown={startChatLongPress(msg)}
-                            onPointerUp={cancelChatLongPress}
-                            onPointerLeave={cancelChatLongPress}
-                            onPointerMove={cancelChatLongPress}
-                            onPointerCancel={cancelChatLongPress}
-                            onContextMenu={(e) => { e.preventDefault(); openChatActions(msg) }}
-                            className={`max-w-[75%] rounded-2xl px-4 py-3 transition ${canEditChatMessage(msg) || canDeleteChatForMe(msg) || canDeleteChatForEveryone(msg) || canSeeChatReadBy(msg) ? 'cursor-pointer active:scale-[0.99]' : ''}`}
-                            style={isMine ? { backgroundColor: isDayMode ? `${palette.accentPrimary}33` : 'rgba(16,185,129,0.20)', borderColor: palette.accentBorder, borderWidth: 1 } : { backgroundColor: isDayMode ? palette.bgTertiary : 'rgba(255,255,255,0.06)', borderColor: palette.borderSoft, borderWidth: 1 }}
-                          >
-                            {!isMine && <div className="text-[10px] font-semibold mb-1" style={{ color: palette.accentPrimary, opacity: 0.7 }}>{msg.senderName || msg.senderEmail}</div>}
-                            <div className={`text-sm ${msg.deletedForEveryone ? 'italic' : ''}`} style={{ color: msg.deletedForEveryone ? palette.textMuted : palette.textPrimary }}>{msg.message}</div>
-                            <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[9px]" style={{ color: palette.textFaint }}>
-                              <span>{new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                              {msg.editedAt && !msg.deletedForEveryone && <span>· edited</span>}
-                              {isMine && readByOthers.length > 0 && <span>· seen by {readByOthers.length}</span>}
+                <div
+                  className="grid overflow-hidden rounded-[30px] border xl:grid-cols-[260px_minmax(0,1fr)_320px]"
+                  style={{ borderColor: palette.borderSoft, backgroundColor: palette.bgSurface, boxShadow: palette.shadowCard }}
+                >
+                  <aside className="border-b p-5 xl:border-b-0 xl:border-r overflow-y-auto" style={{ maxHeight: 'calc(60vh + 140px)', borderColor: palette.borderSoft, backgroundColor: isDayMode ? palette.bgSurface : 'rgba(0,0,0,0.12)' }}>
+                    <h3 className="text-lg font-bold" style={{ color: palette.textPrimary }}>Channels</h3>
+
+                    <div className="mt-5 space-y-2">
+                      {discussionChannels.map(channel => (
+                        <button
+                          key={channel.name}
+                          type="button"
+                          className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-semibold transition"
+                          style={channel.active
+                            ? {
+                                background: isDayMode
+                                  ? `linear-gradient(135deg, ${palette.accentPrimary}, ${palette.accentDark})`
+                                  : 'linear-gradient(135deg, rgba(16,185,129,0.30), rgba(5,150,105,0.45))',
+                                color: '#fff'
+                              }
+                            : { color: palette.textSecondary }}
+                        >
+                          <Hash size={16} />
+                          <span>{channel.name}</span>
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="mt-8 border-t pt-6" style={{ borderColor: palette.borderSoft }}>
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-base font-bold" style={{ color: palette.textPrimary }}>Direct Messages</h4>
+                      </div>
+
+                      <div className="mt-4 space-y-3">
+                        {directMessages.map((member, index) => (
+                          <button key={member.email || member.id || index} onClick={() => member.isCurrentUser ? null : setDmTarget(member)}
+                            className={`flex w-full items-center gap-3 rounded-2xl px-2 py-1.5 text-left transition ${member.isCurrentUser ? '' : 'hover:opacity-80'}`}
+                            style={!member.isCurrentUser && dmTarget?.email === member.email ? { backgroundColor: palette.accentSoft } : {}}>
+                            <div className="relative h-11 w-11 overflow-hidden rounded-full border" style={{ borderColor: palette.borderSoft, backgroundColor: palette.bgTertiary }}>
+                              {member.avatar ? (
+                                <img src={member.avatar} alt={member.name || member.email} className="h-full w-full object-cover" />
+                              ) : (
+                                <div className="flex h-full w-full items-center justify-center text-xs font-bold" style={{ color: palette.accentPrimary }}>{getInitials(member.name || member.email)}</div>
+                              )}
+                              <span
+                                className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2"
+                                style={{
+                                  borderColor: palette.bgSurface,
+                                  backgroundColor: member.status === 'Active' ? palette.accentPrimary : '#a3a3a3'
+                                }}
+                              />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="truncate text-sm font-semibold" style={{ color: palette.textPrimary }}>{member.name || member.email}{member.isCurrentUser ? <span className="ml-1 text-xs font-normal" style={{ color: palette.textMuted }}>(you)</span> : null}</div>
+                              <div className="text-xs" style={{ color: member.status === 'Active' ? palette.accentPrimary : palette.textMuted }}>
+                                {member.status === 'Active' ? 'Online' : 'Offline'}
+                              </div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                  </aside>
+
+                  <section className="min-w-0 border-b flex flex-col xl:border-b-0 xl:border-r" style={{ borderColor: palette.borderSoft }}>
+                    <div className="flex flex-wrap items-start justify-between gap-4 border-b px-5 py-5 md:px-6 shrink-0" style={{ borderColor: palette.borderSoft }}>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          {dmTarget && (
+                            <button type="button" onClick={() => setDmTarget(null)}
+                              className="mr-1 rounded-lg px-2 py-1 text-xs font-semibold transition"
+                              style={{ backgroundColor: palette.bgTertiary, color: palette.textSecondary }}>
+                              back
+                            </button>
+                          )}
+                          <Hash size={18} style={{ color: palette.textPrimary }} />
+                          <h3 className="text-[1.35rem] font-bold" style={{ color: palette.textPrimary }}>{currentDiscussionName}</h3>
+                          <ChevronRight size={16} style={{ color: palette.textMuted }} />
+                        </div>
+                        <p className="mt-1 text-sm" style={{ color: palette.textMuted }}>
+                          {dmTarget ? 'Direct conversation' : `Public channel • ${members.length || 0} members`}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button className="inline-flex h-10 items-center gap-2 rounded-xl border px-4" style={{ borderColor: palette.borderInput, backgroundColor: palette.bgSurface, color: palette.textSecondary }}>
+                          <Users2 size={16} />
+                          <span>{members.length || 0}</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div ref={chatListRef} onScroll={handleChatScroll} className="flex-1 min-h-0 overflow-y-auto px-5 md:px-6 space-y-7"
+                      style={{
+                        maxHeight: '60vh',
+                        backgroundImage: `url(${isDayMode ? chatDoodleDay : chatDoodleNight})`,
+                        backgroundRepeat: 'repeat',
+                        backgroundSize: '400px',
+                        backgroundPosition: '0 0',
+                      }}>
+                      {dmTarget && (
+                        <div className="flex flex-col items-center justify-center pt-8 pb-4 text-center">
+                          <div className="h-16 w-16 overflow-hidden rounded-full border-2 mb-3"
+                            style={{ borderColor: palette.accentPrimary, backgroundColor: palette.bgTertiary }}>
+                            {dmTarget.avatar ? (
+                              <img src={dmTarget.avatar} alt={dmTarget.name || ''} className="h-full w-full object-cover" />
+                            ) : (
+                              <div className="flex h-full w-full items-center justify-center text-lg font-bold" style={{ color: palette.accentPrimary }}>{getInitials(dmTarget.name || dmTarget.email)}</div>
+                            )}
+                          </div>
+                          <div className="text-base font-bold" style={{ color: palette.textPrimary }}>{dmTarget.name || dmTarget.email}</div>
+                          <div className="mt-1 text-xs" style={{ color: palette.textMuted }}>Direct conversation started</div>
+                        </div>
+                      )}
+                      {displayedMessages.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-16 text-center">
+                          <p className="text-sm" style={{ color: palette.textFaint }}>{dmTarget ? 'Start a conversation' : 'No messages yet'}</p>
+                        </div>
+                      ) : displayedMessages.map((msg, index) => {
+                        const isMine = isMyMessage(msg)
+                        const readByOthers = (msg.readBy || []).filter(reader => reader.emailAddress?.toLowerCase() !== normalizedUserEmail)
+                        const sender = members.find(member => member.email?.toLowerCase() === msg.senderEmail?.toLowerCase())
+                        const senderName = msg.senderName || sender?.name || msg.senderEmail || 'Unknown member'
+                        const prevMsg = index > 0 ? displayedMessages[index - 1] : null
+                        const msgDate = msg.created_at ? new Date(msg.created_at).toDateString() : ''
+                        const prevDate = prevMsg?.created_at ? new Date(prevMsg.created_at).toDateString() : ''
+                        const showDateDivider = index === 0 || msgDate !== prevDate
+
+                        return (
+                          <>
+                          {showDateDivider && (
+                            <div key={`date-${index}`} className="flex items-center gap-4 pt-2 text-xs" style={{ color: palette.textFaint }}>
+                              <div className="h-px flex-1" style={{ backgroundColor: palette.borderSoft }} />
+                              <span>{formatChatDateLabel(msg.created_at)}</span>
+                              <div className="h-px flex-1" style={{ backgroundColor: palette.borderSoft }} />
+                            </div>
+                          )}
+                          <div key={msg.id || index} data-msg-id={msg.id} className={`flex gap-3 ${isMine ? 'flex-row-reverse' : ''}`}>
+                            {!isMine && (
+                              <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-full border" style={{ borderColor: palette.borderSoft, backgroundColor: palette.bgTertiary }}>
+                                {sender?.avatar ? (
+                                  <img src={sender.avatar} alt={senderName} className="h-full w-full object-cover" />
+                                ) : (
+                                  <div className="flex h-full w-full items-center justify-center text-sm font-bold" style={{ color: palette.accentPrimary }}>{getInitials(senderName)}</div>
+                                )}
+                                <span
+                                  className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2"
+                                  style={{
+                                    borderColor: palette.bgSurface,
+                                    backgroundColor: sender?.status === 'Active' || isMine ? palette.accentPrimary : '#a3a3a3'
+                                  }}
+                                />
+                              </div>
+                            )}
+
+                            <div className={`min-w-0 ${isMine ? 'max-w-[80%] ml-auto' : 'max-w-[80%]'}`}>
+                              <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 ${isMine ? 'justify-end' : ''}`}>
+                                <span className="text-[1.08rem] font-bold" style={{ color: palette.textPrimary }}>{isMine ? 'You' : senderName}</span>
+                                <span className="text-sm" style={{ color: palette.textMuted }}>{formatMessageTime(msg.created_at)}</span>
+                              </div>
+
+                              <div
+                                onPointerDown={startChatLongPress(msg)}
+                                onPointerUp={cancelChatLongPress}
+                                onPointerLeave={cancelChatLongPress}
+                                onPointerMove={cancelChatLongPress}
+                                onPointerCancel={cancelChatLongPress}
+                                onContextMenu={(e) => { e.preventDefault(); openChatActions(msg, e.clientX, e.clientY) }}
+                                className={`mt-2 rounded-[22px] border px-5 py-4 transition ${canEditChatMessage(msg) || canDeleteChatForMe(msg) || canDeleteChatForEveryone(msg) || canSeeChatReadBy(msg) ? 'cursor-pointer active:scale-[0.99]' : ''}`}
+                                style={isMine
+                                  ? {
+                                      borderColor: palette.accentBorder,
+                                      background: isDayMode
+                                        ? `linear-gradient(135deg, ${palette.accentPrimary}26, ${palette.accentPrimary}12)`
+                                        : 'linear-gradient(135deg, rgba(16,185,129,0.20), rgba(16,185,129,0.08))'
+                                    }
+                                  : {
+                                      borderColor: palette.borderSoft,
+                                      backgroundColor: isDayMode ? palette.bgTertiary : 'rgba(255,255,255,0.03)'
+                                    }}
+                              >
+                                <div className={`text-lg leading-8 ${msg.deletedForEveryone ? 'italic' : ''}`} style={{ color: msg.deletedForEveryone ? palette.textMuted : palette.textPrimary }}>
+                                  {msg.message}
+                                </div>
+                              </div>
+
+                              <div className={`mt-3 flex flex-wrap items-center gap-1.5 ${isMine ? 'justify-end' : ''}`}>
+                                {quickReactions.map(emoji => {
+                                  const key = `${msg.id}-${emoji}`
+                                  const count = messageReactions[key] || 0
+                                  const isActive = myReactions[key]
+                                  if (count === 0) return null
+                                  return (
+                                    <button key={emoji} type="button" onClick={() => addReaction(msg.id, emoji)}
+                                      className="inline-flex items-center justify-center rounded-full border px-2 py-1 text-xs transition hover:scale-110"
+                                      style={{ borderColor: isActive ? palette.accentPrimary : palette.borderSoft, backgroundColor: isActive ? palette.accentSoft : palette.bgSurface, color: palette.textSecondary }}>
+                                      <span className="text-sm leading-none">{emoji}</span>
+                                      <span className="ml-1 text-[10px] font-semibold" style={{ color: isActive ? palette.accentPrimary : palette.textMuted }}>{count}</span>
+                                    </button>
+                                  )
+                                })}
+                                <div className="relative">
+                                  <button type="button" onClick={() => setChatReactionOpen(chatReactionOpen === msg.id ? null : msg.id)}
+                                    className="inline-flex items-center justify-center rounded-full border px-2 py-1 text-xs transition hover:scale-110"
+                                    style={{ borderColor: palette.borderSoft, backgroundColor: palette.bgSurface, color: palette.textSecondary }}>
+                                    <SmilePlus size={14} />
+                                  </button>
+                                  {chatReactionOpen === msg.id && (
+                                    <div className={`absolute z-50 ${index === displayedMessages.length - 1 ? 'bottom-full mb-1' : 'top-full mt-1'} ${isMine ? 'right-0' : 'left-0'}`}>
+                                      <div className="flex items-center gap-1 rounded-xl border p-1.5 shadow-2xl" style={{ borderColor: palette.borderSoft, backgroundColor: palette.bgTertiary }}>
+                                        {quickReactions.map(emoji => (
+                                          <button key={emoji} type="button" onClick={() => addReaction(msg.id, emoji)}
+                                            className="flex h-8 w-8 items-center justify-center rounded-lg text-lg hover:scale-110 transition">
+                                            {emoji}
+                                          </button>
+                                        ))}
+                                        <span className="w-px h-6" style={{ backgroundColor: palette.borderSoft }} />
+                                        <div className="relative">
+                                          <button type="button" onClick={() => setChatReactionOpen(`more-${msg.id}`)}
+                                            className="flex h-8 w-8 items-center justify-center rounded-lg text-lg hover:scale-110 transition">
+                                            <Plus size={14} />
+                                          </button>
+                                          {chatReactionOpen === `more-${msg.id}` && (
+                                            <div className={`absolute top-full mt-1 z-50 ${isMine ? 'right-0' : 'left-0'}`}>
+                                              <div className="grid grid-cols-6 gap-1 rounded-xl border p-2 shadow-2xl" style={{ borderColor: palette.borderSoft, backgroundColor: palette.bgTertiary }}>
+                                                {['😀','😁','😂','🤣','😊','😇','🙂','😉','😌','😍','🥰','😘','😋','😛','😜','🤪','😎','🤩','😏','😒','😞','😔','😟','😕','🙁','😣','😖','😫','😤','😡','😠','🤬','😈','👿','💀','☠️','💩','🤡','👹','👺','👻','👽','👾','🤖','🎃','😺','😸','😹','😻','😼','😽','🙀','😿','😾','❤️','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💔','💕','💞','💗','💖','💘','💝','💟','👍','👎','👊','✊','🤛','🤜','👏','🙌','👐','🤲','🤝','🙏','✌️','🤞','🤟','🤘','👌','✅','❌','⭐','🔥','💯','🎉','🎊','🥳','✨','💪','🚀','👀'].map(emoji => (
+                                                  <button key={emoji} type="button" onClick={() => addReaction(msg.id, emoji)}
+                                                    className="flex h-8 w-8 items-center justify-center rounded-lg text-lg hover:scale-110 transition">
+                                                    {emoji}
+                                                  </button>
+                                                ))}
+                                              </div>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
                             </div>
                           </div>
+                          </>
+                        )
+                      })}
+                      <div ref={chatEndRef} />
+                    </div>
+
+                    <div className="border-t shrink-0" style={{ borderColor: palette.borderSoft }}>
+                      <form onSubmit={sendChat} className="px-5 py-4 md:px-6">
+                         <div className="relative flex items-center gap-3 rounded-[24px] border pl-3 pr-2 py-2" style={{ borderColor: palette.borderSoft, backgroundColor: isDayMode ? palette.bgSurface : 'rgba(255,255,255,0.02)' }}>
+                          <button type="button" className="flex h-11 w-11 items-center justify-center rounded-2xl" style={{ color: palette.textSecondary }}>
+                            <Paperclip size={18} />
+                          </button>
+                          <input ref={inputRef} value={chatInput} onChange={(e) => {
+                            const val = e.target.value
+                            setChatInput(val)
+                            const idx = val.lastIndexOf('@')
+                            if (idx !== -1 && (idx === 0 || val[idx - 1] === ' ')) {
+                              const after = val.slice(idx + 1)
+                              if (!after.includes(' ')) {
+                                setMentionOpen(true)
+                                setMentionQuery(after)
+                                setMentionIndex(idx)
+                                return
+                              }
+                            }
+                            setMentionOpen(false)
+                          }} placeholder="Type a message..."
+                            className="flex-1 bg-transparent px-2 text-base outline-none" style={{ color: palette.textPrimary }} />
+                          <div className="relative" ref={chatEmojiRef}>
+                            <button type="button" onClick={() => setChatEmojiOpen(o => !o)} className="flex h-11 w-11 items-center justify-center rounded-2xl" style={{ color: palette.textSecondary }}>
+                              <SmilePlus size={18} />
+                            </button>
+                            {chatEmojiOpen && (
+                              <div className="absolute bottom-full right-0 mb-2 z-50">
+                                <div className="w-[320px] overflow-hidden rounded-2xl border shadow-2xl" style={{ borderColor: palette.borderSoft, backgroundColor: palette.bgTertiary }}>
+                                  <div className="flex items-center border-b px-2 py-1.5" style={{ borderColor: palette.borderSoft, backgroundColor: palette.bgSurface }}>
+                                    {emojiCategories.map((cat, i) => (
+                                      <button key={i} type="button" onClick={() => setEmojiCategory(i)}
+                                        className="flex h-9 w-9 items-center justify-center rounded-xl text-lg transition"
+                                        style={{ backgroundColor: emojiCategory === i ? palette.accentSoft : 'transparent' }}>
+                                        {cat.icon}
+                                      </button>
+                                    ))}
+                                  </div>
+                                  <div className="grid grid-cols-8 gap-0.5 overflow-y-auto p-3" style={{ maxHeight: '260px' }}>
+                                    {emojiCategories[emojiCategory].emojis.map(emoji => (
+                                      <button key={emoji} type="button" onClick={() => { setChatInput(p => p + emoji); setChatEmojiOpen(false) }}
+                                        className="flex h-9 w-9 items-center justify-center rounded-lg text-xl hover:scale-110 transition">
+                                        {emoji}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                          {mentionOpen && filteredMentions.length > 0 && (
+                            <div className="absolute bottom-full left-0 right-0 mb-2 z-50">
+                              <div className="max-h-48 overflow-y-auto rounded-2xl border shadow-2xl" style={{ borderColor: palette.borderSoft, backgroundColor: palette.bgTertiary }}>
+                                {filteredMentions.map(member => (
+                                  <button key={member.email || member.id} type="button"
+                                    onClick={() => {
+                                      const before = chatInput.slice(0, mentionIndex)
+                                      const after = chatInput.slice(mentionIndex).replace(/^@\S*/, `@${member.name || member.email} `)
+                                      setChatInput(before + after)
+                                      setMentionOpen(false)
+                                      inputRef.current?.focus()
+                                    }}
+                                    className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-semibold transition hover:opacity-80"
+                                    style={{ color: palette.textPrimary, borderBottom: `1px solid ${palette.borderSoft}` }}>
+                                    <div className="h-7 w-7 overflow-hidden rounded-full" style={{ backgroundColor: palette.bgSurface }}>
+                                      {member.avatar ? <img src={member.avatar} alt="" className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center text-[10px] font-bold" style={{ color: palette.accentPrimary }}>{getInitials(member.name || member.email)}</div>}
+                                    </div>
+                                    <span>{member.name || member.email}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          <button type="submit" className="flex h-11 w-11 items-center justify-center rounded-2xl transition" style={{ backgroundColor: palette.accentPrimary, color: '#fff' }}>
+                            <Send size={18} />
+                          </button>
                         </div>
-                      )
-                    })}
-                    <div ref={chatEndRef} />
-                  </div>
-                  <form onSubmit={sendChat} className="border-t px-5 py-3 flex items-center gap-3" style={{ borderColor: palette.borderSoft }}>
-                    <input value={chatInput} onChange={(e) => setChatInput(e.target.value)} placeholder="Type a message..."
-                      className="flex-1 rounded-xl border px-4 py-2.5 text-sm outline-none"
-                      style={{ borderColor: palette.borderInput, backgroundColor: palette.bgSurface, color: palette.textPrimary }} />
-                    <button type="submit" className="flex h-10 w-10 items-center justify-center rounded-xl transition"
-                      style={{ backgroundColor: palette.accentPrimary, color: '#fff' }}>
-                      <Send size={16} />
-                    </button>
-                  </form>
+                      </form>
+                    </div>
+                  </section>
+
+                  <aside className="p-5 overflow-y-auto" style={{ maxHeight: 'calc(60vh + 140px)', backgroundColor: isDayMode ? palette.bgSurface : 'rgba(0,0,0,0.08)' }}>
+                    <div className="rounded-2xl border px-4 py-3" style={{ borderColor: palette.borderSoft, backgroundColor: isDayMode ? palette.bgSurface : 'rgba(255,255,255,0.02)' }}>
+                      <div className="flex items-center gap-3">
+                        <Search size={18} style={{ color: palette.textMuted }} />
+                        <input type="text" placeholder="Search"
+                          className="w-full bg-transparent text-sm outline-none"
+                          style={{ color: palette.textPrimary }} />
+                      </div>
+                    </div>
+
+                    <div className="mt-6 space-y-6">
+                      <div>
+                        <div className="mb-3 flex items-center justify-between">
+                          <h4 className="text-sm font-bold uppercase tracking-[0.18em]" style={{ color: palette.textPrimary }}>Pinned Messages</h4>
+                          {pinnedMessages.length > 2 && (
+                            <button onClick={() => setShowAllPinned(true)} className="text-sm font-semibold" style={{ color: palette.accentPrimary }}>View all</button>
+                          )}
+                        </div>
+                        <div className="space-y-3">
+                          {visiblePinned.length === 0 ? (
+                            <p className="text-sm py-4 text-center" style={{ color: palette.textFaint }}>No pinned messages</p>
+                          ) : visiblePinned.map((msg, index) => {
+                            const sender = members.find(member => member.email?.toLowerCase() === msg.senderEmail?.toLowerCase())
+                            const senderName = msg.senderName || sender?.name || msg.senderEmail || 'Unknown member'
+                            return (
+                              <div key={msg.id || `pin-${index}`} className="group relative rounded-[20px] border p-4" style={{ borderColor: palette.borderSoft, backgroundColor: isDayMode ? palette.bgTertiary : 'rgba(255,255,255,0.02)' }}>
+                                <button type="button" onClick={() => { setScrollToMessageId(msg.id); setActiveTab('discussion') }} className="w-full text-left">
+                                  <div className="flex items-start gap-3">
+                                    <div className="mt-1 flex h-9 w-9 items-center justify-center rounded-xl" style={{ backgroundColor: palette.accentSoft, color: palette.accentPrimary }}>
+                                      <Pin size={16} />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                      <div className="flex items-center gap-2 text-sm font-bold" style={{ color: palette.textPrimary }}>
+                                        <span className="truncate">{senderName}</span>
+                                        <span style={{ color: palette.textMuted }}>• {formatDisplayDate(msg.created_at, 'Today')}</span>
+                                      </div>
+                                      <p className="mt-1 text-sm leading-6" style={{ color: palette.textSecondary, maxHeight: '3rem', overflow: 'hidden' }}>{msg.message}</p>
+                                    </div>
+                                    <ChevronRight size={16} style={{ color: palette.textMuted }} />
+                                  </div>
+                                </button>
+                                <button type="button" onClick={() => setPinnedMessageIds(prev => { const next = new Set(prev); next.delete(msg.id); return next })}
+                                  className="absolute -top-2 -right-2 hidden h-6 w-6 items-center justify-center rounded-full border shadow group-hover:flex"
+                                  style={{ borderColor: palette.borderSoft, backgroundColor: palette.bgSurface, color: palette.textMuted }}>
+                                  <X size={12} />
+                                </button>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="mb-3 flex items-center justify-between">
+                          <h4 className="text-sm font-bold uppercase tracking-[0.18em]" style={{ color: palette.textPrimary }}>Tasks</h4>
+                          <button className="text-sm font-semibold" style={{ color: palette.accentPrimary }}>View all</button>
+                        </div>
+                        <div className="rounded-[24px] border overflow-hidden" style={{ borderColor: palette.borderSoft, backgroundColor: isDayMode ? palette.bgTertiary : 'rgba(255,255,255,0.02)' }}>
+                          {sidebarTasks.length === 0 ? (
+                            <div className="px-4 py-5 text-sm" style={{ color: palette.textMuted }}>No linked tasks yet.</div>
+                          ) : sidebarTasks.map((task, index) => (
+                            <div key={task.id || index} className="flex items-start gap-3 px-4 py-4" style={{ borderTop: index === 0 ? 'none' : `1px solid ${palette.borderSoft}` }}>
+                              <span className="mt-1 flex h-5 w-5 items-center justify-center rounded-full border" style={{ borderColor: task.status === 'Completed' ? palette.accentPrimary : palette.textMuted, color: task.status === 'Completed' ? palette.accentPrimary : 'transparent' }}>
+                                <CheckCircle2 size={12} />
+                              </span>
+                              <div>
+                                <div className="text-sm font-semibold" style={{ color: palette.textPrimary }}>{task.taskName}</div>
+                                <div className="mt-1 text-xs" style={{ color: palette.textMuted }}>Due {formatDisplayDate(task.targetDate, 'TBD')}</div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="mb-3 flex items-center justify-between">
+                          <h4 className="text-sm font-bold uppercase tracking-[0.18em]" style={{ color: palette.textPrimary }}>Shared Files</h4>
+                          <button className="text-sm font-semibold" style={{ color: palette.accentPrimary }}>View all</button>
+                        </div>
+                        <div className="rounded-[24px] border overflow-hidden" style={{ borderColor: palette.borderSoft, backgroundColor: isDayMode ? palette.bgTertiary : 'rgba(255,255,255,0.02)' }}>
+                          {sharedDocs.length === 0 ? (
+                            <div className="px-4 py-5 text-sm" style={{ color: palette.textMuted }}>No shared files yet.</div>
+                          ) : sharedDocs.map((doc, index) => (
+                            <div key={`${doc.title}-${index}`} className="flex items-start gap-3 px-4 py-4" style={{ borderTop: index === 0 ? 'none' : `1px solid ${palette.borderSoft}` }}>
+                              <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-xl" style={{ backgroundColor: palette.bgSurface, color: palette.accentPrimary }}>
+                                <FileText size={18} />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="truncate text-sm font-semibold" style={{ color: palette.textPrimary }}>{doc.title}</div>
+                                <div className="mt-1 text-xs" style={{ color: palette.textMuted }}>{doc.source || 'Document'} • {doc.ownerEmail || 'Shared'}</div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </aside>
                 </div>
               </div>
             )}
@@ -1127,29 +1646,48 @@ export default function ProjectDetailsPage() {
         </ModalOverlay>
       )}
 
-      {chatActionMessage && (
-        <ModalOverlay onClose={closeChatActionMessage} maxWidthClassName="max-w-md">
-          <div className="text-[10px] uppercase tracking-[0.3em]" style={{ color: palette.accentPrimary, opacity: 0.7 }}>Message Actions</div>
-          <h3 className="mt-2 text-2xl font-black" style={{ color: palette.textPrimary }}>Choose an action</h3>
-          <p className="mt-3 rounded-2xl border px-4 py-3 text-sm"
-            style={{ borderColor: palette.borderSoft, backgroundColor: palette.bgInput, color: palette.textSecondary }}>
-            {chatActionMessage.deletedForEveryone ? 'This message was deleted for everyone.' : chatActionMessage.message}
-          </p>
-          <div className="mt-5 space-y-2">
-            {canEditChatMessage(chatActionMessage) && (
-              <SheetAction icon={Edit3} label="Edit message" onClick={() => beginEditChatMessage(chatActionMessage)} />
-            )}
-            {canDeleteChatForMe(chatActionMessage) && (
-              <SheetAction icon={Trash2} label="Delete for me" onClick={() => deleteChatMessage(chatActionMessage, 'me')} danger />
-            )}
-            {canDeleteChatForEveryone(chatActionMessage) && (
-              <SheetAction icon={Trash2} label="Delete for everyone" onClick={() => deleteChatMessage(chatActionMessage, 'everyone')} danger />
-            )}
-            {canSeeChatReadBy(chatActionMessage) && (
-              <SheetAction icon={Eye} label="See read by" onClick={() => openChatReadBy(chatActionMessage)} />
-            )}
+      {chatActionMessage && chatActionPos && (
+        <>
+          <div className="fixed inset-0 z-50" onClick={closeChatActionMessage} />
+          <div
+            className="fixed z-50 w-56 overflow-hidden rounded-2xl border shadow-2xl"
+            style={{
+              left: Math.min(chatActionPos.x, window.innerWidth - 240),
+              top: Math.min(chatActionPos.y, window.innerHeight - 320),
+              borderColor: palette.borderSoft,
+              backgroundColor: palette.bgTertiary,
+            }}
+          >
+            <div className="border-b px-4 py-3" style={{ borderColor: palette.borderSoft }}>
+              <p className="text-sm line-clamp-2" style={{ color: palette.textSecondary }}>
+                {chatActionMessage.deletedForEveryone ? 'This message was deleted for everyone.' : chatActionMessage.message}
+              </p>
+            </div>
+            <div className="p-1.5 space-y-0.5">
+              {canEditChatMessage(chatActionMessage) && (
+                <ContextAction icon={Edit3} label="Edit message" onClick={() => { closeChatActionMessage(); beginEditChatMessage(chatActionMessage) }} />
+              )}
+              <ContextAction icon={Pin} label={pinnedMessageIds.has(chatActionMessage.id) ? 'Unpin message' : 'Pin message'} onClick={() => {
+                setPinnedMessageIds(prev => {
+                  const next = new Set(prev)
+                  if (next.has(chatActionMessage.id)) next.delete(chatActionMessage.id)
+                  else next.add(chatActionMessage.id)
+                  return next
+                })
+                closeChatActionMessage()
+              }} />
+              {canDeleteChatForMe(chatActionMessage) && (
+                <ContextAction icon={Trash2} label="Delete for me" onClick={() => { closeChatActionMessage(); deleteChatMessage(chatActionMessage, 'me') }} danger />
+              )}
+              {canDeleteChatForEveryone(chatActionMessage) && (
+                <ContextAction icon={Trash2} label="Delete for everyone" onClick={() => { closeChatActionMessage(); deleteChatMessage(chatActionMessage, 'everyone') }} danger />
+              )}
+              {canSeeChatReadBy(chatActionMessage) && (
+                <ContextAction icon={Eye} label="See read by" onClick={() => { closeChatActionMessage(); openChatReadBy(chatActionMessage) }} />
+              )}
+            </div>
           </div>
-        </ModalOverlay>
+        </>
       )}
 
       {chatEditMessage && (
@@ -1187,6 +1725,42 @@ export default function ProjectDetailsPage() {
           </div>
         </ModalOverlay>
       )}
+
+      {showAllPinned && (
+        <ModalOverlay onClose={() => setShowAllPinned(false)} maxWidthClassName="max-w-xl">
+          <div className="text-[10px] uppercase tracking-[0.3em]" style={{ color: palette.accentPrimary, opacity: 0.7 }}>Pinned</div>
+          <h3 className="mt-2 text-2xl font-black" style={{ color: palette.textPrimary }}>All Pinned Messages</h3>
+          <div className="mt-5 space-y-3 max-h-72 overflow-y-auto pr-1">
+            {pinnedMessages.length === 0 ? (
+              <p className="rounded-2xl border px-4 py-4 text-sm" style={{ borderColor: palette.borderSoft, backgroundColor: palette.bgInput, color: palette.textMuted }}>No pinned messages.</p>
+            ) : pinnedMessages.map(msg => {
+              const sender = members.find(member => member.email?.toLowerCase() === msg.senderEmail?.toLowerCase())
+              const senderName = msg.senderName || sender?.name || msg.senderEmail || 'Unknown member'
+              return (
+                <div key={msg.id} className="group relative rounded-2xl border px-4 py-3" style={{ borderColor: palette.borderSoft, backgroundColor: palette.bgInput }}>
+                  <button type="button" onClick={() => { setShowAllPinned(false); setScrollToMessageId(msg.id) }} className="w-full text-left">
+                    <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: palette.textPrimary }}>
+                      <Pin size={12} style={{ color: palette.accentPrimary }} />
+                      <span className="truncate">{senderName}</span>
+                      <span style={{ color: palette.textMuted }}>• {formatDisplayDate(msg.created_at, 'Today')}</span>
+                    </div>
+                    <p className="mt-1 text-sm line-clamp-2" style={{ color: palette.textSecondary }}>{msg.message}</p>
+                  </button>
+                  <button type="button" onClick={() => setPinnedMessageIds(prev => { const next = new Set(prev); next.delete(msg.id); return next })}
+                    className="absolute -top-2 -right-2 hidden h-6 w-6 items-center justify-center rounded-full border shadow group-hover:flex"
+                    style={{ borderColor: palette.borderSoft, backgroundColor: palette.bgSurface, color: palette.textMuted }}>
+                    <X size={12} />
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        </ModalOverlay>
+      )}
+
+      <div style={{ position: 'relative', zIndex: 1 }}>
+        <Footer />
+      </div>
     </div>
   )
 }
@@ -1263,6 +1837,21 @@ const SheetAction = ({ icon: Icon, label, onClick, danger = false }) => {
       className="flex w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left text-sm font-semibold transition"
       style={danger ? { borderColor: 'rgba(239,68,68,0.20)', backgroundColor: 'rgba(239,68,68,0.10)', color: '#fca5a5' } : { borderColor: p.borderSoft, backgroundColor: p.bgSurface, color: p.textSecondary }}>
       <Icon size={16} /> {label}
+    </button>
+  )
+}
+
+const ContextAction = ({ icon: Icon, label, onClick, danger = false }) => {
+  const { theme } = useTheme()
+  const isDayMode = theme === 'light'
+  const p = isDayMode ? dayTheme : darkTheme
+  return (
+    <button type="button" onClick={onClick}
+      className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition"
+      style={{ color: danger ? '#f87171' : p.textPrimary }}
+      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = p.bgSurface}
+      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
+      <Icon size={15} /> {label}
     </button>
   )
 }

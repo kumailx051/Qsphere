@@ -337,7 +337,9 @@ const DashboardPage = () => {
           </motion.div>
         </main>
 
-        <Footer />
+        <div style={{ position: 'relative', zIndex: 1 }}>
+          <Footer />
+        </div>
       </div>
     )
   }
@@ -390,10 +392,7 @@ const DashboardPage = () => {
                     <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: palette.accentPrimary, boxShadow: isDayMode ? '0 0 18px rgba(46,197,138,0.45)' : '0 0 18px rgba(16,185,129,0.8)' }} />
                     Personal Dashboard
                   </span>
-                  <span className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.24em]" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: isDayMode ? 'rgba(255,255,255,0.78)' : 'rgba(255,255,255,0.03)', color: palette.textMuted }}>
-                    <Sparkles size={14} style={{ color: palette.accentPrimary }} />
-                    Command surface
-                  </span>
+
                 </div>
 
                 <h1
@@ -514,36 +513,6 @@ const DashboardPage = () => {
             initial="hidden"
             whileInView="visible"
             viewport={{ once: true, margin: '-60px' }}
-            className="mt-8 grid gap-4 lg:grid-cols-[0.95fr_2.05fr]"
-          >
-            <div className="rounded-[30px] p-6 backdrop-blur-xl" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: isDayMode ? 'rgba(255,255,255,0.82)' : 'rgba(255,255,255,0.03)' }}>
-              <div className="text-[10px] font-bold uppercase tracking-[0.28em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.8)' }}>Dashboard note</div>
-              <h2 className="mt-4 text-2xl font-bold" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
-                Built to stay focused.
-              </h2>
-              <p className="mt-4 text-sm leading-7" style={{ color: palette.textSecondary }}>
-                This dashboard keeps only the actions and profile signals that actually help you move faster inside QSphere.
-              </p>
-            </div>
-            <motion.div variants={containerVariants} initial="hidden" whileInView="visible" viewport={{ once: true }} className="grid gap-4 sm:grid-cols-3">
-              {[
-                { label: 'Sharper entry', text: 'The hero makes your role, progress, and profile context visible at a glance.' },
-                { label: 'Cleaner actions', text: 'Creation paths and account controls are surfaced without crowding the page.' },
-                { label: 'Less filler', text: 'Only the sections that help you create, navigate, or refine your profile remain.' },
-              ].map((item) => (
-                <motion.div key={item.label} variants={itemVariants} className="rounded-[30px] p-6 backdrop-blur-xl" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: isDayMode ? 'rgba(255,255,255,0.82)' : 'rgba(255,255,255,0.03)' }}>
-                  <div className="text-[10px] font-bold uppercase tracking-[0.24em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.8)' }}>{item.label}</div>
-                  <p className="mt-4 text-sm leading-7" style={{ color: palette.textSecondary }}>{item.text}</p>
-                </motion.div>
-              ))}
-            </motion.div>
-          </motion.section>
-
-          <motion.section
-            variants={containerVariants}
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, margin: '-60px' }}
             id="dashboard-actions"
             className="mt-10"
           >
@@ -554,9 +523,6 @@ const DashboardPage = () => {
                   Go straight to the work that matters.
                 </h2>
               </div>
-              <p className="max-w-xl text-sm leading-7" style={{ color: palette.textSecondary }}>
-                Publish, organize, recruit, or refine your account from one surface without bouncing through the entire site.
-              </p>
             </div>
 
             <motion.div variants={containerVariants} initial="hidden" whileInView="visible" viewport={{ once: true }} className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
@@ -686,7 +652,9 @@ const DashboardPage = () => {
         </div>
       </main>
 
-      <Footer />
+      <div style={{ position: 'relative', zIndex: 1 }}>
+        <Footer />
+      </div>
     </div>
   )
 }

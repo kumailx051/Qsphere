@@ -1099,17 +1099,30 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
           }}
         >
           {assistantOpen ? (
-            <div className={`absolute bottom-[150px] ${chatAlignRight ? 'right-0' : 'left-0'} w-[min(92vw,320px)] overflow-hidden rounded-[28px] border border-emerald-400/20 bg-black/90 shadow-[0_25px_80px_-24px_rgba(0,0,0,0.95),0_0_40px_rgba(16,185,129,0.18)] backdrop-blur-2xl`}>
-              <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-3">
+            <div className={`absolute bottom-[150px] ${chatAlignRight ? 'right-0' : 'left-0'} w-[min(92vw,320px)] overflow-hidden rounded-[28px] backdrop-blur-2xl`}
+              style={{
+                border: `1px solid ${isDayMode ? palette.borderPrimary : 'rgba(16,185,129,0.20)'}`,
+                backgroundColor: isDayMode ? palette.bgTertiary : 'rgba(0,0,0,0.90)',
+                boxShadow: isDayMode ? palette.shadowCard : '0_25px_80px_-24px_rgba(0,0,0,0.95),0_0_40px_rgba(16,185,129,0.18)',
+              }}
+            >
+              <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: `1px solid ${isDayMode ? palette.borderSoft : 'rgba(255,255,255,0.06)'}` }}>
                 <div>
-                  <div className="text-xs uppercase tracking-[0.28em] text-emerald-300/70">Qubi Assistant</div>
-                  <div className="text-sm font-semibold text-white">Ask me anything</div>
+                  <div className="text-xs uppercase tracking-[0.28em]" style={{ color: isDayMode ? palette.accentPrimary : 'rgba(110,231,183,0.70)' }}>Qubi Assistant</div>
+                  <div className="text-sm font-semibold" style={{ color: palette.textPrimary }}>Ask me anything</div>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => setChatMessages([{ id: Date.now(), role: 'assistant', text: 'Hi, I am Qubi, your AI assistant.' }])}
-                    className="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white transition-colors"
+                    className="flex h-8 w-8 items-center justify-center rounded-full transition-colors"
+                    style={{
+                      border: `1px solid ${isDayMode ? palette.borderPrimary : 'rgba(255,255,255,0.10)'}`,
+                      backgroundColor: isDayMode ? palette.bgSurfaceHover : 'rgba(255,255,255,0.05)',
+                      color: isDayMode ? palette.textMuted : 'rgba(255,255,255,0.70)',
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.backgroundColor = isDayMode ? palette.bgInput : 'rgba(255,255,255,0.10)'; e.currentTarget.style.color = palette.textPrimary }}
+                    onMouseLeave={e => { e.currentTarget.style.backgroundColor = isDayMode ? palette.bgSurfaceHover : 'rgba(255,255,255,0.05)'; e.currentTarget.style.color = isDayMode ? palette.textMuted : 'rgba(255,255,255,0.70)' }}
                     aria-label="New chat"
                     title="New Chat"
                   >
@@ -1121,7 +1134,14 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
                   <button
                     type="button"
                     onClick={() => setAssistantOpen(false)}
-                    className="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white transition-colors"
+                    className="flex h-8 w-8 items-center justify-center rounded-full transition-colors"
+                    style={{
+                      border: `1px solid ${isDayMode ? palette.borderPrimary : 'rgba(255,255,255,0.10)'}`,
+                      backgroundColor: isDayMode ? palette.bgSurfaceHover : 'rgba(255,255,255,0.05)',
+                      color: isDayMode ? palette.textMuted : 'rgba(255,255,255,0.70)',
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.backgroundColor = isDayMode ? palette.bgInput : 'rgba(255,255,255,0.10)'; e.currentTarget.style.color = palette.textPrimary }}
+                    onMouseLeave={e => { e.currentTarget.style.backgroundColor = isDayMode ? palette.bgSurfaceHover : 'rgba(255,255,255,0.05)'; e.currentTarget.style.color = isDayMode ? palette.textMuted : 'rgba(255,255,255,0.70)' }}
                     aria-label="Close assistant"
                     title="Close"
                   >
@@ -1137,7 +1157,8 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
                     className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                   >
                     <div
-                      className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm leading-6 ${message.role === 'user' ? 'bg-emerald-400 text-black' : 'bg-white/5 text-white/80 border border-white/[0.06]'}`}
+                      className="max-w-[85%] rounded-2xl px-3 py-2 text-sm leading-6"
+                      style={message.role === 'user' ? { backgroundColor: palette.accentPrimary, color: '#000' } : { border: `1px solid ${isDayMode ? palette.accentBorder : 'rgba(255,255,255,0.06)'}`, backgroundColor: isDayMode ? palette.bgInput : 'rgba(255,255,255,0.05)', color: palette.textSecondary }}
                     >
                       {message.text}
                     </div>
@@ -1145,27 +1166,34 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
                 ))}
                 {isTyping && (
                   <div className="flex justify-start">
-                    <div className="max-w-[85%] rounded-2xl px-4 py-3 bg-white/5 border border-white/[0.06] flex items-center gap-1.5">
-                      <span className="h-1.5 w-1.5 rounded-full bg-white/50 animate-[bounce_1.4s_infinite_ease-in-out_both]" style={{ animationDelay: '-0.32s' }} />
-                      <span className="h-1.5 w-1.5 rounded-full bg-white/50 animate-[bounce_1.4s_infinite_ease-in-out_both]" style={{ animationDelay: '-0.16s' }} />
-                      <span className="h-1.5 w-1.5 rounded-full bg-white/50 animate-[bounce_1.4s_infinite_ease-in-out_both]" />
+                    <div className="max-w-[85%] rounded-2xl px-4 py-3 flex items-center gap-1.5"
+                      style={{
+                        border: `1px solid ${isDayMode ? palette.borderSoft : 'rgba(255,255,255,0.06)'}`,
+                        backgroundColor: isDayMode ? palette.bgInput : 'rgba(255,255,255,0.05)',
+                      }}
+                    >
+                      <span className="h-1.5 w-1.5 rounded-full animate-[bounce_1.4s_infinite_ease-in-out_both]" style={{ backgroundColor: isDayMode ? palette.accentPrimary : 'rgba(255,255,255,0.50)', animationDelay: '-0.32s' }} />
+                      <span className="h-1.5 w-1.5 rounded-full animate-[bounce_1.4s_infinite_ease-in-out_both]" style={{ backgroundColor: isDayMode ? palette.accentPrimary : 'rgba(255,255,255,0.50)', animationDelay: '-0.16s' }} />
+                      <span className="h-1.5 w-1.5 rounded-full animate-[bounce_1.4s_infinite_ease-in-out_both]" style={{ backgroundColor: isDayMode ? palette.accentPrimary : 'rgba(255,255,255,0.50)' }} />
                     </div>
                   </div>
                 )}
               </div>
 
-              <form onSubmit={handleAssistantSend} className="border-t border-white/[0.06] p-3">
-                <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-black/40 px-3 py-2">
+              <form onSubmit={handleAssistantSend} className="p-3" style={{ borderTop: `1px solid ${isDayMode ? palette.borderSoft : 'rgba(255,255,255,0.06)'}` }}>
+                <div className="flex items-center gap-2 rounded-2xl px-3 py-2" style={{ border: `1px solid ${isDayMode ? palette.borderPrimary : 'rgba(255,255,255,0.10)'}`, backgroundColor: isDayMode ? palette.bgInput : 'rgba(0,0,0,0.40)' }}>
                   <input
                     value={chatInput}
                     onChange={(event) => setChatInput(event.target.value)}
                     type="text"
                     placeholder="Write a message..."
-                    className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/30"
+                    className="min-w-0 flex-1 bg-transparent text-sm outline-none"
+                    style={{ color: palette.textPrimary }}
                   />
                   <button
                     type="submit"
-                    className="rounded-xl bg-emerald-400 px-3 py-1.5 text-xs font-semibold text-black hover:bg-emerald-300"
+                    className="rounded-xl px-3 py-1.5 text-xs font-semibold hover:opacity-90"
+                    style={{ backgroundColor: palette.accentPrimary, color: '#000' }}
                   >
                     Send
                   </button>
@@ -1193,11 +1221,24 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
             style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
           >
             {assistantWaving && !assistantOpen ? (
-              <span className="absolute bottom-[118px] left-1/2 -translate-x-1/2 rounded-full border border-emerald-400/15 bg-emerald-500/8 px-3 py-1 text-center text-[11px] leading-5 text-emerald-50 shadow-[0_10px_30px_rgba(0,0,0,0.22)]">
-                <span className="absolute -bottom-1 left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 border-r border-b border-emerald-400/10 bg-emerald-500/8" />
+              <span className="absolute bottom-[118px] left-1/2 -translate-x-1/2 rounded-full px-3 py-1 text-center text-[11px] leading-5 shadow-[0_10px_30px_rgba(0,0,0,0.22)]"
+                style={{
+                  backgroundColor: isDayMode ? palette.bgSurface : 'rgba(16,185,129,0.08)',
+                  border: `1px solid ${isDayMode ? palette.accentBorder : 'rgba(16,185,129,0.15)'}`,
+                  color: isDayMode ? palette.textPrimary : '#ecfdf5',
+                }}
+              >
+                <span className="absolute -bottom-1 left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 border-r border-b"
+                  style={{
+                    borderColor: isDayMode ? palette.accentBorder : 'rgba(16,185,129,0.10)',
+                    backgroundColor: isDayMode ? palette.bgSurface : 'rgba(16,185,129,0.08)',
+                  }}
+                />
                 <span className="block font-medium min-w-[60px]">
                   {typedGreeting}
-                  <span className="inline-block w-[2px] h-[14px] bg-emerald-300/70 ml-0.5 align-middle animate-pulse" />
+                  <span className="inline-block w-[2px] h-[14px] ml-0.5 align-middle animate-pulse"
+                    style={{ backgroundColor: isDayMode ? palette.accentPrimary : 'rgba(110,231,183,0.7)' }}
+                  />
                 </span>
               </span>
             ) : null}

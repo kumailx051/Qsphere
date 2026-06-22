@@ -623,7 +623,7 @@ export default function BlogDetail() {
   }
 
   return (
-    <div className="relative min-h-screen flex flex-col overflow-hidden" style={{ backgroundColor: palette.bgPrimary, color: palette.textPrimary }}>
+    <div className="relative min-h-screen flex flex-col overflow-x-clip" style={{ backgroundColor: palette.bgPrimary, color: palette.textPrimary }}>
       <Navbar currentPage="blogs" />
 
       <style>{`
@@ -878,7 +878,7 @@ export default function BlogDetail() {
       <main className="flex-1 relative z-10 -mt-14 px-4 pb-24 sm:px-6 lg:-mt-16 lg:px-8">
         <div className="mx-auto w-full max-w-[1680px]">
           <div className="blog-shell rounded-[34px] p-5 sm:p-7 lg:p-10 xl:p-12">
-            <div className="grid justify-center gap-8 lg:grid-cols-[minmax(0,860px)_320px] lg:gap-12">
+            <div className="grid justify-center gap-8 lg:grid-cols-[minmax(0,860px)_320px] lg:items-stretch lg:gap-12">
               <article className="min-w-0">
                 <div className="mx-auto w-full max-w-[76ch]">
                   <div className="mb-8 grid gap-4 md:grid-cols-3">
@@ -910,8 +910,11 @@ export default function BlogDetail() {
                 </div>
               </article>
 
-              <aside className="min-w-0">
-                <div className="space-y-4 lg:sticky lg:top-28">
+              <aside className="min-w-0 lg:h-full">
+                <div
+                  className="space-y-4 lg:sticky lg:top-28 lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto lg:overscroll-contain lg:pr-1"
+                  style={{ backgroundColor: isDayMode ? '#ffffff' : 'transparent' }}
+                >
                   <div className="rounded-[26px] p-5" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.cardBg, boxShadow: isDayMode ? palette.shadowCard : '0 18px 50px -36px rgba(0,0,0,0.85)' }}>
                     <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.32em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(167,243,208,0.7)' }}>
                       <BookOpenText size={14} />

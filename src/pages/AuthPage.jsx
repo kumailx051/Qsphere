@@ -33,6 +33,8 @@ const EYE_CLOSED = (
 const OTP_FLOW_KEY = 'qsphere_otp_flow'
 const OTP_FLOW_VERIFY_EMAIL = 'verify-email'
 const OTP_FLOW_RESET_PASSWORD = 'reset-password'
+const OTP_FLOW_ADMIN_FIRST_LOGIN = 'admin-first-login'
+const ADMIN_SETUP_STAGE_KEY = 'qsphere_admin_setup_stage'
 
 const STAGE = {
   IDLE: 'idle',
@@ -343,13 +345,19 @@ const AuthPage = () => {
     setPageMessageType(type)
   }
 
-  const setOtpFlow = (flow, emailAddress) => {
+  const setOtpFlow = (flow, emailAddress, adminStage = '') => {
     localStorage.setItem('qsphere_email_to_verify', emailAddress)
     localStorage.setItem(OTP_FLOW_KEY, flow)
+    if (flow === OTP_FLOW_ADMIN_FIRST_LOGIN) {
+      localStorage.setItem(ADMIN_SETUP_STAGE_KEY, adminStage || 'otp')
+    } else {
+      localStorage.removeItem(ADMIN_SETUP_STAGE_KEY)
+    }
   }
 
   const clearOtpFlow = () => {
     localStorage.removeItem(OTP_FLOW_KEY)
+    localStorage.removeItem(ADMIN_SETUP_STAGE_KEY)
   }
 
   const getMissingFieldMessage = () => 'Fill this field'
@@ -398,6 +406,21 @@ const AuthPage = () => {
 
       const result = await response.json()
       if (!response.ok) {
+        if (
+          response.status === 403
+          && result.adminFirstLogin
+          && (result.needsVerification || result.requiresPasswordChange)
+        ) {
+          setOtpFlow(
+            OTP_FLOW_ADMIN_FIRST_LOGIN,
+            result.emailAddress || emailAddress,
+            result.requiresPasswordChange ? 'password' : 'otp'
+          )
+          showInlineMessage(result.error || 'Complete administrator security setup to continue.', 'info')
+          navigate('/otp')
+          return
+        }
+
         if (response.status === 403 && result.needsVerification) {
           setOtpFlow(OTP_FLOW_VERIFY_EMAIL, result.emailAddress || emailAddress)
           showInlineMessage(result.error || 'Your email is not verified yet. Redirecting to OTP verification.', 'error')
@@ -421,7 +444,9 @@ const AuthPage = () => {
         return
       }
 
-      if (!user.isOnboarded) {
+      const isAdmin = String(user.role || '').toLowerCase() === 'admin'
+
+      if (!isAdmin && !user.isOnboarded) {
         clearOtpFlow()
         localStorage.setItem('qsphere_email_to_verify', user.emailAddress)
         showInlineMessage('You have not completed onboarding yet. Redirecting to onboarding.', 'success')
@@ -446,7 +471,9 @@ const AuthPage = () => {
 
       showInlineMessage(`Welcome back to the Quantum Community, ${user.fullName}!`, 'success')
       window.dispatchEvent(new CustomEvent('qsphere-snackbar', { detail: { message: 'Logged in successfully', type: 'success' } }))
-      const redirectTo = location?.state?.redirectTo || '/dashboard'
+      window.dispatchEvent(new Event('qsphere-auth-changed'))
+      const requestedRedirect = location?.state?.redirectTo || '/dashboard'
+      const redirectTo = isAdmin ? '/admin' : (requestedRedirect.startsWith('/admin') ? '/dashboard' : requestedRedirect)
       setTimeout(() => navigate(redirectTo), 500)
     } catch (error) {
       if (error instanceof TypeError && error.message === 'Failed to fetch') {
@@ -514,8 +541,12 @@ const AuthPage = () => {
         }
 
         if (response.status === 400 && /already registered/i.test(result.error || '')) {
-          setRegisterErrors((current) => ({ ...current, email: result.error || 'This email is already registered.' }))
-          showInlineMessage(result.error || 'This email is already registered.', 'error')
+          const duplicateMessage = 'Email already exists. Please use a different email address.'
+          setRegisterErrors((current) => ({ ...current, email: duplicateMessage }))
+          showInlineMessage(duplicateMessage, 'error')
+          window.dispatchEvent(new CustomEvent('qsphere-snackbar', {
+            detail: { message: duplicateMessage, type: 'error' }
+          }))
           return
         }
 

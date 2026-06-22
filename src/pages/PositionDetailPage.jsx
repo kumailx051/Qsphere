@@ -191,7 +191,9 @@ export default function PositionDetailPage() {
             </Link>
           </div>
         </main>
-        <Footer />
+        <div style={{ position: 'relative', zIndex: 1 }}>
+          <Footer />
+        </div>
       </div>
     )
   }
@@ -687,7 +689,9 @@ export default function PositionDetailPage() {
         </div>
       </main>
 
-      <Footer />
+      <div style={{ position: 'relative', zIndex: 1 }}>
+        <Footer />
+      </div>
 
       <style>{`
         @keyframes detailFadeUp {

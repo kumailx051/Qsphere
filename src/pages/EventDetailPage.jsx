@@ -212,7 +212,9 @@ const EventDetailPage = () => {
           </div>
         </main>
 
-        <Footer />
+        <div style={{ position: 'relative', zIndex: 1 }}>
+          <Footer />
+        </div>
       </div>
     )
   }
@@ -581,7 +583,9 @@ const EventDetailPage = () => {
         </div>
       </main>
 
-      <Footer />
+      <div style={{ position: 'relative', zIndex: 1 }}>
+        <Footer />
+      </div>
 
       <style>{`
         @keyframes detailFadeUp {
