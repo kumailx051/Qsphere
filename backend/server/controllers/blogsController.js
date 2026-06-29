@@ -3,6 +3,7 @@ import {
   addBlogComment,
   createBlog,
   createBlogCategory,
+  createBlogReport,
   deleteBlog,
   deleteBlogComment,
   getBlogById,
@@ -60,4 +61,8 @@ export const updateComment = asyncHandler(async (request, response) => {
 
 export const removeComment = asyncHandler(async (request, response) => {
   response.json(await deleteBlogComment(request.params.commentId, request.body ?? {}))
+})
+
+export const reportBlog = asyncHandler(async (request, response) => {
+  response.status(201).json(await createBlogReport(request.params.id, request.body ?? {}))
 })

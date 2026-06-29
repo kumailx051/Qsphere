@@ -6,6 +6,7 @@ import {
   getBlogs,
   getComments,
   getUserBlogs,
+  reportBlog,
   remove,
   removeComment,
   update,
@@ -18,6 +19,7 @@ router.get('/', getBlogs)
 router.get('/user/:email', getUserBlogs)
 router.get('/:id/comments', getComments)
 router.post('/:id/comments', createComment)
+router.post('/:id/report', reportBlog)
 router.put('/:id/comments/:commentId', updateComment)
 router.delete('/:id/comments/:commentId', removeComment)
 router.get('/:id', getBlog)

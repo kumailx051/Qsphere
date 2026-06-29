@@ -194,7 +194,7 @@ export default function ContactPage() {
       </div>
 
       <main className="relative z-10 flex-grow px-6 pt-32 pb-24 md:px-10 lg:px-14 xl:px-20">
-        <div className="mx-auto max-w-[1500px] space-y-8">
+        <div className="qs-page-container space-y-8">
           <section
             className="relative overflow-hidden rounded-[40px]"
             style={{
@@ -248,9 +248,9 @@ export default function ContactPage() {
                 </div>
 
                 <h1
-                  className="max-w-5xl text-5xl font-bold leading-[0.9] md:text-6xl xl:text-[5.35rem]"
+                  className="type-heading-soft max-w-4xl"
                   style={{
-                    fontFamily: "'Syne', sans-serif",
+                    fontFamily: 'var(--font-heading)',
                     color: palette.textPrimary,
                     textShadow: isDayMode ? '0 12px 36px rgba(255,255,255,0.6)' : '0 0 40px rgba(16,185,129,0.08)',
                   }}
@@ -260,10 +260,7 @@ export default function ContactPage() {
                   <span style={{ color: palette.accentPrimary }}>through better conversations.</span>
                 </h1>
 
-                <p
-                  className="mt-7 max-w-3xl text-base leading-8 md:text-lg xl:text-[1.12rem]"
-                  style={{ color: palette.textSecondary }}
-                >
+                <p className="mt-7 max-w-3xl text-base leading-8" style={{ color: palette.textSecondary }}>
                   Have a question, a collaboration idea, or a serious quantum initiative worth talking through? This page is built to make that outreach feel clean, direct, and intentional.
                 </p>
 
@@ -284,7 +281,7 @@ export default function ContactPage() {
                       <div className="text-[10px] font-bold uppercase tracking-[0.24em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.8)' }}>
                         {item.label}
                       </div>
-                      <div className="mt-4 text-2xl font-bold" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
+                      <div className="type-cardHeading mt-4" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
                         {item.value}
                       </div>
                     </div>
@@ -337,7 +334,7 @@ export default function ContactPage() {
                     >
                       Conversation quality
                     </div>
-                    <h2 className="mt-4 text-3xl font-bold" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
+                    <h2 className="type-sectionHeading mt-4" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
                       We care about the signal, not just the message volume.
                     </h2>
                     <p className="mt-4 text-sm leading-7" style={{ color: palette.textSecondary }}>
@@ -363,7 +360,7 @@ export default function ContactPage() {
               <div className="text-[10px] font-bold uppercase tracking-[0.32em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.78)' }}>
                 Direct channels
               </div>
-              <h2 className="mt-5 text-4xl font-bold leading-[0.95] md:text-5xl" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
+              <h2 className="mt-5 type-sectionHeading" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
                 Reach us through the route that fits best.
               </h2>
               <p className="mt-6 text-base leading-8" style={{ color: palette.textSecondary }}>
@@ -425,7 +422,7 @@ export default function ContactPage() {
                   <div className="text-[10px] font-bold uppercase tracking-[0.32em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.78)' }}>
                     Send a message
                   </div>
-                  <h2 className="mt-4 text-4xl font-bold leading-[0.95] md:text-5xl" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
+                  <h2 className="type-sectionHeading mt-4" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
                     Start the conversation here.
                   </h2>
                 </div>
@@ -606,7 +603,7 @@ export default function ContactPage() {
                 <div className="text-[10px] font-bold uppercase tracking-[0.32em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.78)' }}>
                   What to expect
                 </div>
-                <h2 className="mt-4 text-4xl font-bold leading-[0.95] md:text-5xl" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
+                <h2 className="type-sectionHeading mt-4" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
                   A better outreach experience by design.
                 </h2>
               </div>

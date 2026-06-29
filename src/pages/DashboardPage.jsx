@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { motion, useScroll, useTransform } from 'framer-motion'
 import {
@@ -11,6 +11,7 @@ import {
   LayoutDashboard,
   Mail,
   MapPin,
+  MessageSquare,
   PenLine,
   Sparkles,
   Telescope,
@@ -181,8 +182,16 @@ const StatCard = ({ label, value, tone, palette, isDayMode }) => (
       backgroundColor: isDayMode ? 'rgba(255,255,255,0.76)' : 'rgba(0,0,0,0.2)',
     }}
   >
-    <div className="text-[10px] font-bold uppercase tracking-[0.24em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.8)' }}>{label}</div>
-    <div className="mt-4 text-4xl font-bold" style={{ fontFamily: "'Syne', sans-serif", color: tone || palette.textPrimary }}>{value}</div>
+    <div className="type-labelText" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.8)' }}>{label}</div>
+    <div
+      className="type-statValue mt-4 break-words"
+      style={{
+        fontFamily: 'var(--font-heading)',
+        color: tone || palette.textPrimary,
+      }}
+    >
+      {value}
+    </div>
   </motion.div>
 )
 
@@ -208,7 +217,7 @@ const ActionCard = ({ icon: Icon, title, description, to, onClick, accent, palet
         </div>
 
         <div className="mt-6 text-[10px] font-bold uppercase tracking-[0.24em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.78)' }}>Quick action</div>
-        <h3 className="mt-4 text-2xl font-bold leading-tight transition-colors duration-300" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
+        <h3 className="type-cardHeading mt-4 leading-tight transition-colors duration-300" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
           {title}
         </h3>
         <p className="mt-4 text-sm leading-7" style={{ color: palette.textSecondary }}>{description}</p>
@@ -254,20 +263,11 @@ const RouteCard = ({ icon: Icon, label, description, to, palette, isDayMode }) =
 const DashboardPage = () => {
   const navigate = useNavigate()
   const location = useLocation()
-  const [profile, setProfile] = useState(() => location.state?.profile ?? readStoredProfile())
+  const profile = useMemo(() => location.state?.profile ?? readStoredProfile(), [location.state])
   const { theme } = useTheme()
 
   const isDayMode = theme === 'light'
   const palette = isDayMode ? dayTheme : darkTheme
-
-  useEffect(() => {
-    if (location.state?.profile) {
-      setProfile(location.state.profile)
-      return
-    }
-
-    setProfile(readStoredProfile())
-  }, [location.state])
 
   const roleConfig = useMemo(() => {
     if (!profile?.role) return onboardingRoles[0]
@@ -280,6 +280,7 @@ const DashboardPage = () => {
     () => formatDateLabel(profile?.created_at || profile?.submittedAt),
     [profile],
   )
+  const isStudentRole = String(roleConfig?.id || profile?.role || '').toLowerCase() === 'student'
 
   const profileEmail = profile?.emailAddress || profile?.email || 'Email not available'
   const profileAvatar = profile?.profileImage || profile?.avatarPreview || ''
@@ -317,7 +318,7 @@ const DashboardPage = () => {
               <LayoutDashboard size={30} />
             </div>
             <div className="mt-6 text-[10px] font-bold uppercase tracking-[0.3em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.78)' }}>Dashboard</div>
-            <h1 className="mt-4 text-4xl font-bold leading-[0.95] md:text-5xl" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
+            <h1 className="type-heading-soft mt-4 max-w-3xl mx-auto" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
               Your control room is ready,
               <br />
               <span style={{ color: palette.accentPrimary }}>but your profile comes first.</span>
@@ -396,15 +397,15 @@ const DashboardPage = () => {
                 </div>
 
                 <h1
-                  className="max-w-5xl text-5xl font-bold leading-[0.9] md:text-6xl xl:text-[5.2rem]"
-                  style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary, textShadow: isDayMode ? '0 12px 36px rgba(255,255,255,0.55)' : '0 0 40px rgba(16,185,129,0.08)' }}
+                  className="type-heading-soft max-w-3xl xl:max-w-[54rem]"
+                  style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary, textShadow: isDayMode ? '0 12px 36px rgba(255,255,255,0.55)' : '0 0 40px rgba(16,185,129,0.08)' }}
                 >
                   Your quantum control room,
                   <br />
                   <span style={{ color: palette.accentPrimary }}>shaped around your role.</span>
                 </h1>
 
-                <p className="mt-7 max-w-3xl text-base leading-8 md:text-lg xl:text-[1.12rem]" style={{ color: palette.textSecondary }}>
+                <p className="mt-7 max-w-3xl text-base leading-8" style={{ color: palette.textSecondary }}>
                   Move quickly between publishing, collaboration, opportunities, and account controls without the dashboard feeling noisy or overloaded.
                 </p>
 
@@ -452,7 +453,7 @@ const DashboardPage = () => {
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <div className="text-[10px] font-bold uppercase tracking-[0.28em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.8)' }}>Profile signal</div>
-                      <h2 className="mt-4 text-3xl font-bold leading-tight md:text-[2.1rem]" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
+                      <h2 className="type-cardHeading mt-4 leading-tight" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
                         {profile.fullName || 'Explorer'}
                       </h2>
                     </div>
@@ -508,6 +509,45 @@ const DashboardPage = () => {
             </div>
           </motion.section>
 
+          <motion.div
+            variants={itemVariants}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: '-40px' }}
+            className="mt-10 flex items-center gap-4 px-2"
+            aria-hidden="true"
+          >
+            <div
+              className="h-px flex-1"
+              style={{
+                background: `linear-gradient(to right, transparent, ${isDayMode ? 'rgba(46,197,138,0.18)' : 'rgba(110,231,183,0.2)'}, transparent)`,
+              }}
+            />
+            <div
+              className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-[10px] font-bold uppercase tracking-[0.24em]"
+              style={{
+                border: `1px solid ${palette.borderPrimary}`,
+                backgroundColor: isDayMode ? 'rgba(255,255,255,0.82)' : 'rgba(255,255,255,0.03)',
+                color: palette.textMuted,
+              }}
+            >
+              <span
+                className="h-2 w-2 rounded-full"
+                style={{
+                  backgroundColor: palette.accentPrimary,
+                  boxShadow: isDayMode ? '0 0 10px rgba(46,197,138,0.25)' : '0 0 12px rgba(16,185,129,0.45)',
+                }}
+              />
+              Next layer
+            </div>
+            <div
+              className="h-px flex-1"
+              style={{
+                background: `linear-gradient(to right, transparent, ${isDayMode ? 'rgba(46,197,138,0.18)' : 'rgba(110,231,183,0.2)'}, transparent)`,
+              }}
+            />
+          </motion.div>
+
           <motion.section
             variants={containerVariants}
             initial="hidden"
@@ -519,7 +559,7 @@ const DashboardPage = () => {
             <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div>
                 <div className="text-[10px] font-bold uppercase tracking-[0.32em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.78)' }}>Command deck</div>
-                <h2 className="mt-4 text-3xl font-bold md:text-4xl" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
+                <h2 className="type-sectionHeading mt-4" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
                   Go straight to the work that matters.
                 </h2>
               </div>
@@ -541,19 +581,26 @@ const DashboardPage = () => {
                   to: '/groups/new',
                   accent: isDayMode ? 'rgba(6,182,212,0.08)' : 'rgba(6,182,212,0.12)',
                 },
-                {
+                !isStudentRole && {
                   icon: CalendarPlus,
-                  title: 'Launch an event',
+                  title: 'Post an event',
                   description: 'Schedule a workshop, seminar, meetup, or signal-rich session for the broader community.',
                   to: '/events/new',
                   accent: isDayMode ? 'rgba(251,191,36,0.10)' : 'rgba(251,191,36,0.12)',
                 },
-                {
+                !isStudentRole && {
                   icon: Briefcase,
                   title: 'Post an opening',
                   description: 'Share internships, research roles, and collaboration opportunities with stronger context upfront.',
                   to: '/positions/new',
                   accent: isDayMode ? 'rgba(99,102,241,0.10)' : 'rgba(99,102,241,0.12)',
+                },
+                {
+                  icon: MessageSquare,
+                  title: 'Start a discussion',
+                  description: 'Post a thread, ask a question, or share an idea with the quantum community.',
+                  to: '/threads',
+                  accent: isDayMode ? 'rgba(16,185,129,0.10)' : 'rgba(16,185,129,0.12)',
                 },
                 {
                   icon: UserCog,
@@ -562,13 +609,107 @@ const DashboardPage = () => {
                   onClick: () => navigate('/account', { state: { profile } }),
                   accent: isDayMode ? 'rgba(46,197,138,0.10)' : 'rgba(16,185,129,0.12)',
                 },
-              ].map((item) => (
+              ].filter(Boolean).map((item) => (
                 <motion.div key={item.title} variants={itemVariants}>
                   <ActionCard {...item} palette={palette} isDayMode={isDayMode} />
                 </motion.div>
               ))}
             </motion.div>
           </motion.section>
+
+          <motion.div
+            variants={itemVariants}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: '-40px' }}
+            className="mt-8 px-2"
+            aria-hidden="true"
+          >
+            <div
+              className="relative h-px w-full overflow-hidden rounded-full"
+              style={{
+                background: isDayMode
+                  ? 'linear-gradient(90deg, transparent 0%, rgba(46,197,138,0.08) 18%, rgba(46,197,138,0.35) 50%, rgba(46,197,138,0.08) 82%, transparent 100%)'
+                  : 'linear-gradient(90deg, transparent 0%, rgba(110,231,183,0.08) 18%, rgba(110,231,183,0.3) 50%, rgba(110,231,183,0.08) 82%, transparent 100%)',
+              }}
+            >
+              <div
+                className="absolute left-1/2 top-1/2 h-2.5 w-20 -translate-x-1/2 -translate-y-1/2 rounded-full blur-md"
+                style={{
+                  backgroundColor: isDayMode ? 'rgba(46,197,138,0.22)' : 'rgba(110,231,183,0.22)',
+                }}
+              />
+            </div>
+          </motion.div>
+
+          {!isStudentRole && (
+            <>
+              <motion.section
+                variants={containerVariants}
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true, margin: '-60px' }}
+                className="mt-10"
+              >
+                <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                  <div>
+                    <div className="text-[10px] font-bold uppercase tracking-[0.32em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.78)' }}>Manage events & positions</div>
+                    <h2 className="type-sectionHeading mt-4" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
+                      Track every registration and application in one sweep.
+                    </h2>
+                  </div>
+                </div>
+
+                <motion.div variants={containerVariants} initial="hidden" whileInView="visible" viewport={{ once: true }} className="grid gap-6 md:grid-cols-2">
+                  {[
+                    {
+                      icon: CalendarPlus,
+                      title: 'Manage events',
+                      description: 'See everyone who registered for the events you posted and keep your attendee signal clean.',
+                      to: '/dashboard/manage-events',
+                      accent: isDayMode ? 'rgba(251,191,36,0.10)' : 'rgba(251,191,36,0.12)',
+                    },
+                    {
+                      icon: Briefcase,
+                      title: 'Manage positions',
+                      description: 'Review applicants, CV-assisted submissions, and candidate details for the openings you created.',
+                      to: '/dashboard/manage-positions',
+                      accent: isDayMode ? 'rgba(99,102,241,0.10)' : 'rgba(99,102,241,0.12)',
+                    },
+                  ].map((item) => (
+                    <motion.div key={item.title} variants={itemVariants}>
+                      <ActionCard {...item} palette={palette} isDayMode={isDayMode} />
+                    </motion.div>
+                  ))}
+                </motion.div>
+              </motion.section>
+
+              <motion.div
+                variants={itemVariants}
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true, margin: '-40px' }}
+                className="mt-8 px-2"
+                aria-hidden="true"
+              >
+                <div
+                  className="relative h-px w-full overflow-hidden rounded-full"
+                  style={{
+                    background: isDayMode
+                      ? 'linear-gradient(90deg, transparent 0%, rgba(46,197,138,0.08) 18%, rgba(46,197,138,0.35) 50%, rgba(46,197,138,0.08) 82%, transparent 100%)'
+                      : 'linear-gradient(90deg, transparent 0%, rgba(110,231,183,0.08) 18%, rgba(110,231,183,0.3) 50%, rgba(110,231,183,0.08) 82%, transparent 100%)',
+                  }}
+                >
+                  <div
+                    className="absolute left-1/2 top-1/2 h-2.5 w-20 -translate-x-1/2 -translate-y-1/2 rounded-full blur-md"
+                    style={{
+                      backgroundColor: isDayMode ? 'rgba(46,197,138,0.22)' : 'rgba(110,231,183,0.22)',
+                    }}
+                  />
+                </div>
+              </motion.div>
+            </>
+          )}
 
           <motion.section
             variants={containerVariants}
@@ -579,7 +720,7 @@ const DashboardPage = () => {
           >
             <motion.div variants={itemVariants} className="rounded-[34px] p-7 md:p-8" style={{ border: `1px solid ${palette.borderPrimary}`, background: isDayMode ? 'linear-gradient(145deg, rgba(255,255,255,0.96), rgba(247,247,245,0.90))' : 'linear-gradient(145deg, rgba(255,255,255,0.05), rgba(255,255,255,0.015))', boxShadow: isDayMode ? '0 28px 100px rgba(15,23,42,0.08)' : '0 28px 100px rgba(0,0,0,0.42)' }}>
               <div className="text-[10px] font-bold uppercase tracking-[0.3em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.78)' }}>Profile readiness</div>
-              <h2 className="mt-4 text-3xl font-bold" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
+              <h2 className="type-sectionHeading mt-4" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
                 Keep your signal sharp.
               </h2>
               <p className="mt-5 max-w-2xl text-sm leading-7" style={{ color: palette.textSecondary }}>
@@ -631,7 +772,7 @@ const DashboardPage = () => {
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <div className="text-[10px] font-bold uppercase tracking-[0.3em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.78)' }}>Workspace routes</div>
-                  <h2 className="mt-4 text-3xl font-bold" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
+                  <h2 className="type-sectionHeading mt-4" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
                     Step into the right room.
                   </h2>
                 </div>
@@ -644,6 +785,7 @@ const DashboardPage = () => {
               <div className="mt-7 grid gap-4">
                 <RouteCard icon={BookPlus} label="Browse blogs" description="Read the latest journal entries and community writing." to="/blogs" palette={palette} isDayMode={isDayMode} />
                 <RouteCard icon={Users2} label="Explore groups" description="Find collaboration spaces and research communities." to="/groups" palette={palette} isDayMode={isDayMode} />
+                <RouteCard icon={MessageSquare} label="Community threads" description="Ask questions, share ideas, and discuss quantum topics with the community." to="/threads" palette={palette} isDayMode={isDayMode} />
                 <RouteCard icon={CalendarPlus} label="See events" description="Jump into workshops, sessions, and live community gatherings." to="/events" palette={palette} isDayMode={isDayMode} />
                 <RouteCard icon={Briefcase} label="View positions" description="Review open roles, internships, and collaboration calls." to="/positions" palette={palette} isDayMode={isDayMode} />
               </div>

@@ -25,18 +25,18 @@ export default function NotFoundPage() {
       <main className="relative z-10 flex-grow flex items-center justify-center px-6 pt-32 pb-24">
         <div className="text-center max-w-lg">
           <div className="font-black leading-none mb-4" style={{
-            fontSize: 'clamp(5rem, 12vw, 9rem)',
-            fontFamily: "'Archivo Black', 'Inter', sans-serif",
+            fontSize: 'var(--type-displayNumber-size)',
+            fontFamily: 'var(--font-accent)',
             color: palette.accentPrimary,
             textShadow: `0 0 60px ${isDayMode ? 'rgba(46,197,138,0.2)' : 'rgba(16,185,129,0.25)'}`,
           }}>
             404
           </div>
           <div className="w-16 h-0.5 mx-auto mb-6" style={{ backgroundColor: palette.accentBorder }} />
-          <h1 className="text-2xl md:text-3xl font-bold mb-3" style={{ fontFamily: "'Archivo Black', 'Inter', sans-serif", color: palette.textPrimary }}>
+          <h1 className="type-cardHeading mb-3" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
             Page Not Found
           </h1>
-          <p className="text-sm md:text-base leading-relaxed mb-8" style={{ color: palette.textMuted }}>
+          <p className="text-sm md:text-base leading-relaxed mb-8" style={{ color: palette.textMuted, fontSize: 'var(--type-bodyText-size)', lineHeight: 'var(--type-bodyText-lineHeight)' }}>
             The page you're looking for doesn't exist or has been moved.
           </p>
           <div className="flex items-center justify-center gap-3">

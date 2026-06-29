@@ -7,7 +7,7 @@
 
 body {
   background: #000 !important;
-  font-family: 'DM Sans', sans-serif;
+  font-family: var(--font-body);
 }
 
 .desktop-gate {
@@ -43,16 +43,16 @@ body {
 
 .desktop-gate__title {
   color: #f5f5f5;
-  font-family: 'Syne', sans-serif;
-  font-size: clamp(2rem, 7vw, 2.8rem);
-  line-height: 0.95;
+  font-family: var(--font-heading);
+  font-size: var(--type-heading-size);
+  line-height: var(--type-heading-lineHeight);
 }
 
 .desktop-gate__copy {
   margin-top: 18px;
   color: rgba(255, 255, 255, 0.78);
-  font-size: 0.98rem;
-  line-height: 1.7;
+  font-size: var(--type-bodyText-size);
+  line-height: var(--type-bodyText-lineHeight);
 }
 
 .desktop-gate__hint {

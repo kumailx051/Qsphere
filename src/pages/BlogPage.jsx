@@ -177,15 +177,15 @@ const BlogPage = () => {
             </div>
 
             <h1
-              className="max-w-5xl text-5xl font-bold leading-[0.9] md:text-6xl xl:text-[5.4rem]"
-              style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary, textShadow: isDayMode ? '0 12px 36px rgba(255,255,255,0.6)' : '0 0 40px rgba(16,185,129,0.08)' }}
+              className="type-heading-soft max-w-3xl xl:max-w-[54rem]"
+              style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary, textShadow: isDayMode ? '0 12px 36px rgba(255,255,255,0.6)' : '0 0 40px rgba(16,185,129,0.08)' }}
             >
               Quantum thinking,
               <br />
               <span style={{ color: palette.accentPrimary }}>written with weight.</span>
             </h1>
 
-            <p className="mt-7 max-w-3xl text-base leading-8 md:text-lg xl:text-[1.12rem]" style={{ color: palette.textSecondary }}>
+            <p className="mt-7 max-w-3xl text-base leading-8" style={{ color: palette.textSecondary }}>
               Research notes, frontier ideas, technical breakdowns, and stories from people building at the edge of quantum science.
             </p>
 
@@ -216,7 +216,9 @@ const BlogPage = () => {
               ].map((item) => (
                 <motion.div key={item.label} variants={itemVariants} className="rounded-[28px] p-5 backdrop-blur-xl" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: isDayMode ? 'rgba(255,255,255,0.72)' : 'rgba(0,0,0,0.2)' }}>
                   <div className="text-[10px] font-bold uppercase tracking-[0.24em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.8)' }}>{item.label}</div>
-                  <div className="mt-4 text-4xl font-bold" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>{item.value}</div>
+                  <div className="type-statValue mt-4" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
+                    {item.value}
+                  </div>
                 </motion.div>
               ))}
             </motion.div>
@@ -261,7 +263,7 @@ const BlogPage = () => {
             <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: isDayMode ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)' }}>
               <BookOpen size={32} style={{ color: palette.textMuted }} />
             </div>
-            <h3 className="mb-3 text-3xl font-bold" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
+            <h3 className="type-sectionHeading mb-3" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
               No articles yet.
             </h3>
             <p className="max-w-xl text-sm leading-7" style={{ color: palette.textSecondary }}>
@@ -325,7 +327,7 @@ const BlogPage = () => {
 
                   <div className="relative p-7 md:p-10 xl:p-12">
                     <span className="inline-flex items-center rounded-full px-4 py-2 text-[11px] font-extrabold uppercase tracking-[0.28em]" style={{ backgroundColor: palette.accentPrimary, color: '#ffffff', boxShadow: isDayMode ? '0 10px 25px -5px rgba(16,185,129,0.3)' : '0 0 22px rgba(16,185,129,0.35)' }}>Featured Article</span>
-                    <h2 className="mt-5 max-w-3xl text-4xl font-bold leading-[0.94] transition-colors duration-300 md:text-5xl" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
+                    <h2 className="mt-5 max-w-3xl type-sectionHeading transition-colors duration-300" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
                       {featuredPost.title}
                     </h2>
 
@@ -377,7 +379,7 @@ const BlogPage = () => {
               <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                 <div>
                   <div className="text-[10px] font-bold uppercase tracking-[0.32em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.78)' }}>Article grid</div>
-                  <h2 className="mt-4 text-3xl font-bold md:text-4xl" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
+                  <h2 className="type-sectionHeading mt-4" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
                     Stories with more editorial gravity.
                   </h2>
                 </div>
@@ -449,8 +451,8 @@ const BlogPage = () => {
                   </div>
 
                   <h3 
-                    className="font-bold text-2xl mb-4 transition-colors duration-300"
-                    style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}
+                    className="type-statValue mb-4 transition-colors duration-300"
+                    style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}
                   >
                     {post.title}
                   </h3>

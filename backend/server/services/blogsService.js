@@ -211,3 +211,60 @@ export const deleteBlogComment = async (commentId, payload) => {
   await pool.query('DELETE FROM blog_comments WHERE id = $1', [parsedId])
   return { success: true }
 }
+
+export const createBlogReport = async (id, payload) => {
+  const blogId = Number(id)
+  if (!blogId) throw createHttpError(400, 'Invalid blog id')
+
+  const reporterEmail = normalizeEmail(payload?.reportedByEmail)
+  const reporterName = String(payload?.reportedByName || '').trim()
+  const reason = String(payload?.reason || '').trim()
+  const details = String(payload?.details || '').trim()
+
+  if (!reporterEmail) throw createHttpError(400, 'Reporter email is required')
+  if (!reporterName) throw createHttpError(400, 'Reporter name is required')
+  if (!reason) throw createHttpError(400, 'Report reason is required')
+
+  const blogResult = await pool.query(
+    'SELECT id, title, author, "authorEmail" FROM blogs WHERE id = $1 LIMIT 1',
+    [blogId],
+  )
+  if (blogResult.rowCount === 0) throw createHttpError(404, 'Blog not found')
+
+  const blog = blogResult.rows[0]
+  if (normalizeEmail(blog.authorEmail) === reporterEmail) {
+    throw createHttpError(400, 'You cannot report your own blog')
+  }
+
+  try {
+    const insertResult = await pool.query(
+      `INSERT INTO blog_reports (
+        "blogId",
+        "blogTitle",
+        "blogAuthorEmail",
+        "reportedByEmail",
+        "reportedByName",
+        reason,
+        details
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      RETURNING *`,
+      [
+        blogId,
+        blog.title,
+        normalizeEmail(blog.authorEmail),
+        reporterEmail,
+        reporterName,
+        reason,
+        details || null,
+      ],
+    )
+
+    return insertResult.rows[0]
+  } catch (error) {
+    if (error?.code === '23505') {
+      throw createHttpError(409, 'You have already reported this blog')
+    }
+    throw error
+  }
+}

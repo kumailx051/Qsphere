@@ -16,13 +16,19 @@ import GroupsPage from './pages/GroupsPage'
 import GroupDetailPage from './pages/GroupDetailPage'
 import ProjectDetailsPage from './pages/ProjectDetailsPage'
 import CreateOpportunityPage from './pages/CreateOpportunityPage'
+import ThreadsPage from './pages/ThreadsPage'
+import ThreadDetailPage from './pages/ThreadDetailPage'
 import EventsPage from './pages/EventsPage'
 import EventDetailPage from './pages/EventDetailPage'
 import PositionsPage from './pages/PositionsPage'
 import PositionDetailPage from './pages/PositionDetailPage'
+import ManageEventsPage from './pages/ManageEventsPage'
+import ManagePositionsPage from './pages/ManagePositionsPage'
 import NotFoundPage from './pages/NotFoundPage'
 import AdminGuard from './pages/admin/AdminGuard'
+import UserGuard from './components/UserGuard'
 import AdminDashboardPage from './pages/admin/AdminDashboardPage'
+import AdminBlogManagementPage from './pages/admin/AdminBlogManagementPage'
 import AdminUsersPage from './pages/admin/AdminUsersPage'
 import AdminUserDetailPage from './pages/admin/AdminUserDetailPage'
 
@@ -97,22 +103,27 @@ function App() {
               <Route path="/auth" element={<AuthPage />} />
               <Route path="/otp" element={<OtpPage />} />
               <Route path="/onboarding" element={<OnboardingPage />} />
-              <Route path="/dashboard" element={<DashboardPage />} />
-              <Route path="/account" element={<AccountManagementPage />} />
+              <Route path="/dashboard" element={<UserGuard><DashboardPage /></UserGuard>} />
+              <Route path="/account" element={<UserGuard allowAdmin><AccountManagementPage /></UserGuard>} />
               <Route path="/blogs" element={<BlogPage />} />
-              <Route path="/blogs/new" element={<CreateBlogPage />} />
+              <Route path="/blogs/new" element={<UserGuard><CreateBlogPage /></UserGuard>} />
               <Route path="/blogs/:id" element={<BlogDetail />} />
               <Route path="/groups" element={<GroupsPage />} />
               <Route path="/groups/:id" element={<GroupDetailPage />} />
-              <Route path="/groups/new" element={<CreateGroupPage />} />
-              <Route path="/events/new" element={<CreateOpportunityPage />} />
-              <Route path="/positions/new" element={<CreateOpportunityPage />} />
+              <Route path="/groups/new" element={<UserGuard><CreateGroupPage /></UserGuard>} />
+              <Route path="/threads" element={<ThreadsPage />} />
+              <Route path="/threads/:id" element={<ThreadDetailPage />} />
+              <Route path="/events/new" element={<UserGuard><CreateOpportunityPage /></UserGuard>} />
+              <Route path="/positions/new" element={<UserGuard><CreateOpportunityPage /></UserGuard>} />
               <Route path="/events" element={<EventsPage />} />
               <Route path="/events/:id" element={<EventDetailPage />} />
               <Route path="/positions" element={<PositionsPage />} />
               <Route path="/positions/:id" element={<PositionDetailPage />} />
+              <Route path="/dashboard/manage-events" element={<UserGuard><ManageEventsPage /></UserGuard>} />
+              <Route path="/dashboard/manage-positions" element={<UserGuard><ManagePositionsPage /></UserGuard>} />
               <Route path="/projects/:id" element={<ProjectDetailsPage />} />
               <Route path="/admin" element={<AdminGuard><AdminDashboardPage /></AdminGuard>} />
+              <Route path="/admin/blog-management" element={<AdminGuard><AdminBlogManagementPage /></AdminGuard>} />
               <Route path="/admin/users" element={<AdminGuard><AdminUsersPage /></AdminGuard>} />
               <Route path="/admin/users/:id" element={<AdminGuard><AdminUserDetailPage /></AdminGuard>} />
               <Route path="*" element={<NotFoundPage />} />

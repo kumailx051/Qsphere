@@ -1,3 +1,5 @@
+@import './styles/typography.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -12,18 +14,19 @@ html, body {
   background: #000;
   color: #fff;
   overflow-x: clip;
+  font-family: var(--font-body);
 }
 
 /* Custom Typography for rich text editor since @tailwindcss/typography isn't installed */
 .prose {
   color: rgba(255, 255, 255, 0.85);
-  font-size: 1rem;
-  line-height: 1.75;
+  font-size: var(--type-proseBody-size);
+  line-height: var(--type-proseBody-lineHeight);
 }
 
 .prose h1 {
   color: #fff;
-  font-size: 2.25em;
+  font-size: var(--type-proseH1-size);
   margin-top: 0;
   margin-bottom: 0.8888889em;
   line-height: 1.1111111;
@@ -32,7 +35,7 @@ html, body {
 
 .prose h2 {
   color: #fff;
-  font-size: 1.5em;
+  font-size: var(--type-proseH2-size);
   margin-top: 2em;
   margin-bottom: 1em;
   line-height: 1.3333333;
@@ -41,10 +44,19 @@ html, body {
 
 .prose h3 {
   color: #fff;
-  font-size: 1.25em;
+  font-size: var(--type-proseH3-size);
   margin-top: 1.6em;
   margin-bottom: 0.6em;
   line-height: 1.6;
+  font-weight: 600;
+}
+
+.prose h4 {
+  color: #fff;
+  font-size: var(--type-proseH4-size);
+  margin-top: 1.35em;
+  margin-bottom: 0.5em;
+  line-height: 1.5;
   font-weight: 600;
 }
 
@@ -108,8 +120,8 @@ html, body {
   text-align: left;
   margin-top: 2em;
   margin-bottom: 2em;
-  font-size: 0.875em;
-  line-height: 1.7142857;
+  font-size: var(--type-cardBody-size);
+  line-height: var(--type-cardBody-lineHeight);
   border-collapse: collapse;
 }
 

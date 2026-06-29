@@ -1,16 +1,21 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import {
   ArrowLeft,
   ArrowUpRight,
+  Building2,
   Briefcase,
   CheckCircle2,
   Clock,
   ExternalLink,
+  FileText,
+  Link2,
   Mail,
   MapPin,
+  Phone,
   Send,
   Sparkles,
+  Upload,
   User,
 } from 'lucide-react'
 import Navbar from '../components/Navbar'
@@ -18,11 +23,25 @@ import Footer from '../components/Footer'
 import { useTheme } from '../contexts/ThemeContext'
 import { dayTheme, darkTheme } from '../themeColors'
 import {
-  getPositionById,
-  getStoredPositions,
   parsePositionDeadline,
   splitPositionRequirements,
 } from '../utils/positionStore'
+import {
+  checkPositionApplicationConflicts,
+  fetchPositionApplication,
+  fetchPositionById,
+  fetchPositions,
+  submitPositionApplication,
+} from '../utils/opportunitiesApi'
+import { extractResumeText, parseResumeAutofill } from '../utils/resumeAutofill'
+import {
+  getCurrentUserAffiliation,
+  getCurrentUserEmail,
+  getCurrentUserLocation,
+  getCurrentUserPhone,
+  getCurrentUserRoleSummary,
+  readStoredProfile,
+} from '../utils/profileStore'
 
 const getTypeStyles = (isDayMode) => ({
   'Research Assistant': isDayMode 
@@ -59,8 +78,6 @@ const getLocationVariants = (isDayMode) => ({
     glow: isDayMode ? 'rgba(16,185,129,0.08)' : 'rgba(16,185,129,0.16)' 
   },
 })
-
-const APPLICATION_STORAGE_KEY = 'qsphere_position_applications'
 
 const getPositionTone = (position) => {
   if (position.type === 'Intern') {
@@ -130,43 +147,177 @@ const getRoleNotes = (position) => {
 
 const isExternalLink = (value) => /^https?:\/\//i.test(String(value || '').trim())
 
-const readStoredProfile = () => {
-  try {
-    const raw = localStorage.getItem('qsphere_onboarding_profile')
-    return raw ? JSON.parse(raw) : null
-  } catch {
-    return null
-  }
-}
-
 const showSnackbar = (message, type = 'success') => {
   window.dispatchEvent(new CustomEvent('qsphere-snackbar', { detail: { message, type } }))
 }
 
+const splitSkillTags = (value) =>
+  String(value || '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
+
+const buildApplicationForm = (profile, existingApplication = null) => ({
+  fullName: existingApplication?.fullName || profile?.fullName || '',
+  email: existingApplication?.email || getCurrentUserEmail(profile) || '',
+  phone: existingApplication?.phone || getCurrentUserPhone(profile) || '',
+  location: existingApplication?.location || getCurrentUserLocation(profile) || '',
+  currentRole: existingApplication?.currentRole || getCurrentUserRoleSummary(profile) || '',
+  organization: existingApplication?.organization || getCurrentUserAffiliation(profile) || '',
+  linkedinUrl: existingApplication?.linkedinUrl || '',
+  portfolioUrl: existingApplication?.portfolioUrl || '',
+  availability: existingApplication?.availability || '',
+  yearsExperience: existingApplication?.yearsExperience || '',
+  skills: Array.isArray(existingApplication?.skills)
+    ? existingApplication.skills.join(', ')
+    : existingApplication?.skills || '',
+  motivation: existingApplication?.motivation || '',
+  resumeFileName: existingApplication?.resumeFileName || '',
+  resumeFileUrl: existingApplication?.resumeFileUrl || '',
+  resumeSummary: existingApplication?.resumeSummary || '',
+  resumeAutofillUsed: Boolean(existingApplication?.resumeAutofillUsed),
+})
+
 export default function PositionDetailPage() {
   const { id } = useParams()
-  const position = getPositionById(id)
+  const [position, setPosition] = useState(null)
+  const [relatedPositions, setRelatedPositions] = useState([])
+  const [existingApplication, setExistingApplication] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [notFound, setNotFound] = useState(false)
   const profile = readStoredProfile()
+  const currentApplicantEmail = getCurrentUserEmail(profile)
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+  const [autofillingResume, setAutofillingResume] = useState(false)
+  const [resumeFile, setResumeFile] = useState(null)
   const [errors, setErrors] = useState({})
-  const [form, setForm] = useState(() => ({
-    fullName: profile?.fullName || '',
-    email: profile?.emailAddress || profile?.email || '',
-    portfolioUrl: '',
-    motivation: '',
-  }))
+  const [applicationConflictState, setApplicationConflictState] = useState({
+    emailRegistered: false,
+    phoneRegistered: false,
+  })
+  const [form, setForm] = useState(() => buildApplicationForm(profile))
 
   const { theme } = useTheme()
   const isDayMode = theme === 'light'
   const palette = isDayMode ? dayTheme : darkTheme
 
-  const relatedPositions = useMemo(() => {
-    if (!position) return []
-    return getStoredPositions().filter((item) => item.id !== position.id).slice(0, 3)
-  }, [position])
+  useEffect(() => {
+    let active = true
 
-  if (!position) {
+    const loadPosition = async () => {
+      setLoading(true)
+      setNotFound(false)
+
+      try {
+        const [positionData, allPositions, savedApplication] = await Promise.all([
+          fetchPositionById(id),
+          fetchPositions(),
+          currentApplicantEmail
+            ? fetchPositionApplication(id, currentApplicantEmail)
+            : Promise.resolve(null),
+        ])
+
+        if (!active) return
+
+        setPosition(positionData)
+        setRelatedPositions(
+          (Array.isArray(allPositions) ? allPositions : [])
+            .filter((item) => String(item.id) !== String(positionData.id))
+            .slice(0, 3),
+        )
+        setExistingApplication(savedApplication)
+        setForm(buildApplicationForm(profile, savedApplication))
+        setSubmitted(false)
+        setResumeFile(null)
+      } catch (error) {
+        console.error('Failed to load position details:', error)
+        if (!active) return
+        setPosition(null)
+        setRelatedPositions([])
+        setExistingApplication(null)
+        setSubmitted(false)
+        setNotFound(error?.status === 404)
+      } finally {
+        if (active) {
+          setLoading(false)
+        }
+      }
+    }
+
+    loadPosition()
+
+    return () => {
+      active = false
+    }
+  }, [id, currentApplicantEmail])
+
+  useEffect(() => {
+    if (!position?.id) return
+
+    const trimmedEmail = form.email.trim()
+    const trimmedPhone = form.phone.trim()
+    const normalizedPhone = trimmedPhone.replace(/\D/g, '')
+    const shouldCheckEmail = trimmedEmail.includes('@')
+    const shouldCheckPhone = normalizedPhone.length >= 7
+
+    if (!shouldCheckEmail && !shouldCheckPhone) {
+      setApplicationConflictState({ emailRegistered: false, phoneRegistered: false })
+      return
+    }
+
+    let active = true
+    const timerId = window.setTimeout(async () => {
+      try {
+        const result = await checkPositionApplicationConflicts(position.id, {
+          email: shouldCheckEmail ? trimmedEmail : '',
+          phone: shouldCheckPhone ? trimmedPhone : '',
+          excludeId: existingApplication?.id || '',
+        })
+
+        if (!active) return
+
+        setApplicationConflictState({
+          emailRegistered: Boolean(result?.emailRegistered),
+          phoneRegistered: Boolean(result?.phoneRegistered),
+        })
+      } catch {
+        if (!active) return
+        setApplicationConflictState({ emailRegistered: false, phoneRegistered: false })
+      }
+    }, 350)
+
+    return () => {
+      active = false
+      window.clearTimeout(timerId)
+    }
+  }, [existingApplication?.id, form.email, form.phone, position?.id])
+
+  if (loading) {
+    return (
+      <div className="relative" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: palette.bgPrimary }}>
+        <Navbar currentPage="positions" />
+        <main className="relative z-10 flex-grow px-6 pt-32 pb-24 md:px-12 lg:px-20 xl:px-28">
+          <div className="overflow-hidden rounded-[36px] p-10 text-center md:p-16" style={{ border: `1px solid ${palette.borderPrimary}`, background: isDayMode ? 'linear-gradient(to bottom right, rgba(255,255,255,0.8), rgba(255,255,255,0.4), transparent)' : 'linear-gradient(to bottom right, rgba(255,255,255,0.04), rgba(255,255,255,0.02), transparent)', boxShadow: isDayMode ? palette.shadowCard : '0 30px 120px rgba(0,0,0,0.45)' }}>
+            <span className="inline-flex rounded-full px-4 py-1.5 text-[11px] font-bold uppercase tracking-[0.28em]" style={{ border: `1px solid ${palette.accentBorder}`, backgroundColor: palette.accentSoft, color: palette.accentDark }}>
+              Loading Position
+            </span>
+            <h1 className="mt-6 type-heading-soft max-w-2xl mx-auto" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
+              Pulling the latest role signal.
+            </h1>
+            <p className="mt-6 mx-auto max-w-2xl text-base leading-8 md:text-lg" style={{ color: palette.textSecondary }}>
+              We are loading this position and its application details from the QSphere database.
+            </p>
+          </div>
+        </main>
+        <div style={{ position: 'relative', zIndex: 1 }}>
+          <Footer />
+        </div>
+      </div>
+    )
+  }
+
+  if (notFound || !position) {
     return (
       <div className="relative" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: palette.bgPrimary }}>
         <Navbar currentPage="positions" />
@@ -175,7 +326,7 @@ export default function PositionDetailPage() {
             <span className="inline-flex rounded-full px-4 py-1.5 text-[11px] font-bold uppercase tracking-[0.28em]" style={{ border: `1px solid ${palette.accentBorder}`, backgroundColor: palette.accentSoft, color: palette.accentDark }}>
               Position Not Found
             </span>
-            <h1 className="mt-6 max-w-3xl text-4xl font-bold leading-[0.94] md:text-6xl" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
+            <h1 className="mt-6 max-w-3xl type-heading-soft" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
               This role is no longer available.
             </h1>
             <p className="mt-6 max-w-2xl text-base leading-8 md:text-lg" style={{ color: palette.textSecondary }}>
@@ -199,6 +350,7 @@ export default function PositionDetailPage() {
   }
 
   const deadline = parsePositionDeadline(position.deadline)
+  const isPositionArchived = deadline.closed
   const requirements = splitPositionRequirements(position.requirements)
   const tone = getPositionTone(position)
   const typeStyles = getTypeStyles(isDayMode)
@@ -211,8 +363,24 @@ export default function PositionDetailPage() {
   const roleNotes = getRoleNotes(position)
   const contactHref = isExternalLink(position.contact) ? position.contact : `mailto:${position.contact}`
 
+  const formatPhone = (raw) => {
+    const digits = raw.replace(/\D/g, '').slice(0, 11)
+    if (digits.startsWith('03') && digits.length > 4) {
+      return digits.slice(0, 4) + '-' + digits.slice(4)
+    }
+    return digits
+  }
+
   const updateField = (key, value) => {
+    if (key === 'phone') value = formatPhone(value)
     setForm((current) => ({ ...current, [key]: value }))
+    if (key === 'email' || key === 'phone') {
+      setApplicationConflictState((current) => ({
+        ...current,
+        ...(key === 'email' ? { emailRegistered: false } : {}),
+        ...(key === 'phone' ? { phoneRegistered: false } : {}),
+      }))
+    }
     setErrors((current) => {
       if (!current[key]) return current
       const next = { ...current }
@@ -221,15 +389,102 @@ export default function PositionDetailPage() {
     })
   }
 
-  const handleSubmit = (event) => {
+  const handleResumeUpload = async (event) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    setResumeFile(file)
+    setAutofillingResume(true)
+    setForm((current) => ({
+      ...current,
+      resumeFileName: file.name,
+      resumeFileUrl: '',
+      resumeAutofillUsed: true,
+    }))
+
+    try {
+      const resumeText = await extractResumeText(file)
+      const autofill = parseResumeAutofill(resumeText, form.fullName)
+      const detectedSkillList = autofill.skills?.length ? autofill.skills.join(', ') : ''
+      const matchedCount = [
+        autofill.fullName,
+        autofill.email,
+        autofill.phone,
+        autofill.location,
+        autofill.currentRole,
+        autofill.organization,
+        autofill.linkedinUrl,
+        autofill.portfolioUrl,
+        autofill.availability,
+        autofill.yearsExperience,
+        detectedSkillList,
+        autofill.summary,
+      ].filter(Boolean).length
+
+      setForm((current) => ({
+        ...current,
+        fullName: autofill.fullName || current.fullName,
+        email: autofill.email || current.email,
+        phone: autofill.phone ? formatPhone(autofill.phone) : current.phone,
+        location: autofill.location || current.location,
+        currentRole: autofill.currentRole || current.currentRole,
+        organization: autofill.organization || current.organization,
+        linkedinUrl: autofill.linkedinUrl || current.linkedinUrl,
+        portfolioUrl: autofill.portfolioUrl || current.portfolioUrl,
+        availability: autofill.availability || current.availability,
+        yearsExperience: autofill.yearsExperience || current.yearsExperience,
+        skills: detectedSkillList || current.skills,
+        resumeFileName: file.name,
+        resumeFileUrl: '',
+        resumeSummary: autofill.summary || current.resumeSummary,
+        resumeAutofillUsed: true,
+      }))
+
+      showSnackbar(
+        matchedCount > 0
+          ? `CV parsed and ${matchedCount} field${matchedCount === 1 ? '' : 's'} were autofilled.`
+          : 'CV uploaded. Autofill is best-effort, so a few details may still need manual review.',
+        'success',
+      )
+    } catch {
+      showSnackbar('CV attached. We could not fully parse this file, so please review the fields manually before submitting.', 'error')
+    } finally {
+      setAutofillingResume(false)
+      event.target.value = ''
+    }
+  }
+
+  const handleSubmit = async (event) => {
     event.preventDefault()
 
     const nextErrors = {}
     if (!form.fullName.trim()) nextErrors.fullName = 'Name is required'
     if (!form.email.trim()) nextErrors.email = 'Email is required'
+    else if (!form.email.includes('@')) nextErrors.email = 'Enter a valid email with @'
+    if (!form.phone.trim()) nextErrors.phone = 'Phone number is required'
     if (!form.motivation.trim()) nextErrors.motivation = 'Tell them why you are a fit'
 
+    const liveConflicts = await checkPositionApplicationConflicts(position.id, {
+      email: form.email.trim(),
+      phone: form.phone.trim(),
+      excludeId: existingApplication?.id || '',
+    }).catch(() => ({ emailRegistered: false, phoneRegistered: false }))
+
+    if (liveConflicts.emailRegistered) {
+      nextErrors.email = 'This email is already applied.'
+    }
+
+    if (liveConflicts.phoneRegistered) {
+      nextErrors.phone = 'This phone number is already applied.'
+    }
+
+    setApplicationConflictState({
+      emailRegistered: Boolean(liveConflicts.emailRegistered),
+      phoneRegistered: Boolean(liveConflicts.phoneRegistered),
+    })
+
     if (Object.keys(nextErrors).length > 0) {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
       setErrors(nextErrors)
       showSnackbar('Please complete the required application fields.', 'error')
       return
@@ -237,31 +492,59 @@ export default function PositionDetailPage() {
 
     setSubmitting(true)
 
-    window.setTimeout(() => {
-      try {
-        const existing = JSON.parse(localStorage.getItem(APPLICATION_STORAGE_KEY) || '[]')
-        const application = {
-          id: `${position.id}-${Date.now()}`,
-          positionId: position.id,
-          positionTitle: position.title,
-          fullName: form.fullName.trim(),
-          email: form.email.trim(),
-          portfolioUrl: form.portfolioUrl.trim(),
-          motivation: form.motivation.trim(),
-          submittedAt: new Date().toISOString(),
-          contact: position.contact,
-        }
+    try {
+      const hadExistingApplication = Boolean(existingApplication?.id)
+      const application = await submitPositionApplication(position.id, {
+        applicationId: existingApplication?.id || '',
+        fullName: form.fullName.trim(),
+        email: form.email.trim(),
+        phone: form.phone.trim(),
+        location: form.location.trim(),
+        currentRole: form.currentRole.trim(),
+        organization: form.organization.trim(),
+        linkedinUrl: form.linkedinUrl.trim(),
+        portfolioUrl: form.portfolioUrl.trim(),
+        availability: form.availability.trim(),
+        yearsExperience: form.yearsExperience.trim(),
+        skills: splitSkillTags(form.skills),
+        motivation: form.motivation.trim(),
+        resumeFileName: form.resumeFileName.trim(),
+        resumeFileUrl: form.resumeFileUrl.trim(),
+        resumeSummary: form.resumeSummary.trim(),
+        resumeAutofillUsed: Boolean(form.resumeAutofillUsed),
+        resumeFile,
+      })
 
-        localStorage.setItem(APPLICATION_STORAGE_KEY, JSON.stringify([application, ...existing]))
-        setSubmitted(true)
-        setForm((current) => ({ ...current, portfolioUrl: '', motivation: '' }))
-        showSnackbar('Application draft saved successfully.', 'success')
-      } catch {
-        showSnackbar('Unable to save your application right now.', 'error')
-      } finally {
-        setSubmitting(false)
+      setExistingApplication(application)
+      setSubmitted(true)
+      setForm(buildApplicationForm(profile, application))
+      setApplicationConflictState({ emailRegistered: false, phoneRegistered: false })
+      setResumeFile(null)
+      setPosition((current) =>
+        current
+          ? {
+              ...current,
+              applicationCount: Number(current.applicationCount || 0) + (hadExistingApplication ? 0 : 1),
+            }
+          : current,
+      )
+      showSnackbar(hadExistingApplication ? 'Application updated successfully.' : 'Application submitted successfully.', 'success')
+    } catch (error) {
+      const message = error?.message || ''
+      if (message.toLowerCase().includes('email is already applied')) {
+        setApplicationConflictState((current) => ({ ...current, emailRegistered: true }))
+        setErrors((current) => ({ ...current, email: 'This email is already applied.' }))
+        showSnackbar('This email is already applied for this position.', 'error')
+      } else if (message.toLowerCase().includes('phone number is already applied')) {
+        setApplicationConflictState((current) => ({ ...current, phoneRegistered: true }))
+        setErrors((current) => ({ ...current, phone: 'This phone number is already applied.' }))
+        showSnackbar('This phone number is already applied for this position.', 'error')
+      } else {
+        showSnackbar(message || 'Unable to save your application right now.', 'error')
       }
-    }, 900)
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -328,15 +611,11 @@ export default function PositionDetailPage() {
                 </div>
 
                 <h1
-                  className="mt-7 max-w-5xl text-4xl font-bold leading-[0.9] md:text-6xl xl:text-[5.15rem]"
-                  style={{ fontFamily: "'Syne', sans-serif", textShadow: isDayMode ? 'none' : '0 0 40px rgba(16,185,129,0.08)', color: palette.textPrimary }}
+                  className="mt-7 max-w-3xl xl:max-w-[54rem] type-heading-soft"
+                  style={{ fontFamily: 'var(--font-heading)', textShadow: isDayMode ? 'none' : '0 0 40px rgba(16,185,129,0.08)', color: palette.textPrimary }}
                 >
                   {position.title}
                 </h1>
-
-                <p className="mt-7 max-w-4xl text-base leading-8 md:text-lg xl:text-[1.15rem]" style={{ color: palette.textSecondary }}>
-                  {position.description || 'A carefully designed opening for builders, researchers, and operators who want to contribute to work that actually matters.'}
-                </p>
 
                 <div className="mt-8 grid gap-4 sm:grid-cols-2 2xl:grid-cols-4">
                   <div className="rounded-[28px] p-5 backdrop-blur-xl" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: isDayMode ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.2)' }}>
@@ -344,28 +623,28 @@ export default function PositionDetailPage() {
                       <Briefcase size={15} />
                       Role type
                     </div>
-                    <div className="mt-4 text-xl font-semibold md:text-2xl" style={{ color: palette.textPrimary }}>{position.type || 'Open role'}</div>
+                    <div className="mt-4 text-base font-semibold md:text-[1.05rem]" style={{ color: palette.textPrimary }}>{position.type || 'Open role'}</div>
                   </div>
                   <div className="rounded-[28px] p-5 backdrop-blur-xl" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: isDayMode ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.2)' }}>
                     <div className="flex items-center gap-3 text-[11px] font-bold uppercase tracking-[0.22em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.85)' }}>
                       <MapPin size={15} />
                       Work mode
                     </div>
-                    <div className="mt-4 text-xl font-semibold md:text-2xl" style={{ color: palette.textPrimary }}>{position.location || 'Flexible'}</div>
+                    <div className="mt-4 text-base font-semibold md:text-[1.05rem]" style={{ color: palette.textPrimary }}>{position.location || 'Flexible'}</div>
                   </div>
                   <div className="rounded-[28px] p-5 backdrop-blur-xl" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: isDayMode ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.2)' }}>
                     <div className="flex items-center gap-3 text-[11px] font-bold uppercase tracking-[0.22em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.85)' }}>
                       <Clock size={15} />
                       Deadline
                     </div>
-                    <div className="mt-4 text-lg font-semibold leading-7" style={{ color: palette.textPrimary }}>{deadline.closed ? 'Applications closed' : deadline.full}</div>
+                    <div className="mt-4 text-[1.1rem] font-semibold leading-[1.28] tracking-[-0.02em] md:text-[1.2rem]" style={{ color: palette.textPrimary }}>{deadline.closed ? 'Applications closed' : deadline.full}</div>
                   </div>
                   <div className="rounded-[28px] p-5 backdrop-blur-xl" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: isDayMode ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.2)' }}>
                     <div className="flex items-center gap-3 text-[11px] font-bold uppercase tracking-[0.22em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.85)' }}>
                       <Mail size={15} />
                       Contact point
                     </div>
-                    <div className="mt-4 break-all text-lg font-semibold leading-7" style={{ color: palette.textPrimary }}>{position.contact || 'Unavailable'}</div>
+                    <div className="mt-4 break-all text-base font-semibold leading-7 md:text-[1.02rem]" style={{ color: palette.textPrimary }}>{position.contact || 'Unavailable'}</div>
                   </div>
                 </div>
               </div>
@@ -377,13 +656,13 @@ export default function PositionDetailPage() {
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <div className="text-[11px] font-bold uppercase tracking-[0.3em]" style={{ color: palette.accentPrimary }}>Apply window</div>
-                      <div className="mt-3 text-4xl font-bold leading-none" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
+                      <div className="type-statValue mt-3" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
                         {deadline.closed ? 'Closed' : deadline.label}
                       </div>
                     </div>
                     <div className="rounded-2xl px-4 py-2 text-right" style={{ border: `1px solid ${palette.accentBorder}`, backgroundColor: palette.accentSoft }}>
                       <div className="text-[10px] font-bold uppercase tracking-[0.24em]" style={{ color: palette.accentDark }}>Status</div>
-                      <div className={`mt-1 text-base font-semibold ${deadline.closed ? 'opacity-50' : deadline.urgent ? 'text-amber-500' : ''}`} style={{ color: deadline.closed ? palette.textSecondary : deadline.urgent ? (isDayMode ? '#d97706' : '#fcd34d') : palette.textPrimary }}>
+                      <div className={`mt-1 text-base font-semibold ${deadline.closed ? 'opacity-50' : deadline.urgent ? 'text-red-500' : ''}`} style={{ color: deadline.closed ? palette.textSecondary : deadline.urgent ? (isDayMode ? '#dc2626' : '#ef4444') : palette.textPrimary }}>
                         {deadline.closed ? 'Closed' : deadline.urgent ? 'Priority' : 'Open'}
                       </div>
                     </div>
@@ -418,27 +697,35 @@ export default function PositionDetailPage() {
 
                 <div className="mt-5 rounded-[30px] p-5" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.cardBg }}>
                   <div className="text-[10px] font-bold uppercase tracking-[0.28em]" style={{ color: palette.textMuted }}>Fast actions</div>
-                  <h2 className="mt-3 text-2xl font-semibold" style={{ color: palette.textPrimary }}>Apply your way</h2>
+                  <h2 className="type-sectionHeading mt-3" style={{ color: palette.textPrimary }}>Apply your way</h2>
 
                   <div className="mt-5 grid gap-3">
-                    <a
-                      href={contactHref}
-                      target={isExternalLink(position.contact) ? '_blank' : undefined}
-                      rel={isExternalLink(position.contact) ? 'noreferrer' : undefined}
-                      className="inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3.5 text-sm font-semibold no-underline transition-all hover:brightness-110"
-                      style={{ border: `1px solid ${palette.accentBorder}`, backgroundColor: palette.accentSoft, color: palette.accentDark }}
-                    >
-                      {isExternalLink(position.contact) ? <ExternalLink size={16} /> : <Mail size={16} />}
-                      {isExternalLink(position.contact) ? 'Open application link' : 'Email this role'}
-                    </a>
-                    <a
-                      href="#apply-panel"
-                      className="inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3.5 text-sm font-semibold no-underline transition-all hover:brightness-110"
-                      style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.bgSecondary, color: palette.textSecondary }}
-                    >
-                      Start quick application
-                      <ArrowUpRight size={16} />
-                    </a>
+                    {isPositionArchived ? (
+                      <div className="rounded-[24px] px-4 py-4 text-sm leading-7" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.bgSecondary, color: palette.textSecondary }}>
+                        This position is archived now, so this page is view-only and applications are closed.
+                      </div>
+                    ) : (
+                      <>
+                        <a
+                          href={contactHref}
+                          target={isExternalLink(position.contact) ? '_blank' : undefined}
+                          rel={isExternalLink(position.contact) ? 'noreferrer' : undefined}
+                          className="inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3.5 text-sm font-semibold no-underline transition-all hover:brightness-110"
+                          style={{ border: `1px solid ${palette.accentBorder}`, backgroundColor: palette.accentSoft, color: palette.accentDark }}
+                        >
+                          {isExternalLink(position.contact) ? <ExternalLink size={16} /> : <Mail size={16} />}
+                          {isExternalLink(position.contact) ? 'Open application link' : 'Email this role'}
+                        </a>
+                        <a
+                          href="#apply-panel"
+                          className="inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3.5 text-sm font-semibold no-underline transition-all hover:brightness-110"
+                          style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.bgSecondary, color: palette.textSecondary }}
+                        >
+                          Start quick application
+                          <ArrowUpRight size={16} />
+                        </a>
+                      </>
+                    )}
                   </div>
                 </div>
               </aside>
@@ -451,7 +738,7 @@ export default function PositionDetailPage() {
                 <Sparkles size={15} />
                 Role overview
               </div>
-              <h2 className="mt-5 text-3xl font-bold md:text-4xl" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
+              <h2 className="type-sectionHeading mt-5 max-w-2xl" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
                 A role built for people who want to matter on day one.
               </h2>
               <div className="mt-6 space-y-6 text-[1.02rem] leading-8" style={{ color: palette.textSecondary }}>
@@ -475,7 +762,7 @@ export default function PositionDetailPage() {
 
             <div className="overflow-hidden rounded-[34px] p-7 md:p-8" style={{ border: `1px solid ${palette.borderPrimary}`, background: isDayMode ? 'linear-gradient(180deg, rgba(255,255,255,0.9), rgba(255,255,255,0.6))' : 'linear-gradient(180deg,rgba(7,12,10,0.95),rgba(4,8,7,0.72))', boxShadow: isDayMode ? palette.shadowCard : '0 20px 80px rgba(0,0,0,0.34)' }}>
               <div className="text-[11px] font-bold uppercase tracking-[0.28em]" style={{ color: palette.accentPrimary }}>Requirements cloud</div>
-              <h2 className="mt-5 text-3xl font-bold" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
+              <h2 className="type-sectionHeading mt-5 max-w-xl" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
                 What will make you stand out.
               </h2>
 
@@ -508,15 +795,16 @@ export default function PositionDetailPage() {
             </div>
           </section>
 
+          {!isPositionArchived && (
           <section id="apply-panel" className="mt-8 overflow-hidden rounded-[34px] p-7 md:p-10" style={{ border: `1px solid ${palette.borderPrimary}`, background: isDayMode ? 'linear-gradient(180deg, rgba(255,255,255,0.8), rgba(255,255,255,0.4))' : 'linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.015))', boxShadow: isDayMode ? palette.shadowCard : '0 20px 80px rgba(0,0,0,0.34)' }}>
             <div className="grid gap-8 xl:grid-cols-[0.88fr_1.12fr] xl:items-start">
               <div>
                 <div className="text-[11px] font-bold uppercase tracking-[0.28em]" style={{ color: palette.accentPrimary }}>Application cockpit</div>
-                <h2 className="mt-4 text-3xl font-bold md:text-4xl" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
+                <h2 className="type-sectionHeading mt-4 max-w-xl" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
                   Apply with speed, clarity, and signal.
                 </h2>
                 <p className="mt-5 max-w-xl text-base leading-8" style={{ color: palette.textSecondary }}>
-                  This quick-apply form saves your application draft locally and lets you route the final handoff through the contact method provided by the role owner. It feels fast, clean, and friction-light.
+                  This quick-apply form saves your application directly to QSphere so the role owner can review it from the manage positions workspace without any manual handoff.
                 </p>
 
                 <div className="mt-6 rounded-[28px] p-5" style={{ border: `1px solid ${palette.accentBorder}`, backgroundColor: palette.accentSoft }}>
@@ -528,12 +816,75 @@ export default function PositionDetailPage() {
 
                 {submitted && (
                   <div className="mt-5 rounded-[24px] px-4 py-4 text-sm" style={{ border: `1px solid ${palette.accentBorder}`, backgroundColor: palette.accentSoft, color: palette.accentDark }}>
-                    Your application draft has been saved. You can now send it through the direct contact channel too.
+                    {existingApplication ? (
+                      <>Your application for this position is already on file. No need to apply again.</>
+                    ) : (
+                      <>Your application is saved in the QSphere database and now appears in the manage positions view for the role owner.</>
+                    )}
                   </div>
                 )}
               </div>
 
+              {submitted ? (
+                <div className="flex flex-col items-center justify-center rounded-[30px] p-10 text-center" style={{ border: `1px solid ${palette.accentBorder}`, backgroundColor: palette.accentSoft }}>
+                  <div className="flex h-16 w-16 items-center justify-center rounded-2xl" style={{ backgroundColor: isDayMode ? 'rgba(255,255,255,0.72)' : 'rgba(0,0,0,0.15)', color: palette.accentPrimary }}>
+                    <Send size={24} />
+                  </div>
+                  <h3 className="mt-5 type-statValue" style={{ color: palette.textPrimary }}>
+                    {existingApplication ? 'Application already submitted.' : 'Application submitted.'}
+                  </h3>
+                  <p className="mt-3 max-w-lg text-sm leading-7" style={{ color: palette.textSecondary }}>
+                    {existingApplication
+                      ? 'Your application for this position is already on file. The role owner can review it from the manage positions workspace.'
+                      : 'Your application has been saved to QSphere and sent to the manage positions workspace for the role owner.'}
+                  </p>
+                </div>
+              ) : (
               <form onSubmit={handleSubmit} className="rounded-[30px] p-5 md:p-6" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.cardBg }}>
+                <div className="rounded-[26px] p-4" style={{ border: `1px solid ${palette.accentBorder}`, backgroundColor: palette.accentSoft }}>
+                  <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <div className="text-[10px] uppercase tracking-[0.24em]" style={{ color: palette.accentDark }}>CV autofill</div>
+                      <p className="mt-2 text-sm leading-7" style={{ color: palette.textSecondary }}>
+                        Upload a CV to prefill the application fields faster. Text-based resumes work best, while PDF and DOCX files are handled best-effort.
+                      </p>
+                    </div>
+                    <label
+                      htmlFor="position-cv-upload"
+                      className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-2xl px-5 py-3.5 text-sm font-semibold"
+                      style={{ backgroundColor: palette.btnPrimaryBg, color: palette.btnPrimaryText }}
+                    >
+                      <Upload size={16} />
+                      {autofillingResume ? 'Reading CV...' : 'Upload CV'}
+                    </label>
+                  </div>
+                  <input
+                    id="position-cv-upload"
+                    type="file"
+                    accept=".txt,.md,.rtf,.json,.pdf,.doc,.docx"
+                    onChange={handleResumeUpload}
+                    className="hidden"
+                  />
+
+                  {form.resumeFileName && (
+                    <div className="mt-4 rounded-2xl px-4 py-3 text-sm" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: isDayMode ? 'rgba(255,255,255,0.78)' : 'rgba(0,0,0,0.18)', color: palette.textSecondary }}>
+                      <div>Source CV: {form.resumeFileName}</div>
+                      {form.resumeFileUrl && (
+                        <a
+                          href={form.resumeFileUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="mt-2 inline-flex items-center gap-2 no-underline"
+                          style={{ color: palette.accentPrimary }}
+                        >
+                          <FileText size={14} />
+                          Open uploaded CV
+                        </a>
+                      )}
+                    </div>
+                  )}
+                </div>
+
                 <div className="grid gap-4 md:grid-cols-2">
                   <div>
                     <label className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: palette.accentPrimary }}>Full name *</label>
@@ -555,7 +906,10 @@ export default function PositionDetailPage() {
 
                   <div>
                     <label className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: palette.accentPrimary }}>Email address *</label>
-                    <div className={`mt-2 rounded-2xl border transition-colors ${errors.email ? 'border-red-500' : ''}`} style={{ backgroundColor: palette.bgSecondary, borderColor: errors.email ? '#ef4444' : palette.borderPrimary }}>
+                    {applicationConflictState.emailRegistered && (
+                      <p className="mt-2 text-xs" style={{ color: '#ef4444' }}>This email is already applied.</p>
+                    )}
+                    <div className={`mt-2 rounded-2xl border transition-colors ${errors.email || applicationConflictState.emailRegistered ? 'border-red-500' : ''}`} style={{ backgroundColor: palette.bgSecondary, borderColor: errors.email || applicationConflictState.emailRegistered ? '#ef4444' : palette.borderPrimary }}>
                       <div className="flex items-center gap-3 px-4 py-3.5">
                         <Mail size={16} style={{ color: palette.accentPrimary }} />
                         <input
@@ -573,21 +927,179 @@ export default function PositionDetailPage() {
                 </div>
 
                 <div className="mt-4">
-                  <label className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: palette.accentPrimary }}>Portfolio / LinkedIn / Resume URL</label>
-                  <div className="mt-2 rounded-2xl" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.bgSecondary }}>
+                  <label className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: palette.accentPrimary }}>Phone number *</label>
+                  {applicationConflictState.phoneRegistered && (
+                    <p className="mt-2 text-xs" style={{ color: '#ef4444' }}>This phone number is already applied.</p>
+                  )}
+                  <div className={`mt-2 rounded-2xl border transition-colors ${errors.phone || applicationConflictState.phoneRegistered ? 'border-red-500' : ''}`} style={{ borderColor: errors.phone || applicationConflictState.phoneRegistered ? '#ef4444' : palette.borderPrimary, backgroundColor: palette.bgSecondary }}>
                     <div className="flex items-center gap-3 px-4 py-3.5">
-                      <ExternalLink size={16} style={{ color: palette.accentPrimary }} />
+                      <Phone size={16} style={{ color: palette.accentPrimary }} />
                       <input
                         type="text"
-                        value={form.portfolioUrl}
-                        onChange={(event) => updateField('portfolioUrl', event.target.value)}
-                        placeholder="https://portfolio.example.com"
+                        value={form.phone}
+                        onChange={(event) => updateField('phone', event.target.value)}
+                        placeholder="+92..."
                         className="w-full bg-transparent outline-none"
                         style={{ color: palette.textPrimary }}
                       />
                     </div>
                   </div>
+                  {errors.phone && <p className="mt-2 text-xs" style={{ color: '#ef4444' }}>{errors.phone}</p>}
                 </div>
+
+                <div className="mt-4 grid gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: palette.accentPrimary }}>Current role / degree</label>
+                    <div className="mt-2 rounded-2xl" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.bgSecondary }}>
+                      <div className="flex items-center gap-3 px-4 py-3.5">
+                        <Briefcase size={16} style={{ color: palette.accentPrimary }} />
+                        <input
+                          type="text"
+                          value={form.currentRole}
+                          onChange={(event) => updateField('currentRole', event.target.value)}
+                          placeholder="Researcher, Student, Engineer..."
+                          className="w-full bg-transparent outline-none"
+                          style={{ color: palette.textPrimary }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: palette.accentPrimary }}>Institute / organization</label>
+                    <div className="mt-2 rounded-2xl" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.bgSecondary }}>
+                      <div className="flex items-center gap-3 px-4 py-3.5">
+                        <Building2 size={16} style={{ color: palette.accentPrimary }} />
+                        <input
+                          type="text"
+                          value={form.organization}
+                          onChange={(event) => updateField('organization', event.target.value)}
+                          placeholder="University, company, or lab"
+                          className="w-full bg-transparent outline-none"
+                          style={{ color: palette.textPrimary }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: palette.accentPrimary }}>Location</label>
+                    <div className="mt-2 rounded-2xl" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.bgSecondary }}>
+                      <div className="flex items-center gap-3 px-4 py-3.5">
+                        <MapPin size={16} style={{ color: palette.accentPrimary }} />
+                        <input
+                          type="text"
+                          value={form.location}
+                          onChange={(event) => updateField('location', event.target.value)}
+                          placeholder="City, country"
+                          className="w-full bg-transparent outline-none"
+                          style={{ color: palette.textPrimary }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: palette.accentPrimary }}>Availability</label>
+                    <div className="mt-2 rounded-2xl" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.bgSecondary }}>
+                      <div className="flex items-center gap-3 px-4 py-3.5">
+                        <Clock size={16} style={{ color: palette.accentPrimary }} />
+                        <input
+                          type="text"
+                          value={form.availability}
+                          onChange={(event) => updateField('availability', event.target.value)}
+                          placeholder="Immediate, 2 weeks, Part-time..."
+                          className="w-full bg-transparent outline-none"
+                          style={{ color: palette.textPrimary }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: palette.accentPrimary }}>LinkedIn URL</label>
+                    <div className="mt-2 rounded-2xl" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.bgSecondary }}>
+                      <div className="flex items-center gap-3 px-4 py-3.5">
+                        <Link2 size={16} style={{ color: palette.accentPrimary }} />
+                        <input
+                          type="text"
+                          value={form.linkedinUrl}
+                          onChange={(event) => updateField('linkedinUrl', event.target.value)}
+                          placeholder="https://linkedin.com/in/..."
+                          className="w-full bg-transparent outline-none"
+                          style={{ color: palette.textPrimary }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: palette.accentPrimary }}>Portfolio / website</label>
+                    <div className="mt-2 rounded-2xl" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.bgSecondary }}>
+                      <div className="flex items-center gap-3 px-4 py-3.5">
+                        <ExternalLink size={16} style={{ color: palette.accentPrimary }} />
+                        <input
+                          type="text"
+                          value={form.portfolioUrl}
+                          onChange={(event) => updateField('portfolioUrl', event.target.value)}
+                          placeholder="https://portfolio.example.com"
+                          className="w-full bg-transparent outline-none"
+                          style={{ color: palette.textPrimary }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: palette.accentPrimary }}>Years of experience</label>
+                    <div className="mt-2 rounded-2xl" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.bgSecondary }}>
+                      <div className="flex items-center gap-3 px-4 py-3.5">
+                        <FileText size={16} style={{ color: palette.accentPrimary }} />
+                        <input
+                          type="text"
+                          value={form.yearsExperience}
+                          onChange={(event) => updateField('yearsExperience', event.target.value)}
+                          placeholder="e.g. 2 years"
+                          className="w-full bg-transparent outline-none"
+                          style={{ color: palette.textPrimary }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: palette.accentPrimary }}>Key skills</label>
+                    <div className="mt-2 rounded-2xl" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.bgSecondary }}>
+                      <div className="flex items-center gap-3 px-4 py-3.5">
+                        <Sparkles size={16} style={{ color: palette.accentPrimary }} />
+                        <input
+                          type="text"
+                          value={form.skills}
+                          onChange={(event) => updateField('skills', event.target.value)}
+                          placeholder="Qiskit, Python, Research, React..."
+                          className="w-full bg-transparent outline-none"
+                          style={{ color: palette.textPrimary }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {form.resumeSummary && (
+                  <div className="mt-4 rounded-[22px] p-4" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: isDayMode ? 'rgba(247,247,245,0.92)' : 'rgba(0,0,0,0.18)' }}>
+                    <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: palette.accentPrimary }}>
+                      <FileText size={12} />
+                      CV summary
+                    </div>
+                    <p className="mt-3 text-sm leading-7" style={{ color: palette.textSecondary }}>{form.resumeSummary}</p>
+                  </div>
+                )}
 
                 <div className="mt-4">
                   <label className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: palette.accentPrimary }}>Why are you a fit? *</label>
@@ -612,7 +1124,7 @@ export default function PositionDetailPage() {
                     style={{ backgroundColor: palette.btnPrimaryBg, color: palette.btnPrimaryText }}
                   >
                     <Send size={16} />
-                    {deadline.closed ? 'Applications closed' : submitting ? 'Saving application...' : 'Save application draft'}
+                    {deadline.closed ? 'Applications closed' : submitting ? 'Saving application...' : 'Save application'}
                   </button>
                   <a
                     href={contactHref}
@@ -626,15 +1138,17 @@ export default function PositionDetailPage() {
                   </a>
                 </div>
               </form>
+              )}
             </div>
           </section>
+          )}
 
           {relatedPositions.length > 0 && (
             <section className="mt-8 overflow-hidden rounded-[34px] p-7 md:p-10" style={{ border: `1px solid ${palette.borderPrimary}`, background: isDayMode ? 'linear-gradient(180deg, rgba(255,255,255,0.8), rgba(255,255,255,0.4))' : 'linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.015))', boxShadow: isDayMode ? palette.shadowCard : '0 20px 80px rgba(0,0,0,0.34)' }}>
               <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                 <div>
                   <div className="text-[11px] font-bold uppercase tracking-[0.28em]" style={{ color: palette.accentPrimary }}>More openings</div>
-                  <h2 className="mt-4 text-3xl font-bold md:text-4xl" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
+                  <h2 className="type-sectionHeading mt-4 max-w-xl" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
                     Keep exploring the frontier.
                   </h2>
                 </div>
@@ -664,7 +1178,7 @@ export default function PositionDetailPage() {
                             <span className={`h-1.5 w-1.5 rounded-full ${loc.dot}`} />
                             {item.location}
                           </span>
-                          <h3 className="mt-4 text-2xl font-semibold leading-tight transition-colors group-hover:brightness-125" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
+                          <h3 className="mt-4 text-xl font-semibold leading-tight transition-colors group-hover:brightness-125" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
                             {item.title}
                           </h3>
                         </div>

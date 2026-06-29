@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import * as THREE from 'three'
 import Navbar from '../components/Navbar'
+import { useTheme } from '../contexts/ThemeContext'
+import { dayTheme, darkTheme } from '../themeColors'
 
 const OTP_FLOW_KEY = 'qsphere_otp_flow'
 const OTP_FLOW_VERIFY_EMAIL = 'verify-email'
@@ -33,6 +35,9 @@ const EYE_CLOSED = (
 
 
 const OtpPage = () => {
+  const { theme } = useTheme()
+  const isDayMode = theme === 'light'
+  const palette = isDayMode ? dayTheme : darkTheme
   const canvasRef = useRef(null)
   const sceneRefs = useRef({})
   const navigate = useNavigate()
@@ -105,7 +110,7 @@ const OtpPage = () => {
     const previousBodyBackground = document.body.style.background
     document.documentElement.style.overflow = 'hidden'
     document.body.style.overflow = 'hidden'
-    document.body.style.background = '#030705'
+    document.body.style.background = palette.bgPrimary
 
     const cv = canvasRef.current
     if (!cv) return undefined
@@ -115,7 +120,7 @@ const OtpPage = () => {
     renderer.setSize(window.innerWidth, window.innerHeight)
 
     const scene = new THREE.Scene()
-    scene.fog = new THREE.Fog('#030705', 10, 50)
+    scene.fog = new THREE.Fog(palette.bgPrimary, 10, 50)
 
     const starsGeometry = (() => {
       const n = 2000
@@ -141,7 +146,7 @@ const OtpPage = () => {
           sizeAttenuation: true,
           transparent: true,
           opacity: 0.5,
-          color: '#aaffdd',
+          color: isDayMode ? '#ccd5d0' : '#aaffdd',
           depthWrite: false
         })
       )
@@ -169,7 +174,7 @@ const OtpPage = () => {
         sizeAttenuation: true,
         transparent: true,
         opacity: 0.75,
-        color: '#00e5a0',
+        color: palette.accentPrimary,
         depthWrite: false,
         blending: THREE.AdditiveBlending
       })
@@ -180,7 +185,7 @@ const OtpPage = () => {
     rays.position.set(0, 0, -12)
     for (let i = 0; i < 10; i += 1) {
       const material = new THREE.MeshBasicMaterial({
-        color: i % 3 === 0 ? '#00e5a0' : i % 3 === 1 ? '#00b377' : '#00ff99',
+        color: i % 3 === 0 ? palette.accentPrimary : i % 3 === 1 ? (isDayMode ? '#059669' : '#00b377') : (isDayMode ? '#10b981' : '#00ff99'),
         transparent: true,
         opacity: 0.035,
         blending: THREE.AdditiveBlending,
@@ -194,12 +199,12 @@ const OtpPage = () => {
     scene.add(rays)
 
     const orbData = [
-      { p: [-7, 2, -3], c: '#00e5a0', r: 2.4, s: 0 },
-      { p: [7, -2, -4], c: '#00b377', r: 2.8, s: 2 },
-      { p: [0, 4, -7], c: '#00ff99', r: 2.0, s: 4 },
-      { p: [-5, -3, 3], c: '#00cc88', r: 1.8, s: 1 },
-      { p: [5, 3, 3], c: '#00e5a0', r: 1.5, s: 3 },
-      { p: [2, -4, -2], c: '#009966', r: 2.2, s: 5 }
+      { p: [-7, 2, -3], c: palette.accentPrimary, r: 2.4, s: 0 },
+      { p: [7, -2, -4], c: isDayMode ? '#059669' : '#00b377', r: 2.8, s: 2 },
+      { p: [0, 4, -7], c: isDayMode ? '#10b981' : '#00ff99', r: 2.0, s: 4 },
+      { p: [-5, -3, 3], c: isDayMode ? '#0d9488' : '#00cc88', r: 1.8, s: 1 },
+      { p: [5, 3, 3], c: palette.accentPrimary, r: 1.5, s: 3 },
+      { p: [2, -4, -2], c: isDayMode ? '#047857' : '#009966', r: 2.2, s: 5 }
     ]
 
     const orbs = orbData.map((data) => {
@@ -218,7 +223,7 @@ const OtpPage = () => {
       return { mesh, base: [...data.p], seed: data.s }
     })
 
-    const gridMaterial = new THREE.LineBasicMaterial({ color: '#00e5a0', transparent: true, opacity: 0.04 })
+    const gridMaterial = new THREE.LineBasicMaterial({ color: palette.accentPrimary, transparent: true, opacity: 0.04 })
     for (let i = -5; i <= 5; i += 1) {
       const g1 = new THREE.BufferGeometry().setFromPoints([
         new THREE.Vector3(-20, 0, i * 4),
@@ -232,17 +237,17 @@ const OtpPage = () => {
       scene.add(new THREE.Line(g2, gridMaterial))
     }
 
-    scene.add(new THREE.AmbientLight('#001a0d', 0.3))
-    const light1 = new THREE.PointLight('#00e5a0', 1.4, 25)
+    scene.add(new THREE.AmbientLight(palette.accentPrimary, 0.15))
+    const light1 = new THREE.PointLight(palette.accentPrimary, 1.4, 25)
     light1.position.set(0, 2, 8)
     scene.add(light1)
-    const light2 = new THREE.PointLight('#00b377', 0.5, 25)
+    const light2 = new THREE.PointLight(isDayMode ? '#059669' : '#00b377', 0.5, 25)
     light2.position.set(0, 2, -8)
     scene.add(light2)
-    const light3 = new THREE.PointLight('#00ff99', 0.4, 18)
+    const light3 = new THREE.PointLight(isDayMode ? '#10b981' : '#00ff99', 0.4, 18)
     light3.position.set(7, -3, 2)
     scene.add(light3)
-    const light4 = new THREE.PointLight('#009966', 0.4, 18)
+    const light4 = new THREE.PointLight(isDayMode ? '#047857' : '#009966', 0.4, 18)
     light4.position.set(-7, 3, -2)
     scene.add(light4)
 
@@ -511,18 +516,16 @@ const OtpPage = () => {
     : otp.join('').length === otpLength
 
   return (
-    <div className="relative h-screen w-screen overflow-hidden bg-[#030705] text-white">
+    <div className="relative h-screen w-screen overflow-hidden" style={{ backgroundColor: palette.bgPrimary, color: palette.textPrimary }}>
       <Navbar currentPage="auth" />
 
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap');
-
         :root {
-          --g: #00e5a0;
-          --g2: #00b377;
-          --g3: #00ff99;
-          --bg: #030705;
-          --card: rgba(4,18,10,0.88);
+          --g: ${palette.accentPrimary};
+          --g2: ${isDayMode ? '#059669' : '#00b377'};
+          --g3: ${isDayMode ? '#10b981' : '#00ff99'};
+          --bg: ${palette.bgPrimary};
+          --card: ${isDayMode ? 'rgba(255,255,255,0.88)' : 'rgba(4,18,10,0.88)'};
         }
 
         html, body {
@@ -530,7 +533,7 @@ const OtpPage = () => {
           height: 100%;
           background: var(--bg);
           overflow: hidden;
-          font-family: 'DM Sans', sans-serif;
+          font-family: var(--font-body);
         }
 
         #cv {
@@ -548,9 +551,9 @@ const OtpPage = () => {
           z-index: 1;
           pointer-events: none;
           background:
-            radial-gradient(ellipse at 15% 30%, rgba(0,229,160,0.12), transparent 55%),
-            radial-gradient(ellipse at 85% 70%, rgba(0,180,120,0.09), transparent 55%),
-            radial-gradient(ellipse at 50% 100%, rgba(0,120,80,0.12), transparent 60%);
+            radial-gradient(ellipse at 15% 30%, ${palette.accentPrimary}1f, transparent 55%),
+            radial-gradient(ellipse at 85% 70%, ${isDayMode ? '#05966917' : 'rgba(0,180,120,0.09)'}, transparent 55%),
+            radial-gradient(ellipse at 50% 100%, ${isDayMode ? '#10b9811f' : 'rgba(0,120,80,0.12)'}, transparent 60%);
         }
 
         #fw {
@@ -575,15 +578,15 @@ const OtpPage = () => {
           background: var(--card);
           backdrop-filter: blur(28px) saturate(160%);
           -webkit-backdrop-filter: blur(28px) saturate(160%);
-          border: 1px solid rgba(0,229,160,0.15);
+          border: 1px solid ${palette.accentPrimary}26;
           border-radius: 20px;
           padding: 36px 32px 32px;
-          color: #fff;
+          color: ${palette.textPrimary};
           box-shadow:
-            0 0 0 1px rgba(0,229,160,0.05) inset,
+            0 0 0 1px ${palette.accentPrimary}0d inset,
             0 32px 80px -16px rgba(0,0,0,0.8),
-            0 0 60px -10px rgba(0,229,160,0.15),
-            0 0 120px -30px rgba(0,229,160,0.08);
+            0 0 60px -10px ${palette.accentPrimary}26,
+            0 0 120px -30px ${palette.accentPrimary}14;
         }
 
         .card::before {
@@ -593,10 +596,10 @@ const OtpPage = () => {
           border-radius: inherit;
           padding: 1px;
           background: linear-gradient(135deg,
-            rgba(0,229,160,0.5),
-            rgba(0,180,120,0.2) 40%,
-            rgba(0,229,160,0.1) 80%,
-            rgba(0,100,60,0.3) 100%);
+            ${palette.accentPrimary}80,
+            ${isDayMode ? '#059669' : 'rgba(0,180,120,0.2)'} 40%,
+            ${palette.accentPrimary}1a 80%,
+            ${isDayMode ? '#10b9814d' : 'rgba(0,100,60,0.3)'} 100%);
           -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
           -webkit-mask-composite: xor;
           mask-composite: exclude;
@@ -613,7 +616,7 @@ const OtpPage = () => {
           letter-spacing: .28em;
           text-transform: uppercase;
           color: var(--g);
-          font-family: 'DM Sans', sans-serif;
+          font-family: var(--font-body);
           margin-bottom: 18px;
           pointer-events: auto;
         }
@@ -631,11 +634,11 @@ const OtpPage = () => {
           display: inline-flex;
           align-items: center;
           gap: 10px;
-          border: 1px solid rgba(0,229,160,0.25);
+          border: 1px solid ${palette.accentPrimary}40;
           border-radius: 999px;
           padding: 6px 14px 6px 8px;
           margin-bottom: 24px;
-          background: rgba(0,229,160,0.04);
+          background: ${palette.accentPrimary}0a;
           pointer-events: auto;
         }
 
@@ -643,33 +646,33 @@ const OtpPage = () => {
           width: 30px;
           height: 30px;
           border-radius: 50%;
-          border: 1px solid rgba(0,229,160,0.4);
-          background: rgba(0,229,160,0.08);
+          border: 1px solid ${palette.accentPrimary}66;
+          background: ${palette.accentPrimary}14;
           display: flex;
           align-items: center;
           justify-content: center;
-          font-family: 'Syne', sans-serif;
+          font-family: var(--font-heading);
           font-weight: 800;
           font-size: 12px;
           color: var(--g);
         }
 
         .brand-text {
-          font-family: 'Syne', sans-serif;
+          font-family: var(--font-heading);
           font-weight: 700;
           font-size: 13px;
           letter-spacing: .18em;
-          color: #fff;
+          color: ${palette.textPrimary};
         }
 
         .h1 {
-          font-family: 'Syne', sans-serif;
+          font-family: var(--font-heading);
           font-weight: 800;
           font-size: 30px;
           line-height: 1.1;
-          color: #fff;
+          color: ${palette.textPrimary};
           margin-bottom: 6px;
-          text-shadow: 0 0 40px rgba(0,229,160,0.2);
+          text-shadow: 0 0 40px ${palette.accentPrimary}33;
           pointer-events: auto;
         }
 
@@ -679,9 +682,9 @@ const OtpPage = () => {
           margin-bottom: 18px;
           padding: 12px 14px;
           border-radius: 12px;
-          border: 1px solid rgba(0,229,160,0.14);
-          background: rgba(0,229,160,0.06);
-          color: rgba(220,252,231,0.95);
+          border: 1px solid ${palette.accentPrimary}24;
+          background: ${palette.accentPrimary}0f;
+          color: ${isDayMode ? 'rgba(6,78,59,0.95)' : 'rgba(220,252,231,0.95)'};
           font-size: 13px;
           line-height: 1.5;
           pointer-events: auto;
@@ -694,9 +697,9 @@ const OtpPage = () => {
         }
 
         .banner.success {
-          border-color: rgba(34,197,94,0.24);
-          background: rgba(20,83,45,0.24);
-          color: rgba(220,252,231,0.98);
+          border-color: ${isDayMode ? 'rgba(16,185,129,0.28)' : 'rgba(74,222,128,0.3)'};
+          background: ${isDayMode ? 'rgba(209,250,229,0.78)' : 'rgba(20,83,45,0.34)'};
+          color: ${isDayMode ? 'rgba(6,95,70,0.98)' : 'rgba(236,253,245,0.98)'};
         }
 
         .otp-error {
@@ -708,7 +711,7 @@ const OtpPage = () => {
 
         .sub {
           font-size: 13px;
-          color: rgba(255,255,255,.45);
+          color: ${palette.textMuted};
           margin-bottom: 28px;
           font-weight: 300;
           line-height: 1.5;
@@ -721,16 +724,16 @@ const OtpPage = () => {
 
         .fi input {
           width: 100%;
-          background: rgba(0,229,160,0.03);
-          color: #fff;
-          border: 1px solid rgba(0,229,160,0.12);
+          background: ${palette.accentPrimary}08;
+          color: ${palette.textPrimary};
+          border: 1px solid ${palette.accentPrimary}1f;
           border-radius: 10px;
           padding: 17px 44px 7px 14px;
           font-size: 14px;
           outline: none;
-          font-family: 'DM Sans', sans-serif;
+          font-family: var(--font-body);
           transition: border-color .25s, box-shadow .25s, background .25s;
-          box-shadow: inset 0 1px 0 rgba(0,229,160,0.04), inset 0 0 20px rgba(0,0,0,0.3);
+          box-shadow: inset 0 1px 0 ${palette.accentPrimary}0a, inset 0 0 20px rgba(0,0,0,0.3);
         }
 
         .fi.err input {
@@ -761,25 +764,25 @@ const OtpPage = () => {
         .field-note {
           margin-top: 8px;
           text-align: center;
-          color: rgba(255,255,255,.45);
+          color: ${palette.textMuted};
           font-size: 12px;
           line-height: 1.5;
           pointer-events: auto;
         }
 
         .otp-input {
-          color: #f6fff9 !important;
-          -webkit-text-fill-color: #f6fff9 !important;
-          caret-color: #00e5a0;
+          color: ${palette.textPrimary} !important;
+          -webkit-text-fill-color: ${palette.textPrimary} !important;
+          caret-color: ${palette.accentPrimary};
           opacity: 1 !important;
-          text-shadow: 0 0 10px rgba(0,229,160,0.28);
+          text-shadow: 0 0 10px ${palette.accentPrimary}47;
           font-variant-numeric: tabular-nums;
         }
 
         .fi input:focus {
-          border-color: rgba(0,229,160,0.5);
-          background: rgba(0,229,160,0.05);
-          box-shadow: 0 0 0 3px rgba(0,229,160,0.12), inset 0 0 24px rgba(0,229,160,0.06);
+          border-color: ${palette.accentPrimary}80;
+          background: ${palette.accentPrimary}0d;
+          box-shadow: 0 0 0 3px ${palette.accentPrimary}1f, inset 0 0 24px ${palette.accentPrimary}0f;
         }
 
         .fi label {
@@ -787,11 +790,11 @@ const OtpPage = () => {
           left: 14px;
           top: 13px;
           font-size: 13px;
-          color: rgba(255,255,255,.4);
+          color: ${palette.textMuted};
           pointer-events: none;
           transition: all .2s ease;
           letter-spacing: .01em;
-          font-family: 'DM Sans', sans-serif;
+          font-family: var(--font-body);
         }
 
         .fi input:focus + label,
@@ -810,7 +813,7 @@ const OtpPage = () => {
           transform: translateY(-50%);
           background: none;
           border: none;
-          color: rgba(255,255,255,.3);
+          color: ${palette.textFaint};
           cursor: pointer;
           display: flex;
           align-items: center;
@@ -832,18 +835,18 @@ const OtpPage = () => {
           border-radius: 10px;
           color: #000;
           cursor: pointer;
-          font-family: 'Syne', sans-serif;
-          background: linear-gradient(135deg,var(--g) 0%, #00b377 100%);
+          font-family: var(--font-heading);
+          background: linear-gradient(135deg,var(--g) 0%, var(--g2) 100%);
           border: none;
           transition: transform .2s cubic-bezier(.2,.8,.2,1), box-shadow .2s, filter .2s;
-          box-shadow: 0 8px 24px -6px rgba(0,229,160,0.5), 0 0 20px rgba(0,229,160,0.2);
+          box-shadow: 0 8px 24px -6px ${palette.accentPrimary}80, 0 0 20px ${palette.accentPrimary}33;
           pointer-events: auto;
         }
 
         .btn:hover {
           transform: translateY(-1px) scale(1.01);
           filter: brightness(1.08);
-          box-shadow: 0 12px 32px -6px rgba(0,229,160,0.65), 0 0 30px rgba(0,229,160,0.3);
+          box-shadow: 0 12px 32px -6px ${palette.accentPrimary}a6, 0 0 30px ${palette.accentPrimary}4d;
         }
 
         .btn:active { transform: translateY(0) scale(.98); }
@@ -857,7 +860,7 @@ const OtpPage = () => {
           background: none;
           border: none;
           font-size: inherit;
-          font-family: 'DM Sans', sans-serif;
+          font-family: var(--font-body);
           padding: 0;
           transition: text-shadow .2s, opacity .2s;
           opacity: .9;
@@ -874,8 +877,8 @@ const OtpPage = () => {
           width: 15px;
           height: 15px;
           border-radius: 50%;
-          border: 2px solid rgba(0,0,0,.25);
-          border-top-color: #000;
+          border: 2px solid ${palette.textFaint};
+          border-top-color: ${palette.textPrimary};
           animation: spin .8s linear infinite;
           display: inline-block;
           flex-shrink: 0;
@@ -891,17 +894,17 @@ const OtpPage = () => {
           gap: 8px;
           padding: 8px 18px;
           border-radius: 999px;
-          border: 1px solid rgba(0,229,160,0.2);
-          background: rgba(0,0,0,0.6);
+          border: 1px solid ${palette.accentPrimary}33;
+          background: ${palette.bgTertiary};
           backdrop-filter: blur(20px);
           font-size: 10px;
           letter-spacing: .22em;
           text-transform: uppercase;
-          color: rgba(255,255,255,.55);
+          color: ${palette.textMuted};
           pointer-events: none;
           z-index: 22;
           white-space: nowrap;
-          font-family: 'DM Sans', sans-serif;
+          font-family: var(--font-body);
         }
 
         .sdot {
@@ -925,11 +928,11 @@ const OtpPage = () => {
           font-size: 9px;
           letter-spacing: .3em;
           text-transform: uppercase;
-          color: rgba(255,255,255,.2);
+          color: ${palette.textFaint};
           pointer-events: none;
           z-index: 22;
           white-space: nowrap;
-          font-family: 'DM Sans', sans-serif;
+          font-family: var(--font-body);
         }
 
         @media (max-width: 768px) {
@@ -1049,17 +1052,17 @@ const OtpPage = () => {
                           height: 52,
                           padding: 0,
                           borderRadius: 12,
-                          border: '1px solid rgba(0,229,160,0.12)',
-                          background: 'rgba(0,229,160,0.03)',
-                          color: '#fff',
-                          WebkitTextFillColor: '#ffffff',
-                          caretColor: '#00e5a0',
+                          border: `1px solid ${palette.accentPrimary}1f`,
+                          background: `${palette.accentPrimary}08`,
+                          color: palette.textPrimary,
+                          WebkitTextFillColor: palette.textPrimary,
+                          caretColor: palette.accentPrimary,
                           textAlign: 'center',
-                          fontFamily: 'DM Sans, sans-serif',
+                          fontFamily: 'var(--font-body)',
                           fontWeight: 700,
                           fontSize: 18,
                           outline: 'none',
-                          boxShadow: 'inset 0 1px 0 rgba(0,229,160,0.04), inset 0 0 20px rgba(0,0,0,0.3)',
+                          boxShadow: `inset 0 1px 0 ${palette.accentPrimary}0a, inset 0 0 20px rgba(0,0,0,0.3)`,
                         }}
                       />
                     )
@@ -1120,7 +1123,7 @@ const OtpPage = () => {
               </button>
 
               {!isAdminPasswordStage ? (
-                <div style={{ textAlign: 'center', fontSize: '13px', color: 'rgba(255,255,255,.5)' }}>
+                <div style={{ textAlign: 'center', fontSize: '13px', color: palette.textMuted }}>
                   Didn’t receive it?{' '}
                   <button
                     className="ghost"
@@ -1134,7 +1137,7 @@ const OtpPage = () => {
                 </div>
               ) : null}
 
-              <div style={{ textAlign: 'center', fontSize: '13px', color: 'rgba(255,255,255,.5)' }}>
+              <div style={{ textAlign: 'center', fontSize: '13px', color: palette.textMuted }}>
                 <button
                   className="ghost"
                   type="button"

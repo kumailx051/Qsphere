@@ -684,8 +684,6 @@ const AuthPage = () => {
     <div className="relative h-screen w-screen overflow-hidden" style={{ background: palette.bgPrimary, color: palette.textPrimary }}>
       <Navbar currentPage="auth" />
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap');
-
         :root {
           --g: ${palette.accentPrimary};
           --g2: ${palette.accentDark};
@@ -710,7 +708,7 @@ const AuthPage = () => {
           height: 100%;
           background: var(--bg);
           overflow: hidden;
-          font-family: 'DM Sans', sans-serif;
+          font-family: var(--font-body);
         }
 
         #cv {
@@ -806,7 +804,7 @@ const AuthPage = () => {
           letter-spacing: .28em;
           text-transform: uppercase;
           color: var(--g);
-          font-family: 'DM Sans', sans-serif;
+          font-family: var(--font-body);
           margin-bottom: 18px;
         }
 
@@ -839,14 +837,14 @@ const AuthPage = () => {
           display: flex;
           align-items: center;
           justify-content: center;
-          font-family: 'Syne', sans-serif;
+          font-family: var(--font-heading);
           font-weight: 800;
           font-size: 12px;
           color: var(--g);
         }
 
         .brand-text {
-          font-family: 'Syne', sans-serif;
+          font-family: var(--font-heading);
           font-weight: 700;
           font-size: 13px;
           letter-spacing: .18em;
@@ -854,7 +852,7 @@ const AuthPage = () => {
         }
 
         .h1 {
-          font-family: 'Syne', sans-serif;
+          font-family: var(--font-heading);
           font-weight: 800;
           font-size: 30px;
           line-height: 1.1;
@@ -888,7 +886,7 @@ const AuthPage = () => {
           padding: 17px 44px 7px 14px;
           font-size: 14px;
           outline: none;
-          font-family: 'DM Sans', sans-serif;
+          font-family: var(--font-body);
           transition: border-color .25s, box-shadow .25s, background .25s;
           box-shadow: inset 0 1px 0 ${isDayMode ? 'rgba(46,197,138,0.03)' : 'rgba(0,229,160,0.04)'}, inset 0 0 20px ${isDayMode ? 'rgba(15,23,42,0.03)' : 'rgba(0,0,0,0.3)'};
         }
@@ -919,7 +917,7 @@ const AuthPage = () => {
           pointer-events: none;
           transition: all .2s ease;
           letter-spacing: .01em;
-          font-family: 'DM Sans', sans-serif;
+          font-family: var(--font-body);
         }
 
         .fi input:focus + label,
@@ -981,7 +979,7 @@ const AuthPage = () => {
           border-radius: 10px;
           color: ${isDayMode ? '#ffffff' : '#000'};
           cursor: pointer;
-          font-family: 'Syne', sans-serif;
+          font-family: var(--font-heading);
           background: linear-gradient(135deg,var(--g) 0%,var(--g2) 100%);
           border: none;
           transition: transform .2s cubic-bezier(.2,.8,.2,1), box-shadow .2s, filter .2s;
@@ -1011,7 +1009,7 @@ const AuthPage = () => {
           background: none;
           border: none;
           font-size: inherit;
-          font-family: 'DM Sans', sans-serif;
+          font-family: var(--font-body);
           padding: 0;
           transition: text-shadow .2s, opacity .2s;
           opacity: .9;
@@ -1152,7 +1150,7 @@ const AuthPage = () => {
           pointer-events: none;
           z-index: 22;
           white-space: nowrap;
-          font-family: 'DM Sans', sans-serif;
+          font-family: var(--font-body);
         }
 
         #status.msg-error {
@@ -1196,7 +1194,7 @@ const AuthPage = () => {
           pointer-events: none;
           z-index: 22;
           white-space: nowrap;
-          font-family: 'DM Sans', sans-serif;
+          font-family: var(--font-body);
         }
 
         .badge {
@@ -1211,7 +1209,7 @@ const AuthPage = () => {
           letter-spacing: .2em;
           text-transform: uppercase;
           color: ${isDayMode ? 'rgba(14,150,96,.72)' : 'rgba(0,229,160,.6)'};
-          font-family: 'DM Sans', sans-serif;
+          font-family: var(--font-body);
           background: ${isDayMode ? 'rgba(46,197,138,0.08)' : 'rgba(0,229,160,0.04)'};
         }
 
@@ -1299,7 +1297,7 @@ const AuthPage = () => {
           font-size: 9px;
           letter-spacing: 0.22em;
           text-transform: uppercase;
-          font-family: 'DM Sans', sans-serif;
+          font-family: var(--font-body);
           color: ${isDayMode ? '#0d6e4a' : '#a7f3d0'};
           background: ${isDayMode ? 'rgba(46,197,138,0.12)' : 'rgba(0,229,160,0.10)'};
           border: 1px solid ${isDayMode ? 'rgba(46,197,138,0.22)' : 'rgba(0,229,160,0.18)'};
@@ -1317,7 +1315,7 @@ const AuthPage = () => {
         }
 
         .vp-title {
-          font-family: 'Syne', sans-serif;
+          font-family: var(--font-heading);
           font-weight: 800;
           font-size: 22px;
           line-height: 1.15;
@@ -1347,7 +1345,7 @@ const AuthPage = () => {
         }
 
         .vp-stat-val {
-          font-family: 'Syne', sans-serif;
+          font-family: var(--font-heading);
           font-weight: 700;
           font-size: 16px;
           color: #ffffff;
@@ -1433,7 +1431,7 @@ const AuthPage = () => {
 
                 <div className="fstack">
                   {loginFormError && (
-                    <div style={{ color: '#ef4444', fontSize: '13px', padding: '12px 16px', background: isDayMode ? 'rgba(239,68,68,0.08)' : 'rgba(255,60,60,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ color: '#ef4444', fontSize: 'var(--type-uiText-size)', lineHeight: 'var(--type-uiText-lineHeight)', padding: '12px 16px', background: isDayMode ? 'rgba(239,68,68,0.08)' : 'rgba(255,60,60,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <circle cx="12" cy="12" r="10"></circle>
                         <line x1="12" y1="8" x2="12" y2="12"></line>
@@ -1481,7 +1479,7 @@ const AuthPage = () => {
                         <div className="fi-msg">{loginErrors.password || '\u00A0'}</div>
                       </div>
 
-                      <div className="row-sb" style={{ fontSize: '13px' }}>
+                      <div className="row-sb" style={{ fontSize: 'var(--type-uiText-size)', lineHeight: 'var(--type-uiText-lineHeight)' }}>
                         <label className="row" style={{ gap: 8, cursor: 'pointer', color: palette.textSecondary }}>
                           <input
                             type="checkbox"
@@ -1494,7 +1492,7 @@ const AuthPage = () => {
                         </label>
                         <button
                           className="ghost"
-                          style={{ fontSize: '11px' }}
+                          style={{ fontSize: 'var(--type-metaText-size)', lineHeight: 'var(--type-metaText-lineHeight)' }}
                           type="button"
                           onClick={() => {
                             setLoginView('forgot')
@@ -1507,7 +1505,7 @@ const AuthPage = () => {
                       </div>
                     </>
                   ) : (
-                    <div style={{ fontSize: '12px', color: palette.textSecondary, lineHeight: 1.6, marginTop: '-2px' }}>
+                    <div style={{ fontSize: 'var(--type-helperText-size)', color: palette.textSecondary, lineHeight: 'var(--type-helperText-lineHeight)', marginTop: '-2px' }}>
                       We will email a one-time code to this address. Use it to create a new password on the next screen.
                     </div>
                   )}
@@ -1528,7 +1526,7 @@ const AuthPage = () => {
 
                 <div className="divr"><div className="divr-l" /><span className="divr-t">or</span><div className="divr-l" /></div>
 
-                <div style={{ textAlign: 'center', fontSize: '13px', color: palette.textSecondary }}>
+                <div style={{ textAlign: 'center', fontSize: 'var(--type-uiText-size)', lineHeight: 'var(--type-uiText-lineHeight)', color: palette.textSecondary }}>
                   {isForgotPasswordView ? (
                     <>
                       Remembered your password?{' '}
@@ -1588,41 +1586,43 @@ const AuthPage = () => {
                 <p className="sub">Collaborate with 50+ researchers and pioneers shaping the future of quantum science.</p>
 
                 <div className="fstack">
-                  <div className={`fi ${registerErrors.name ? 'err' : ''}`}>
-                    <input
-                      type="text"
-                      id="rName"
-                      placeholder=" "
-                      value={rName}
-                      onChange={(e) => setRName(e.target.value)}
-                    />
-                    <label htmlFor="rName">Full name</label>
-                    <span className="ico">
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                        <circle cx="12" cy="7" r="4" />
-                      </svg>
-                    </span>
-                    <div className="fi-msg">{registerErrors.name || '\u00A0'}</div>
-                  </div>
+                  <div className="grid2">
+                    <div className={`fi ${registerErrors.name ? 'err' : ''}`}>
+                      <input
+                        type="text"
+                        id="rName"
+                        placeholder=" "
+                        value={rName}
+                        onChange={(e) => setRName(e.target.value)}
+                      />
+                      <label htmlFor="rName">Full name</label>
+                      <span className="ico">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                          <circle cx="12" cy="7" r="4" />
+                        </svg>
+                      </span>
+                      <div className="fi-msg">{registerErrors.name || '\u00A0'}</div>
+                    </div>
 
-                  <div className={`fi ${registerErrors.email ? 'err' : ''}`}>
-                    <input
-                      type="email"
-                      id="rEmail"
-                      placeholder=" "
-                      autoComplete="email"
-                      value={rEmail}
-                      onChange={(e) => setREmail(e.target.value)}
-                    />
-                    <label htmlFor="rEmail">Email address</label>
-                    <span className="ico">
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                        <rect width="20" height="16" x="2" y="4" rx="2" />
-                        <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
-                      </svg>
-                    </span>
-                    <div className="fi-msg">{registerErrors.email || '\u00A0'}</div>
+                    <div className={`fi ${registerErrors.email ? 'err' : ''}`}>
+                      <input
+                        type="email"
+                        id="rEmail"
+                        placeholder=" "
+                        autoComplete="email"
+                        value={rEmail}
+                        onChange={(e) => setREmail(e.target.value)}
+                      />
+                      <label htmlFor="rEmail">Email address</label>
+                      <span className="ico">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                          <rect width="20" height="16" x="2" y="4" rx="2" />
+                          <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+                        </svg>
+                      </span>
+                      <div className="fi-msg">{registerErrors.email || '\u00A0'}</div>
+                    </div>
                   </div>
 
                   <div className="grid2">
@@ -1655,7 +1655,8 @@ const AuthPage = () => {
                     id="rEyeBtn"
                     onClick={() => setShowRegisterPassword((value) => !value)}
                     style={{
-                      fontSize: '11px',
+                      fontSize: 'var(--type-metaText-size)',
+                      lineHeight: 'var(--type-metaText-lineHeight)',
                       color: showRegisterPassword ? palette.accentDark : palette.accentPrimary,
                       background: 'none',
                       border: 'none',
@@ -1663,7 +1664,7 @@ const AuthPage = () => {
                       display: 'flex',
                       alignItems: 'center',
                       gap: '5px',
-                      fontFamily: 'DM Sans, sans-serif',
+                      fontFamily: 'var(--font-body)',
                       transition: 'color .2s',
                       letterSpacing: '.02em',
                     }}
@@ -1684,7 +1685,7 @@ const AuthPage = () => {
 
                 <div className="divr"><div className="divr-l" /><span className="divr-t">or</span><div className="divr-l" /></div>
 
-                <div style={{ textAlign: 'center', fontSize: '13px', color: palette.textSecondary }}>
+                <div style={{ textAlign: 'center', fontSize: 'var(--type-uiText-size)', lineHeight: 'var(--type-uiText-lineHeight)', color: palette.textSecondary }}>
                   Already a member?{' '}
                   <button className="ghost" type="button" disabled={stage !== STAGE.IDLE} onClick={handleBackToSignIn} style={{ fontWeight: 600 }}>
                     ← Sign In

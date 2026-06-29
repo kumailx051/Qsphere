@@ -1,12 +1,12 @@
+import fs from 'fs/promises'
 import { createHttpError } from '../utils/errors.js'
 
-export const uploadImageToImgBB = async (base64DataUrl) => {
+const uploadBase64ImageToImgBB = async (base64Data) => {
   const apiKey = process.env.IMGBB_API_KEY
   if (!apiKey) {
     throw createHttpError(500, 'ImgBB API key is not configured in environment variables.')
   }
 
-  const base64Data = String(base64DataUrl || '').replace(/^data:image\/\w+;base64,/, '')
   const params = new URLSearchParams()
   params.append('image', base64Data)
 
@@ -25,4 +25,14 @@ export const uploadImageToImgBB = async (base64DataUrl) => {
   }
 
   return result.data.url
+}
+
+export const uploadImageToImgBB = async (base64DataUrl) => {
+  const base64Data = String(base64DataUrl || '').replace(/^data:image\/\w+;base64,/, '')
+  return uploadBase64ImageToImgBB(base64Data)
+}
+
+export const uploadImageFileToImgBB = async (filePath) => {
+  const fileBuffer = await fs.readFile(filePath)
+  return uploadBase64ImageToImgBB(fileBuffer.toString('base64'))
 }

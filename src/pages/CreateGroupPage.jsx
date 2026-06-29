@@ -260,7 +260,7 @@ const CreateGroupPage = () => {
 
       <main className="relative z-10 flex-grow w-full pt-32 pb-24">
         <div className="px-6 md:px-12 lg:px-20 xl:px-28">
-          <div className="mx-auto max-w-[1500px]">
+          <div className="qs-page-container">
             <motion.button
               variants={itemVariants}
               initial="hidden"
@@ -294,15 +294,15 @@ const CreateGroupPage = () => {
                 </div>
 
                 <h1
-                  className="max-w-5xl text-5xl font-bold leading-[0.9] md:text-6xl xl:text-[5.35rem]"
-                  style={{ fontFamily: "'Syne', sans-serif", textShadow: '0 0 40px rgba(16,185,129,0.08)', color: palette.textPrimary }}
+                  className="type-heading max-w-4xl"
+                  style={{ fontFamily: 'var(--font-heading)', textShadow: '0 0 40px rgba(16,185,129,0.08)', color: palette.textPrimary }}
                 >
                   Start a focused
                   <br />
                   <span style={{ color: palette.accentPrimary }}>collaboration room.</span>
                 </h1>
 
-                <p className="mt-7 max-w-3xl text-base leading-8 md:text-lg xl:text-[1.12rem]" style={{ color: palette.textSecondary }}>
+                <p className="mt-7 max-w-3xl text-base leading-8" style={{ color: palette.textSecondary }}>
                   Define the type, scope, and purpose of your group so the right people can find it and contribute with clarity.
                 </p>
 
@@ -314,7 +314,7 @@ const CreateGroupPage = () => {
                   ].map((item) => (
                     <motion.div key={item.label} variants={itemVariants} className="rounded-[28px] border p-5 backdrop-blur-xl" style={{ borderColor: palette.borderPrimary, backgroundColor: palette.bgSecondary }}>
                       <div className="text-[10px] font-bold uppercase tracking-[0.24em]" style={{ color: palette.accentLight, opacity: 0.8 }}>{item.label}</div>
-                      <div className="mt-4 text-2xl font-bold" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>{item.value}</div>
+                      <div className="type-cardHeading mt-4" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>{item.value}</div>
                     </motion.div>
                   ))}
                 </motion.div>
@@ -452,7 +452,7 @@ const CreateGroupPage = () => {
                       <Sparkles size={20} />
                     </div>
                     <div className="text-[10px] font-bold uppercase tracking-[0.26em]" style={{ color: palette.accentPrimary }}>AI-powered setup</div>
-                    <h3 className="mt-3 text-xl font-bold" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
+                    <h3 className="type-cardHeading mt-3" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
                       Smarter group creation
                     </h3>
                     <p className="mt-3 text-sm leading-7" style={{ color: palette.textSecondary }}>
@@ -465,7 +465,7 @@ const CreateGroupPage = () => {
                       <Users2 size={20} />
                     </div>
                     <div className="text-[10px] font-bold uppercase tracking-[0.26em]" style={{ color: palette.accentPrimary }}>About groups</div>
-                    <h3 className="mt-3 text-xl font-bold" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
+                    <h3 className="type-cardHeading mt-3" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
                       Purpose-driven rooms
                     </h3>
                     <p className="mt-3 text-sm leading-7" style={{ color: palette.textSecondary }}>
@@ -486,7 +486,7 @@ const CreateGroupPage = () => {
                       <CheckCircle2 size={20} style={{ color: '#fff' }} />
                     </div>
                     <div className="text-[10px] font-bold uppercase tracking-[0.26em]" style={{ color: palette.accentPrimary }}>Tips</div>
-                    <h3 className="mt-3 text-xl font-bold" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
+                    <h3 className="type-cardHeading mt-3" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
                       Strong groups start here
                     </h3>
                     <ul className="mt-3 space-y-2 text-sm leading-7" style={{ color: palette.textSecondary }}>
@@ -526,7 +526,7 @@ const CreateGroupPage = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="w-full max-w-md rounded-3xl border shadow-2xl animate-in zoom-in-95 duration-200" style={{ borderColor: palette.borderPrimary, backgroundColor: palette.bgTertiary }}>
             <div className="p-6 md:p-8">
-              <h3 className="mb-2 text-xl font-bold" style={{ color: palette.textPrimary }}>Create New Group Type</h3>
+              <h3 className="type-cardHeading mb-2" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>Create New Group Type</h3>
               <p className="mb-6 text-sm" style={{ color: palette.textMuted }}>Enter the name for the new custom group category you want to create.</p>
 
               <div className="mb-6">

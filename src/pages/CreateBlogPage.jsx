@@ -184,7 +184,9 @@ export default function CreateBlogPage() {
     
     if (editorRef.current) {
       editorRef.current.innerHTML = draft.body || ''
+      normalizeEditorThemeStyles()
     }
+    handleEditorChange()
     setSuccessMsg('Draft restored successfully!')
     setTimeout(() => setSuccessMsg(''), 3000)
     setShowDraftsModal(false)
@@ -204,6 +206,19 @@ export default function CreateBlogPage() {
   // Dismiss banner
   const dismissDraftBanner = () => {
     setHasDraftToRestore(false)
+  }
+
+  const normalizeEditorThemeStyles = () => {
+    if (!editorRef.current || !isDayMode) return
+
+    editorRef.current.querySelectorAll('*').forEach((node) => {
+      if (!(node instanceof HTMLElement)) return
+      node.style.removeProperty('color')
+      node.style.removeProperty('-webkit-text-fill-color')
+      node.style.removeProperty('text-shadow')
+      node.style.removeProperty('background-color')
+      node.removeAttribute('color')
+    })
   }
 
   // Debounced auto-save effect
@@ -314,6 +329,7 @@ export default function CreateBlogPage() {
   // Handle keyup / click / input within rich editor to compute counts & styles
   const handleEditorChange = () => {
     if (!editorRef.current) return
+    normalizeEditorThemeStyles()
     const content = editorRef.current.innerHTML || ''
     const text = editorRef.current.innerText || ''
 
@@ -345,6 +361,10 @@ export default function CreateBlogPage() {
   useEffect(() => {
     handleEditorChange()
   }, [title, excerpt])
+
+  useEffect(() => {
+    normalizeEditorThemeStyles()
+  }, [isDayMode])
 
   // Auto-calculated reading time
   const getAutoReadTime = () => {
@@ -810,6 +830,17 @@ export default function CreateBlogPage() {
     <div className="relative overflow-hidden" style={{ backgroundColor: palette.bgPrimary, minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <Navbar currentPage="blogs" />
 
+      {isDayMode ? (
+        <style>{`
+          .qs-blog-editor,
+          .qs-blog-editor :where(h1,h2,h3,h4,h5,h6,p,span,strong,em,b,i,u,li,blockquote,a,code,pre,td,th,small) {
+            color: #000000 !important;
+            -webkit-text-fill-color: #000000 !important;
+            text-shadow: none !important;
+          }
+        `}</style>
+      ) : null}
+
       {/* Parallax ambient glows */}
       <div className="fixed inset-0 pointer-events-none" style={{ zIndex: 0 }}>
         <div className="absolute inset-0" style={{ backgroundColor: palette.bgPrimary }} />
@@ -837,13 +868,7 @@ export default function CreateBlogPage() {
               <ArrowLeft size={16} />
             </button>
             <div>
-              <div className="flex items-center gap-3 mb-1">
-                <span className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.28em]" style={{ border: `1px solid ${palette.accentBorder}`, backgroundColor: palette.accentSoft, color: palette.accentLight }}>
-                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: palette.accentPrimary, boxShadow: `0 0 10px ${palette.accentPrimary}` }} />
-                  Interactive Publisher
-                </span>
-              </div>
-              <h1 className="font-bold text-2xl leading-tight md:text-3xl" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>Write Blog Post</h1>
+              <h1 className="type-heading" style={{ color: palette.textPrimary }}>Write Blog Post</h1>
             </div>
           </div>
 
@@ -918,7 +943,7 @@ export default function CreateBlogPage() {
                     onChange={(v) => setTitle(v)}
                     placeholder="Enter Title..."
                     className="flex-1 w-full font-black text-3xl md:text-4xl outline-none pb-4 transition-all"
-                    style={{ color: palette.textPrimary, borderBottom: `1px solid ${palette.borderPrimary}`, fontFamily: "'Archivo Black', 'Inter', sans-serif" }}
+                    style={{ color: palette.textPrimary, borderBottom: `1px solid ${palette.borderPrimary}`, fontFamily: 'var(--font-accent)' }}
                   />
                   <button
                     type="button"
@@ -1026,12 +1051,28 @@ export default function CreateBlogPage() {
                       setSelectedImageNode(null)
                     }
                   }}
-                  className="w-full min-h-[450px] p-6 leading-relaxed outline-none transition-all prose prose-invert max-w-none"
+                  className={`qs-blog-editor w-full min-h-[450px] p-6 leading-relaxed outline-none transition-all prose max-w-none ${isDayMode ? '' : 'prose-invert'}`}
                   style={{
                     backgroundColor: palette.bgInput,
-                    color: palette.textPrimary,
+                    color: isDayMode ? '#000000' : palette.textPrimary,
                     overflowY: 'auto',
-                    fontFamily: "'Inter', sans-serif"
+                    fontFamily: 'var(--font-body)',
+                    '--tw-prose-body': isDayMode ? '#000000' : palette.textPrimary,
+                    '--tw-prose-headings': isDayMode ? '#000000' : palette.textPrimary,
+                    '--tw-prose-lead': isDayMode ? '#111827' : palette.textSecondary,
+                    '--tw-prose-links': isDayMode ? '#000000' : palette.textPrimary,
+                    '--tw-prose-bold': isDayMode ? '#000000' : palette.textPrimary,
+                    '--tw-prose-counters': isDayMode ? '#111827' : palette.textSecondary,
+                    '--tw-prose-bullets': isDayMode ? '#111827' : palette.textSecondary,
+                    '--tw-prose-hr': palette.borderPrimary,
+                    '--tw-prose-quotes': isDayMode ? '#000000' : palette.textPrimary,
+                    '--tw-prose-quote-borders': palette.borderPrimary,
+                    '--tw-prose-captions': isDayMode ? '#374151' : palette.textMuted,
+                    '--tw-prose-code': isDayMode ? '#000000' : palette.textPrimary,
+                    '--tw-prose-pre-code': isDayMode ? '#000000' : palette.textPrimary,
+                    '--tw-prose-pre-bg': palette.bgSurfaceHover,
+                    '--tw-prose-th-borders': palette.borderPrimary,
+                    '--tw-prose-td-borders': palette.borderPrimary,
                   }}
                   placeholder="Click here to start composing your rich article content..."
                 />
@@ -1058,7 +1099,7 @@ export default function CreateBlogPage() {
               
               {/* Cover Image Upload (No presets shown!) */}
               <div className="rounded-3xl p-6 space-y-4 backdrop-blur-xl" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.bgSurface, boxShadow: palette.shadowCard }}>
-                <h2 className="text-sm font-bold tracking-wider uppercase flex items-center justify-between" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
+                <h2 className="text-sm font-bold tracking-wider uppercase flex items-center justify-between" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
                   <span>Cover Banner Image</span>
                   <Settings size={14} style={{ color: palette.accentPrimary }} />
                 </h2>
@@ -1097,7 +1138,7 @@ export default function CreateBlogPage() {
               {/* Image Properties Panel (Only shows when an image is selected in the editor) */}
               {selectedImageNode && (
                 <div className="rounded-3xl p-6 space-y-4 backdrop-blur-xl animate-in slide-in-from-top-4 fade-in" style={{ border: `1px solid ${palette.accentBorder}`, backgroundColor: palette.bgTertiary, boxShadow: palette.shadowCard }}>
-                  <h2 className="text-sm font-bold tracking-wider uppercase flex items-center justify-between" style={{ fontFamily: "'Syne', sans-serif", color: palette.accentPrimary }}>
+                  <h2 className="text-sm font-bold tracking-wider uppercase flex items-center justify-between" style={{ fontFamily: 'var(--font-heading)', color: palette.accentPrimary }}>
                     <span>Image Properties</span>
                     <Settings size={14} />
                   </h2>
@@ -1125,7 +1166,7 @@ export default function CreateBlogPage() {
               {/* Auto Save Settings Panel */}
               <div className="rounded-3xl p-6 space-y-4 backdrop-blur-xl" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.bgSurface, boxShadow: palette.shadowCard }}>
                 <div className="flex items-center justify-between">
-                  <h2 className="text-sm font-bold tracking-wider uppercase" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
+                  <h2 className="text-sm font-bold tracking-wider uppercase" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
                     Auto Save
                   </h2>
                   <div className="flex items-center gap-2">
@@ -1166,7 +1207,7 @@ export default function CreateBlogPage() {
 
               {/* Dynamic Categories (Defaults removed!) */}
               <div className="rounded-3xl p-6 space-y-4 backdrop-blur-xl" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.bgSurface, boxShadow: palette.shadowCard }}>
-                <h2 className="text-sm font-bold tracking-wider uppercase" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
+                <h2 className="text-sm font-bold tracking-wider uppercase" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
                   Categories List
                 </h2>
 
@@ -1219,7 +1260,7 @@ export default function CreateBlogPage() {
 
               {/* Publish Info Panel */}
               <div className="rounded-3xl p-6 space-y-4 backdrop-blur-xl" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.bgSurface, boxShadow: palette.shadowCard }}>
-                <h2 className="text-sm font-bold tracking-wider uppercase" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
+                <h2 className="text-sm font-bold tracking-wider uppercase" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
                   Post Metadata
                 </h2>
 

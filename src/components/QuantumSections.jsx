@@ -86,12 +86,12 @@ const TextPanel = ({ section, palette }) => {
       <motion.span
         variants={itemVariants}
         style={{
-          fontSize: 11,
-          letterSpacing: '0.4em',
+          fontSize: 'var(--type-labelText-size)',
+          letterSpacing: 'var(--type-labelText-letterSpacing)',
           color: '#10b981',
-          fontWeight: 700,
+          fontWeight: 'var(--type-labelText-weight)',
           textTransform: 'uppercase',
-          fontFamily: "'Syne', 'Inter', sans-serif",
+          fontFamily: 'var(--font-heading)',
         }}
       >
         — {section.tag}
@@ -100,11 +100,11 @@ const TextPanel = ({ section, palette }) => {
         <motion.h2
           variants={itemVariants}
           style={{
-            fontFamily: "'Syne', 'Inter', sans-serif",
-            fontSize: 'clamp(2rem, 3.5vw, 3.2rem)',
-            fontWeight: 900,
-            lineHeight: 1.05,
-            letterSpacing: '-0.03em',
+            fontFamily: 'var(--font-heading)',
+            fontSize: 'var(--type-sectionHeading-size)',
+            fontWeight: 'var(--type-heading-weight)',
+            lineHeight: 'var(--type-sectionHeading-lineHeight)',
+            letterSpacing: 'var(--type-heading-letterSpacing)',
             color: palette.textPrimary,
           }}
         >
@@ -121,9 +121,9 @@ const TextPanel = ({ section, palette }) => {
           variants={itemVariants}
           style={{
             color: palette.textSecondary,
-            fontSize: 'clamp(0.85rem, 1.1vw, 1rem)',
-            lineHeight: 1.8,
-            fontFamily: "'Syne', 'Inter', sans-serif",
+            fontSize: 'var(--type-bodyText-size)',
+            lineHeight: 'var(--type-bodyText-lineHeight)',
+            fontFamily: 'var(--font-body)',
           }}
         >
           {section.body}

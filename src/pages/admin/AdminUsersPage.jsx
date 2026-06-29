@@ -50,7 +50,7 @@ export default function AdminUsersPage() {
   }
 
   return (
-    <AdminPageShell eyebrow="User administration" title="Manage people without losing the human signal." description="Search accounts, inspect onboarding state, assign roles, and suspend or restore access.">
+    <AdminPageShell eyebrow="User administration" title="Manage people without losing" titleAccent="the human signal." description="Search accounts, inspect onboarding state, assign roles, and suspend or restore access.">
       <section className="rounded-[34px] p-5 md:p-7" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.bgSurface, boxShadow: isDayMode ? palette.shadowCard : '0 24px 80px rgba(0,0,0,0.25)' }}>
         <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_220px]">
           <label className="flex items-center gap-3 rounded-2xl px-4 py-3" style={{ border: `1px solid ${palette.borderInput}`, backgroundColor: palette.bgInput }}>

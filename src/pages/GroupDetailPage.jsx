@@ -4,6 +4,8 @@ import { motion, useScroll, useTransform } from 'framer-motion'
 import {
   ArrowLeft,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Crown,
   LayoutGrid,
   Plus,
@@ -12,6 +14,8 @@ import {
   Upload,
   Users2,
   UserPen,
+  AlertTriangle,
+  X,
 } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
@@ -72,6 +76,8 @@ const statusBadgeClass = (status) => {
   if (status === 'Active') return 'border-emerald-400/30 bg-emerald-500/10 text-emerald-300'
   if (status === 'In Progress') return 'border-cyan-400/30 bg-cyan-500/10 text-cyan-300'
   if (status === 'Planning') return 'border-amber-400/30 bg-amber-500/10 text-amber-300'
+  if (status === 'Review') return 'border-violet-400/30 bg-violet-500/10 text-violet-300'
+  if (status === 'Completed') return 'border-emerald-400/30 bg-emerald-500/10 text-emerald-300'
   return 'border-white/10 bg-white/[0.04] text-white/70'
 }
 
@@ -112,6 +118,7 @@ const GroupDetailPage = () => {
   const { scrollY } = useScroll()
   const glowY1 = useTransform(scrollY, [0, 500], [0, -60])
   const glowY2 = useTransform(scrollY, [0, 500], [0, -30])
+  const completedProjectsRef = useRef(null)
 
   useEffect(() => {
     const logged = localStorage.getItem('qsphere_logged_in') === '1'
@@ -134,12 +141,15 @@ const GroupDetailPage = () => {
   const [members, setMembers] = useState([])
   const [projects, setProjects] = useState([])
   const [showProjectModal, setShowProjectModal] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState(null)
   const [projectForm, setProjectForm] = useState({ title: '', description: '', dueDate: '', status: 'Planning', owner: profile?.emailAddress || '' })
   const [projectFile, setProjectFile] = useState(null)
   const [isGeneratingDesc, setIsGeneratingDesc] = useState(false)
   const fileInputRef = useRef(null)
   const today = new Date().toISOString().split('T')[0]
   const [memberPositions, setMemberPositions] = useState({})
+  const [activeProjectsPage, setActiveProjectsPage] = useState(0)
+  const [completedProjectsPage, setCompletedProjectsPage] = useState(0)
 
   const fetchMembers = async () => {
     try {
@@ -227,11 +237,49 @@ const GroupDetailPage = () => {
   const totalMembers = members.length
   const activeUsers = members.filter((member) => member.status === 'Active').length
   const totalProjects = projects.length
+  const activeProjects = useMemo(
+    () => projects.filter((project) => String(project.status || '').trim().toLowerCase() !== 'completed'),
+    [projects],
+  )
+  const completedProjects = useMemo(
+    () => projects.filter((project) => String(project.status || '').trim().toLowerCase() === 'completed'),
+    [projects],
+  )
+  const projectsPerPage = 3
+  const activeProjectsPageCount = Math.max(1, Math.ceil(activeProjects.length / projectsPerPage))
+  const completedProjectsPageCount = Math.max(1, Math.ceil(completedProjects.length / projectsPerPage))
+  const visibleActiveProjects = useMemo(
+    () => activeProjects.slice(activeProjectsPage * projectsPerPage, activeProjectsPage * projectsPerPage + projectsPerPage),
+    [activeProjects, activeProjectsPage],
+  )
+  const visibleCompletedProjects = useMemo(
+    () => completedProjects.slice(completedProjectsPage * projectsPerPage, completedProjectsPage * projectsPerPage + projectsPerPage),
+    [completedProjects, completedProjectsPage],
+  )
   const currentMember = useMemo(
     () => members.find((member) => String(member.email || '').trim().toLowerCase() === currentUserEmail) ?? null,
     [members, currentUserEmail],
   )
   const canViewWorkspace = isAdmin || currentMember?.status === 'Active'
+
+  useEffect(() => {
+    setActiveProjectsPage((current) => Math.min(current, Math.max(0, activeProjectsPageCount - 1)))
+  }, [activeProjectsPageCount])
+
+  useEffect(() => {
+    setCompletedProjectsPage((current) => Math.min(current, Math.max(0, completedProjectsPageCount - 1)))
+  }, [completedProjectsPageCount])
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const scrollParam = params.get('scroll')
+    const sectionParam = params.get('section')
+    if (scrollParam === 'projects' && sectionParam === 'completed' && activeTab === 'projects') {
+      window.setTimeout(() => {
+        completedProjectsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 220)
+    }
+  }, [activeTab, completedProjects.length, location.search])
 
   const updateMemberPosition = async (memberEmail, position) => {
     try {
@@ -331,12 +379,18 @@ const GroupDetailPage = () => {
   }
 
   const deleteProject = async (projectId) => {
-    if (!window.confirm('Are you sure you want to delete this project?')) return
+    setDeleteConfirm(projectId)
+  }
+
+  const confirmDeleteProject = async () => {
+    if (!deleteConfirm) return
     try {
-      const res = await fetch(`/api/projects/${projectId}`, { method: 'DELETE' })
-      if (res.ok) setProjects((current) => current.filter((p) => p.id !== projectId))
+      const res = await fetch(`/api/projects/${deleteConfirm}`, { method: 'DELETE' })
+      if (res.ok) setProjects((current) => current.filter((p) => p.id !== deleteConfirm))
     } catch (err) {
       console.error('Failed to delete project', err)
+    } finally {
+      setDeleteConfirm(null)
     }
   }
 
@@ -361,7 +415,7 @@ const GroupDetailPage = () => {
               <Users2 size={28} />
             </div>
             <div className="mt-6 text-[10px] font-bold uppercase tracking-[0.3em]" style={{ color: palette.accentPrimary }}>Group not found</div>
-            <h1 className="mt-4 text-4xl font-bold leading-[0.95] md:text-5xl" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
+            <h1 className="type-heading mt-4" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
               This group does not exist.
             </h1>
             <p className="mx-auto mt-6 max-w-xl text-sm leading-7" style={{ color: palette.textMuted }}>Return to the groups list and choose another project workspace.</p>
@@ -405,7 +459,7 @@ const GroupDetailPage = () => {
 
       <main className="relative z-10 flex-grow w-full pt-32 pb-24">
         <div className="px-6 md:px-12 lg:px-20 xl:px-28">
-          <div className="mx-auto max-w-[1500px]">
+          <div className="qs-page-container">
             <motion.button
               variants={itemVariants}
               initial="hidden"
@@ -447,8 +501,8 @@ const GroupDetailPage = () => {
                       )}
                     </div>
                     <h1
-                      className="text-5xl font-bold leading-[0.9] md:text-6xl xl:text-[5rem]"
-                      style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary, textShadow: `0 0 40px ${isDayMode ? 'rgba(46,197,138,0.08)' : 'rgba(16,185,129,0.08)'}` }}
+                      className="type-heroHeading"
+                      style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary, textShadow: `0 0 40px ${isDayMode ? 'rgba(46,197,138,0.08)' : 'rgba(16,185,129,0.08)'}` }}
                     >
                       {group.groupTitle || group.title}
                     </h1>
@@ -460,7 +514,7 @@ const GroupDetailPage = () => {
                       <Crown size={18} />
                       <span className="text-[10px] font-bold uppercase tracking-[0.28em]" style={{ color: palette.accentPrimary }}>Admin</span>
                     </div>
-                    <div className="mt-3 text-xl font-bold" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>{group.owner}</div>
+                    <div className="mt-3 text-xl font-bold" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>{group.owner}</div>
                     <div className="mt-1 text-xs" style={{ color: palette.textMuted }}>Project owner and management access holder</div>
                   </div>
                 </div>
@@ -533,7 +587,7 @@ const GroupDetailPage = () => {
                 <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
                   <div>
                     <div className="text-[10px] font-semibold uppercase tracking-[0.28em]" style={{ color: palette.accentPrimary }}>Workspace Members</div>
-                    <h2 className="mt-2 text-2xl font-bold" style={{ color: palette.textPrimary }}>Members</h2>
+                    <h2 className="type-cardHeading mt-2" style={{ color: palette.textPrimary }}>Members</h2>
                     <p className="mt-1 text-sm" style={{ color: palette.textMuted }}>{isAdmin ? 'Assign positions or remove members from the group.' : 'View who is active inside this research group.'}</p>
                   </div>
                   <div className="rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em]" style={{ borderColor: palette.accentBorder, backgroundColor: palette.accentSoft, color: palette.accentPrimary }}>
@@ -647,7 +701,7 @@ const GroupDetailPage = () => {
                 <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
                   <div>
                     <div className="text-[10px] font-semibold uppercase tracking-[0.28em]" style={{ color: palette.accentPrimary }}>Shared Work</div>
-                    <h2 className="mt-2 text-2xl font-bold" style={{ color: palette.textPrimary }}>Projects</h2>
+                    <h2 className="type-cardHeading mt-2" style={{ color: palette.textPrimary }}>Projects</h2>
                     <p className="mt-1 text-sm" style={{ color: palette.textMuted }}>{isAdmin ? 'Create and showcase group projects in a polished workspace view.' : 'Browse the current initiatives inside this group workspace.'}</p>
                   </div>
                   {isAdmin ? (
@@ -668,44 +722,122 @@ const GroupDetailPage = () => {
                 </div>
 
                 {projects.length > 0 ? (
-                  <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-                    {projects.map((project) => (
-                      <article
-                        key={project.id}
-                        className="group relative rounded-[26px] border p-5 transition cursor-pointer"
-                        style={{ borderColor: palette.borderSoft, backgroundColor: palette.bgInput }}
-                        onClick={() => navigate(`/projects/${project.id}`)}
-                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = palette.accentBorder; e.currentTarget.style.backgroundColor = palette.bgSurfaceHover }}
-                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = palette.borderSoft; e.currentTarget.style.backgroundColor = palette.bgInput }}
-                      >
-                        {isAdmin ? (
-                          <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); deleteProject(project.id) }}
-                            className="absolute top-4 right-4 flex h-8 w-8 items-center justify-center rounded-full border border-red-400/20 bg-red-500/10 text-red-400 opacity-0 group-hover:opacity-100 transition hover:bg-red-500/25"
-                            title="Delete project"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        ) : null}
-                        <div className={`flex items-start justify-between gap-4 ${isAdmin ? 'pr-8' : ''}`}>
-                          <div>
-                            <div className="text-[10px] uppercase tracking-[0.24em]" style={{ color: palette.accentPrimary }}>Project</div>
-                            <h3 className="mt-2 text-xl font-bold transition" style={{ color: palette.textPrimary }}>{project.title}</h3>
+                  <div className="space-y-8">
+                    <div>
+                      <div className="mb-4 flex items-center justify-between gap-3">
+                        <div>
+                          <div className="text-[10px] uppercase tracking-[0.24em]" style={{ color: palette.accentPrimary }}>Live workspace</div>
+                          <div className="mt-2 text-xl font-bold" style={{ color: palette.textPrimary }}>Active projects</div>
+                        </div>
+                        <div className="rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em]" style={{ borderColor: palette.borderInput, backgroundColor: palette.bgInput, color: palette.textSecondary }}>
+                          {activeProjects.length} active
+                        </div>
+                      </div>
+
+                      {activeProjects.length > 0 ? (
+                        <div>
+                          {activeProjects.length > projectsPerPage ? (
+                            <div className="mb-4 flex items-center justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setActiveProjectsPage((current) => Math.max(0, current - 1))}
+                                disabled={activeProjectsPage === 0}
+                                className="inline-flex h-10 w-10 items-center justify-center rounded-full border transition disabled:cursor-not-allowed disabled:opacity-40"
+                                style={{ borderColor: palette.borderInput, backgroundColor: palette.bgInput, color: palette.textPrimary }}
+                              >
+                                <ChevronLeft size={16} />
+                              </button>
+                              <div className="rounded-full border px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.2em]" style={{ borderColor: palette.borderInput, backgroundColor: palette.bgInput, color: palette.textSecondary }}>
+                                {activeProjectsPage + 1} / {activeProjectsPageCount}
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setActiveProjectsPage((current) => Math.min(activeProjectsPageCount - 1, current + 1))}
+                                disabled={activeProjectsPage >= activeProjectsPageCount - 1}
+                                className="inline-flex h-10 w-10 items-center justify-center rounded-full border transition disabled:cursor-not-allowed disabled:opacity-40"
+                                style={{ borderColor: palette.borderInput, backgroundColor: palette.bgInput, color: palette.textPrimary }}
+                              >
+                                <ChevronRight size={16} />
+                              </button>
+                            </div>
+                          ) : null}
+
+                          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+                          {visibleActiveProjects.map((project) => (
+                            <ProjectWorkspaceCard
+                              key={project.id}
+                              project={project}
+                              isAdmin={isAdmin}
+                              navigate={navigate}
+                              deleteProject={deleteProject}
+                            />
+                          ))}
                           </div>
-                          <span className={`rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] ${statusBadgeClass(project.status)}`}>
-                            {project.status}
-                          </span>
                         </div>
-                        <p className="mt-4 text-sm leading-6" style={{ color: palette.textSecondary }}>{project.description}</p>
-                        <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
-                          <MiniValue label="Owner" value={project.ownerName || project.owner || 'Admin'} />
-                          <MiniValue label="Due" value={formatDisplayDate(project.dueDate, 'TBD')} />
-                          <MiniValue label="Start" value={formatDisplayDate(project.startDate, 'N/A')} />
-                          <MiniValue label="Access" value="Shared" />
+                      ) : (
+                        <div className="rounded-3xl border px-5 py-10 text-center" style={{ borderColor: palette.borderSoft, backgroundColor: palette.bgInput, color: palette.textMuted }}>
+                          No active projects are running right now.
                         </div>
-                      </article>
-                    ))}
+                      )}
+                    </div>
+
+                    <div ref={completedProjectsRef}>
+                      <div className="mb-4 flex items-center justify-between gap-3">
+                        <div>
+                          <div className="text-[10px] uppercase tracking-[0.24em]" style={{ color: palette.accentPrimary }}>Archived wins</div>
+                          <div className="mt-2 text-xl font-bold" style={{ color: palette.textPrimary }}>Completed projects</div>
+                        </div>
+                        <div className="rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em]" style={{ borderColor: palette.borderInput, backgroundColor: palette.bgInput, color: palette.textSecondary }}>
+                          {completedProjects.length} completed
+                        </div>
+                      </div>
+
+                      {completedProjects.length > 0 ? (
+                        <div>
+                          {completedProjects.length > projectsPerPage ? (
+                            <div className="mb-4 flex items-center justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setCompletedProjectsPage((current) => Math.max(0, current - 1))}
+                                disabled={completedProjectsPage === 0}
+                                className="inline-flex h-10 w-10 items-center justify-center rounded-full border transition disabled:cursor-not-allowed disabled:opacity-40"
+                                style={{ borderColor: palette.borderInput, backgroundColor: palette.bgInput, color: palette.textPrimary }}
+                              >
+                                <ChevronLeft size={16} />
+                              </button>
+                              <div className="rounded-full border px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.2em]" style={{ borderColor: palette.borderInput, backgroundColor: palette.bgInput, color: palette.textSecondary }}>
+                                {completedProjectsPage + 1} / {completedProjectsPageCount}
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setCompletedProjectsPage((current) => Math.min(completedProjectsPageCount - 1, current + 1))}
+                                disabled={completedProjectsPage >= completedProjectsPageCount - 1}
+                                className="inline-flex h-10 w-10 items-center justify-center rounded-full border transition disabled:cursor-not-allowed disabled:opacity-40"
+                                style={{ borderColor: palette.borderInput, backgroundColor: palette.bgInput, color: palette.textPrimary }}
+                              >
+                                <ChevronRight size={16} />
+                              </button>
+                            </div>
+                          ) : null}
+
+                          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+                          {visibleCompletedProjects.map((project) => (
+                            <ProjectWorkspaceCard
+                              key={project.id}
+                              project={project}
+                              isAdmin={isAdmin}
+                              navigate={navigate}
+                              deleteProject={deleteProject}
+                            />
+                          ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="rounded-3xl border px-5 py-10 text-center" style={{ borderColor: palette.borderSoft, backgroundColor: palette.bgInput, color: palette.textMuted }}>
+                          Completed projects will land here after the owner marks them finished.
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ) : (
                   <div className="rounded-3xl border px-5 py-10 text-center" style={{ borderColor: palette.borderSoft, backgroundColor: palette.bgInput, color: palette.textMuted }}>
@@ -742,7 +874,7 @@ const GroupDetailPage = () => {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <div className="text-[10px] uppercase tracking-[0.3em]" style={{ color: palette.accentPrimary }}>New Project</div>
-                <h3 className="mt-2 text-3xl font-black" style={{ color: palette.textPrimary }}>Add project</h3>
+                <h3 className="type-sectionHeading mt-2" style={{ color: palette.textPrimary }}>Add project</h3>
                 <p className="mt-2 text-sm" style={{ color: palette.textMuted }}>Create a new project card for this group workspace.</p>
               </div>
               <button
@@ -812,7 +944,7 @@ const GroupDetailPage = () => {
                   style={{ borderColor: palette.borderInput, backgroundColor: palette.bgSurfaceHover, color: palette.textMuted }}
                 />
               </div>
-              <FormField label="Due date" type="date" value={projectForm.dueDate} onChange={(value) => setProjectForm((current) => ({ ...current, dueDate: value }))} placeholder="" />
+              <FormField label="Due date" type="date" value={projectForm.dueDate} onChange={(value) => setProjectForm((current) => ({ ...current, dueDate: value }))} placeholder="" min={today} />
               <div>
                 <label className="mb-2 block text-sm" style={{ color: palette.textSecondary }}>Status</label>
                  <select
@@ -860,6 +992,55 @@ const GroupDetailPage = () => {
           </div>
         </div>
       ) : null}
+
+      {deleteConfirm ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 py-8 backdrop-blur-md">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.92 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
+            className="w-full max-w-md rounded-[30px] border p-7 text-center"
+            style={{ borderColor: palette.borderPrimary, backgroundColor: palette.bgTertiary, boxShadow: palette.shadowDropdown }}
+          >
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full" style={{ backgroundColor: isDayMode ? '#fef2f2' : 'rgba(220,38,38,0.15)' }}>
+              <AlertTriangle size={30} style={{ color: isDayMode ? '#dc2626' : '#fca5a5' }} />
+            </div>
+            <h3 className="mt-5 text-xl font-bold" style={{ color: palette.textPrimary }}>
+              Delete project?
+            </h3>
+            <p className="mt-3 text-sm leading-6" style={{ color: palette.textSecondary }}>
+              This will permanently remove{' '}
+              <span className="font-semibold" style={{ color: palette.textPrimary }}>
+                &ldquo;{projects.find((p) => p.id === deleteConfirm)?.title || 'this project'}&rdquo;
+              </span>{' '}
+              and all its data. This action cannot be undone.
+            </p>
+            <div className="mt-7 flex items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => setDeleteConfirm(null)}
+                className="inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold transition"
+                style={{ border: `1px solid ${palette.borderInput}`, backgroundColor: palette.bgSurface, color: palette.textSecondary }}
+              >
+                <X size={16} />
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeleteProject}
+                className="inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold transition hover:brightness-110"
+                style={isDayMode
+                  ? { backgroundColor: '#dc2626', color: '#fff', border: 'none' }
+                  : { backgroundColor: 'rgba(220,38,38,0.15)', color: '#fca5a5', border: '1px solid rgba(220,38,38,0.25)' }
+                }
+              >
+                <Trash2 size={16} />
+                Delete
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -884,6 +1065,51 @@ const TabButton = ({ active, onClick, icon: Icon, label }) => {
   )
 }
 
+const ProjectWorkspaceCard = ({ project, isAdmin, navigate, deleteProject }) => {
+  const { theme } = useTheme()
+  const isDayMode = theme === 'light'
+  const palette = isDayMode ? dayTheme : darkTheme
+
+  return (
+    <article
+      className="group relative rounded-[26px] border p-5 transition cursor-pointer"
+      style={{ borderColor: palette.borderSoft, backgroundColor: palette.bgInput }}
+      onClick={() => navigate(`/projects/${project.id}`)}
+      onMouseEnter={(e) => { e.currentTarget.style.borderColor = palette.accentBorder; e.currentTarget.style.backgroundColor = palette.bgSurfaceHover }}
+      onMouseLeave={(e) => { e.currentTarget.style.borderColor = palette.borderSoft; e.currentTarget.style.backgroundColor = palette.bgInput }}
+    >
+      {isAdmin && String(project.status || '').trim().toLowerCase() !== 'completed' ? (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); deleteProject(project.id) }}
+          className="absolute top-4 right-4 flex h-8 w-8 items-center justify-center rounded-full border border-red-400/20 bg-red-500/10 text-red-400 opacity-0 group-hover:opacity-100 transition hover:bg-red-500/25"
+          title="Delete project"
+        >
+          <Trash2 size={14} />
+        </button>
+      ) : null}
+      <div className={`flex items-start justify-between gap-4 ${isAdmin ? 'pr-8' : ''}`}>
+        <div>
+          <div className="text-[10px] uppercase tracking-[0.24em]" style={{ color: palette.accentPrimary }}>
+            {String(project.status || '').trim().toLowerCase() === 'completed' ? 'Completed project' : 'Project'}
+          </div>
+          <h3 className="mt-2 text-xl font-bold transition" style={{ color: palette.textPrimary }}>{project.title}</h3>
+        </div>
+        <span className={`rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] ${statusBadgeClass(project.status)}`}>
+          {project.status}
+        </span>
+      </div>
+      <p className="mt-4 text-sm leading-6" style={{ color: palette.textSecondary }}>{project.description}</p>
+      <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
+        <MiniValue label="Owner" value={project.ownerName || project.owner || 'Admin'} />
+        <MiniValue label={String(project.status || '').trim().toLowerCase() === 'completed' ? 'Completed' : 'Due'} value={formatDisplayDate(String(project.status || '').trim().toLowerCase() === 'completed' ? project.completedAt : project.dueDate, String(project.status || '').trim().toLowerCase() === 'completed' ? 'Archived' : 'TBD')} />
+        <MiniValue label="Start" value={formatDisplayDate(project.startDate, 'N/A')} />
+        <MiniValue label="Access" value="Shared" />
+      </div>
+    </article>
+  )
+}
+
 const StatCard = ({ icon: Icon, label, value, accent = false }) => {
   const { theme } = useTheme()
   const isDayMode = theme === 'light'
@@ -898,7 +1124,7 @@ const StatCard = ({ icon: Icon, label, value, accent = false }) => {
         </span>
         <div>
           <div className="text-[10px] uppercase tracking-[0.28em]" style={{ color: p.textFaint }}>{label}</div>
-          <div className="mt-1 text-2xl font-bold" style={{ color: accent ? p.accentPrimary : p.textPrimary }}>{value}</div>
+          <div className="type-cardHeading mt-1" style={{ color: accent ? p.accentPrimary : p.textPrimary }}>{value}</div>
         </div>
       </div>
     </motion.div>
@@ -929,7 +1155,7 @@ const MiniValue = ({ label, value }) => {
   )
 }
 
-const FormField = ({ label, type = 'text', value, onChange, placeholder = '' }) => {
+const FormField = ({ label, type = 'text', value, onChange, placeholder = '', min }) => {
   const { theme } = useTheme()
   const isDayMode = theme === 'light'
   const p = isDayMode ? dayTheme : darkTheme
@@ -941,6 +1167,7 @@ const FormField = ({ label, type = 'text', value, onChange, placeholder = '' }) 
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
+        min={min}
         className="w-full rounded-2xl border px-4 py-3 text-sm outline-none transition"
         style={{ borderColor: p.borderInput, backgroundColor: p.bgSurface, color: p.textPrimary }}
       />

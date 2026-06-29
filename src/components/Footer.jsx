@@ -40,12 +40,13 @@ export default function Footer() {
     alignItems: 'center',
     gap: 6,
     color: palette.textSecondary,
-    fontSize: 13,
+    fontSize: 'var(--type-uiText-size)',
+    lineHeight: 'var(--type-uiText-lineHeight)',
     letterSpacing: '0.02em',
   }
 
   const Dot = () => (
-    <span style={{ color: palette.accentBorder, fontSize: 16, lineHeight: 1 }}>·</span>
+    <span style={{ color: palette.accentBorder, fontSize: 'var(--type-bodyText-size)', lineHeight: 1 }}>·</span>
   )
 
   return (
@@ -54,7 +55,7 @@ export default function Footer() {
         background: isDayMode ? palette.bgSecondary : '#000',
         borderTop: `1px solid ${palette.borderPrimary}`,
         padding: '56px 6vw 32px',
-        fontFamily: "'Inter', sans-serif",
+        fontFamily: 'var(--font-body)',
       }}
     >
       {/* ── Top row ────────────────────────────────────────── */}
@@ -115,7 +116,8 @@ export default function Footer() {
                 style={{
                   color: palette.textSecondary,
                   textDecoration: 'none',
-                  fontSize: 13,
+                  fontSize: 'var(--type-uiText-size)',
+                  lineHeight: 'var(--type-uiText-lineHeight)',
                   letterSpacing: '0.04em',
                   transition: 'color 0.2s',
                 }}
@@ -149,7 +151,7 @@ export default function Footer() {
           gap: 12,
         }}
       >
-        <span style={{ color: palette.textMuted, fontSize: 12, letterSpacing: '0.03em' }}>
+        <span style={{ color: palette.textMuted, fontSize: 'var(--type-helperText-size)', lineHeight: 'var(--type-helperText-lineHeight)', letterSpacing: '0.03em' }}>
           © 2026 QSphere · All Rights Reserved
         </span>
 
@@ -162,7 +164,8 @@ export default function Footer() {
             alignItems: 'center',
             gap: 6,
             color: palette.textMuted,
-            fontSize: 12,
+            fontSize: 'var(--type-helperText-size)',
+            lineHeight: 'var(--type-helperText-lineHeight)',
             textDecoration: 'none',
             letterSpacing: '0.03em',
             transition: 'color 0.2s',
@@ -171,7 +174,7 @@ export default function Footer() {
           onMouseLeave={e => (e.currentTarget.style.color = palette.textMuted)}
         >
           {String.fromCharCode(..._0x1a9b)}
-          <span style={{ color: '#e25555', fontSize: 14 }}>{String.fromCodePoint(0x2764, 0xFE0F)}</span>
+          <span style={{ color: '#e25555', fontSize: 'var(--type-uiText-size)' }}>{String.fromCodePoint(0x2764, 0xFE0F)}</span>
           {String.fromCharCode(..._0x9c3d) + String.fromCodePoint(0x2197)}
         </a>
       </div>

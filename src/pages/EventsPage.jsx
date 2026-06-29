@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, useScroll, useTransform } from 'framer-motion'
 import { Calendar, Clock, ArrowUpRight, MapPin, Sparkles, Users } from 'lucide-react'
@@ -22,11 +22,11 @@ import Footer from '../components/Footer'
 import {
   formatEventTime,
   getRegistrationState,
-  getStoredEvents,
   parseEventDate,
 } from '../utils/eventStore'
 import { useTheme } from '../contexts/ThemeContext'
 import { darkTheme, dayTheme } from '../themeColors'
+import { fetchEvents } from '../utils/opportunitiesApi'
 
 const getDynamicTypeStyles = (type, isDayMode, palette) => {
   if (type === 'Workshop') return isDayMode ? { bg: 'rgba(99,102,241,0.1)', color: '#4f46e5', border: 'rgba(99,102,241,0.3)', shadow: '0 0 12px rgba(99,102,241,0.1)' } : { bg: 'rgba(99,102,241,0.15)', color: '#a5b4fc', border: 'rgba(99,102,241,0.3)', shadow: '0 0 12px rgba(99,102,241,0.08)' }
@@ -69,6 +69,14 @@ const getEventAccent = (type) => {
 }
 
 const getDynamicStatusBadgeStyles = (badge, isDayMode, palette) => {
+  if (badge === 'Expired') {
+    return {
+      border: 'rgba(239,68,68,0.24)',
+      bg: 'rgba(239,68,68,0.08)',
+      color: '#dc2626',
+    }
+  }
+
   if (badge === 'Closing Soon') {
     return isDayMode ? { border: 'rgba(245,158,11,0.3)', bg: 'rgba(245,158,11,0.1)', color: '#d97706' } : { border: 'rgba(251,191,36,0.25)', bg: 'rgba(251,191,36,0.12)', color: '#fcd34d' }
   }
@@ -80,10 +88,30 @@ const getDynamicStatusBadgeStyles = (badge, isDayMode, palette) => {
   return isDayMode ? { border: 'rgba(16,185,129,0.3)', bg: 'rgba(16,185,129,0.1)', color: '#059669' } : { border: 'rgba(52,211,153,0.2)', bg: 'rgba(52,211,153,0.1)', color: '#6ee7b7' }
 }
 
-const isFutureEvent = (event) => {
-  if (!event?.date) return true
+const isEventArchived = (event) => {
+  const registrationState = getRegistrationState(event?.deadline)
+
+  if (registrationState.badge === 'Closed') {
+    return true
+  }
+
+  if (!event?.date) return false
+
   const timestamp = new Date(event.date).getTime()
-  return Number.isNaN(timestamp) ? true : timestamp >= Date.now()
+  return Number.isNaN(timestamp) ? false : timestamp < Date.now()
+}
+
+const getEventTimestamp = (event) => {
+  if (!event?.date) return Number.MAX_SAFE_INTEGER
+  const timestamp = new Date(event.date).getTime()
+  return Number.isNaN(timestamp) ? Number.MAX_SAFE_INTEGER : timestamp
+}
+
+const scrollToEventGrid = () => {
+  if (typeof document === 'undefined') return
+  const grid = document.getElementById('event-grid')
+  if (!grid) return
+  grid.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
 const EventsPage = () => {
@@ -95,16 +123,62 @@ const EventsPage = () => {
   const glowY1 = useTransform(scrollY, [0, 500], [0, -60])
   const glowY2 = useTransform(scrollY, [0, 500], [0, -30])
 
-  const [events] = useState(() => getStoredEvents())
-  const sortedEvents = useMemo(
-    () => [...events].sort((a, b) => new Date(a.date || 0).getTime() - new Date(b.date || 0).getTime()),
+  const [events, setEvents] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [eventTab, setEventTab] = useState('active')
+
+  useEffect(() => {
+    let active = true
+
+    const loadEvents = async () => {
+      try {
+        const data = await fetchEvents()
+        if (active) {
+          setEvents(Array.isArray(data) ? data : [])
+        }
+      } catch (error) {
+        console.error('Failed to load events:', error)
+        if (active) {
+          setEvents([])
+        }
+      } finally {
+        if (active) {
+          setLoading(false)
+        }
+      }
+    }
+
+    loadEvents()
+
+    return () => {
+      active = false
+    }
+  }, [])
+  const activeEvents = useMemo(
+    () => events.filter((event) => !isEventArchived(event)),
     [events],
   )
 
-  const featuredEvent = sortedEvents.find(isFutureEvent) || sortedEvents[0] || null
-  const liveCount = sortedEvents.filter(isFutureEvent).length
-  const openRegistrations = sortedEvents.filter((event) => getRegistrationState(event.deadline).badge !== 'Closed').length
-  const eventTypesCount = new Set(sortedEvents.map((event) => event.type).filter(Boolean)).size
+  const archivedEvents = useMemo(
+    () => events.filter((event) => isEventArchived(event)),
+    [events],
+  )
+
+  const sortedActiveEvents = useMemo(
+    () => [...activeEvents].sort((a, b) => getEventTimestamp(a) - getEventTimestamp(b)),
+    [activeEvents],
+  )
+
+  const sortedArchivedEvents = useMemo(
+    () => [...archivedEvents].sort((a, b) => getEventTimestamp(b) - getEventTimestamp(a)),
+    [archivedEvents],
+  )
+
+  const displayedEvents = eventTab === 'archived' ? sortedArchivedEvents : sortedActiveEvents
+
+  const liveCount = sortedActiveEvents.length
+  const openRegistrations = sortedActiveEvents.filter((event) => getRegistrationState(event.deadline).badge !== 'Closed').length
+  const archivedCount = sortedArchivedEvents.length
 
   return (
     <div className="relative overflow-hidden" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: palette.bgPrimary }}>
@@ -153,15 +227,15 @@ const EventsPage = () => {
                 </div>
 
                 <h1
-                  className="max-w-5xl text-5xl font-bold leading-[0.9] md:text-6xl xl:text-[5.35rem]"
-                  style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary, textShadow: isDayMode ? '0 12px 36px rgba(255,255,255,0.6)' : '0 0 40px rgba(16,185,129,0.08)' }}
+                  className="type-heading-soft max-w-3xl xl:max-w-[54rem]"
+                  style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary, textShadow: isDayMode ? '0 12px 36px rgba(255,255,255,0.6)' : '0 0 40px rgba(16,185,129,0.08)' }}
                 >
                   Where quantum minds gather,
                   <br />
                   <span style={{ color: palette.accentPrimary }}>build, and spark momentum.</span>
                 </h1>
 
-                <p className="mt-7 max-w-3xl text-base leading-8 md:text-lg xl:text-[1.12rem]" style={{ color: palette.textSecondary }}>
+                <p className="mt-7 max-w-3xl text-base leading-8" style={{ color: palette.textSecondary }}>
                   Explore workshops, seminars, webinars, and community meetups designed to feel more like high-signal launchpads than ordinary listings.
                 </p>
 
@@ -186,21 +260,47 @@ const EventsPage = () => {
 
                 <motion.div variants={containerVariants} initial="hidden" whileInView="visible" viewport={{ once: true }} className="mt-10 grid gap-4 md:grid-cols-3">
                   {[
-                    { label: 'Live opportunities', value: String(liveCount).padStart(2, '0') },
-                    { label: 'Open registrations', value: String(openRegistrations).padStart(2, '0') },
-                    { label: 'Event formats', value: String(eventTypesCount).padStart(2, '0') },
-                  ].map((item) => (
-                    <motion.div key={item.label} variants={itemVariants} className="rounded-[28px] p-5 backdrop-blur-xl" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: isDayMode ? 'rgba(255,255,255,0.72)' : 'rgba(0,0,0,0.2)' }}>
-                      <div className="text-[10px] font-bold uppercase tracking-[0.24em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.8)' }}>{item.label}</div>
-                      <div className="mt-4 text-4xl font-bold" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>{item.value}</div>
-                    </motion.div>
-                  ))}
+                    { key: 'active', label: 'Live opportunities', value: String(liveCount).padStart(2, '0') },
+                    { key: 'active', label: 'Open registrations', value: String(openRegistrations).padStart(2, '0') },
+                    { key: 'archived', label: 'Archived events', value: String(archivedCount).padStart(2, '0') },
+                  ].map((item) => {
+                    const selected = eventTab === item.key
+
+                    return (
+                      <motion.button
+                        key={item.label}
+                        variants={itemVariants}
+                        type="button"
+                        onClick={() => {
+                          setEventTab(item.key)
+                          window.requestAnimationFrame(() => scrollToEventGrid())
+                        }}
+                        className="rounded-[28px] p-5 text-left backdrop-blur-xl transition-all duration-300 hover:-translate-y-1"
+                        style={{
+                          border: `1px solid ${selected ? palette.accentBorder : palette.borderPrimary}`,
+                          backgroundColor: selected
+                            ? palette.accentSoft
+                            : isDayMode
+                              ? 'rgba(255,255,255,0.72)'
+                              : 'rgba(0,0,0,0.2)',
+                          boxShadow: selected
+                            ? (isDayMode ? '0 18px 40px rgba(46,197,138,0.12)' : '0 18px 40px rgba(16,185,129,0.10)')
+                            : 'none',
+                        }}
+                      >
+                        <div className="text-[10px] font-bold uppercase tracking-[0.24em]" style={{ color: selected ? palette.accentPrimary : isDayMode ? palette.accentDark : 'rgba(110,231,183,0.8)' }}>{item.label}</div>
+                        <div className="type-statValue mt-4" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
+                          {item.value}
+                        </div>
+                      </motion.button>
+                    )
+                  })}
                 </motion.div>
               </div>
             </div>
           </motion.section>
 
-          {events.length === 0 ? (
+          {!loading && displayedEvents.length === 0 ? (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
@@ -211,17 +311,55 @@ const EventsPage = () => {
               <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full backdrop-blur-xl" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: isDayMode ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.02)' }}>
                 <Calendar size={32} style={{ color: palette.textMuted }} />
               </div>
-              <h3 className="mb-2 text-2xl font-semibold" style={{ color: palette.textSecondary }}>No events yet</h3>
-              <p className="max-w-md text-sm" style={{ color: palette.textMuted }}>Events appear here once the community creates them.</p>
+              <h3 className="type-statValue mb-2" style={{ fontFamily: 'var(--font-heading)', color: palette.textSecondary }}>
+                {eventTab === 'archived' ? 'No archived events yet' : 'No live events right now'}
+              </h3>
+              <p className="max-w-md text-sm" style={{ color: palette.textMuted }}>
+                {eventTab === 'archived'
+                  ? 'Once an event expires, it will move into the archived tab here.'
+                  : 'Switch to the archived tab to review expired events, or wait for new live events to appear.'}
+              </p>
             </motion.div>
           ) : (
             <section id="event-grid" className="mt-10">
               <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                 <div>
                   <div className="text-[10px] font-bold uppercase tracking-[0.32em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.78)' }}>Event grid</div>
-                  <h2 className="mt-4 text-3xl font-bold md:text-4xl" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
+                  <h2 className="type-sectionHeading mt-4 max-w-3xl" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
                     Pick the room you want to enter next.
                   </h2>
+                </div>
+
+                <div className="flex flex-wrap gap-3">
+                  {[
+                    { key: 'active', label: 'Live', count: sortedActiveEvents.length },
+                    { key: 'archived', label: 'Archived', count: sortedArchivedEvents.length },
+                  ].map((tab) => {
+                    const activeTab = eventTab === tab.key
+
+                    return (
+                      <button
+                        key={tab.key}
+                        type="button"
+                        onClick={() => setEventTab(tab.key)}
+                        className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold transition-all"
+                        style={{
+                          border: `1px solid ${activeTab ? palette.accentBorder : palette.borderPrimary}`,
+                          backgroundColor: activeTab
+                            ? palette.accentSoft
+                            : isDayMode
+                              ? 'rgba(255,255,255,0.82)'
+                              : 'rgba(255,255,255,0.03)',
+                          color: activeTab ? palette.accentPrimary : palette.textSecondary,
+                        }}
+                      >
+                        {tab.label}
+                        <span className="inline-flex min-w-[22px] items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ backgroundColor: activeTab ? 'rgba(255,255,255,0.78)' : palette.accentSoft, color: activeTab ? palette.textPrimary : palette.accentPrimary }}>
+                          {tab.count}
+                        </span>
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
 
@@ -232,12 +370,14 @@ const EventsPage = () => {
                 viewport={{ once: true, margin: '-60px' }}
                 className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3 md:gap-8"
               >
-                {sortedEvents.map((event, index) => {
+                {displayedEvents.map((event) => {
                 const dateInfo = parseEventDate(event.date)
                 const deadline = getRegistrationState(event.deadline)
+                const archived = isEventArchived(event)
                 const accent = getEventAccent(event.type)
                 const typeStyle = getDynamicTypeStyles(event.type, isDayMode, palette)
-                const badgeStyle = getDynamicStatusBadgeStyles(deadline.badge, isDayMode, palette)
+                const statusLabel = archived ? 'Expired' : deadline.badge
+                const badgeStyle = getDynamicStatusBadgeStyles(statusLabel, isDayMode, palette)
 
                 return (
                   <motion.div key={event.id} variants={itemVariants}>
@@ -259,7 +399,7 @@ const EventsPage = () => {
                       <div className="flex items-start justify-between mb-6 gap-4">
                         <div className="flex flex-col items-center rounded-[24px] px-4 py-3 min-w-[92px]" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: isDayMode ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.04)', boxShadow: isDayMode ? '0 4px 12px rgba(15,23,42,0.04)' : '0 0 20px rgba(0,0,0,0.2)' }}>
                           <span className="text-[10px] font-bold uppercase tracking-[0.25em]" style={{ color: palette.accentPrimary }}>{dateInfo.month}</span>
-                          <span className="mt-1 text-3xl font-bold leading-none" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>{dateInfo.day}</span>
+                          <span className="mt-1" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary, fontSize: 'clamp(1.5rem, 2vw, 2rem)', fontWeight: 700, lineHeight: 1 }}>{dateInfo.day}</span>
                           <span className="mt-1 text-[10px]" style={{ color: palette.textMuted }}>{dateInfo.weekday}</span>
                         </div>
                         <div className="flex flex-col items-end gap-2">
@@ -273,12 +413,12 @@ const EventsPage = () => {
                             className="inline-flex rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em]"
                             style={{ backgroundColor: badgeStyle.bg, color: badgeStyle.color, borderColor: badgeStyle.border }}
                           >
-                            {deadline.badge}
+                            {statusLabel}
                           </span>
                         </div>
                       </div>
 
-                      <h3 className="text-2xl md:text-[2rem] mb-3 leading-tight font-bold transition-colors duration-300 group-hover:text-emerald-400" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
+                      <h3 className="type-statValue mb-3 transition-colors duration-300 group-hover:text-emerald-400" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
                         {event.title}
                       </h3>
 
@@ -315,11 +455,13 @@ const EventsPage = () => {
                         {event.deadline && (
                           <div className="flex items-center gap-2 text-xs" style={{ color: palette.textMuted }}>
                             <Calendar size={12} />
-                            Reg closes {parseEventDate(event.deadline).full}
+                            {archived ? `Expired ${parseEventDate(event.deadline).full}` : `Reg closes ${parseEventDate(event.deadline).full}`}
                           </div>
                         )}
                         <div className="mt-3 flex items-center justify-between gap-4">
-                          <span className="text-sm font-semibold" style={{ color: palette.textSecondary }}>{deadline.label}</span>
+                          <span className="text-sm font-semibold" style={{ color: archived ? '#dc2626' : palette.textSecondary }}>
+                            {archived ? 'This event is archived.' : deadline.label}
+                          </span>
                           <span className="inline-flex items-center gap-1 text-sm font-semibold transition-all duration-300 group-hover:gap-2" style={{ color: palette.accentPrimary }}>
                             Details
                             <ArrowUpRight size={14} className="transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />

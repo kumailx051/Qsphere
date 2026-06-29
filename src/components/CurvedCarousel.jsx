@@ -229,7 +229,7 @@ export default function CurvedCarousel() {
           text-transform: uppercase;
           color: var(--cs-label-color, #555049);
           white-space: nowrap;
-          font-family: 'Inter', sans-serif;
+          font-family: var(--font-body);
         }
 
         .cs-track-line {
@@ -309,7 +309,7 @@ export default function CurvedCarousel() {
           color: rgba(255,255,255,0.2);
           z-index: 2;
           transition: color 0.4s ease;
-          font-family: 'Inter', sans-serif;
+          font-family: var(--font-body);
         }
         .cs-item.cs-center .cs-item-index { color: rgba(255,255,255,0.45); }
 
@@ -326,7 +326,7 @@ export default function CurvedCarousel() {
           align-items: baseline;
           gap: 0.3rem;
           pointer-events: none;
-          font-family: 'Inter', sans-serif;
+          font-family: var(--font-body);
         }
         .cs-counter-current {
           color: var(--cs-counter-current-color, #e8e4de);

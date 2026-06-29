@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useTheme } from '../contexts/ThemeContext'
 import { darkTheme, dayTheme } from '../themeColors'
 import qubiImg from '../assets/Qubi.png'
@@ -69,6 +69,7 @@ const formatNotificationTime = (dateValue) => {
 
 const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = null }) => {
   const { theme, toggleTheme } = useTheme()
+  const location = useLocation()
   const [menuOpen, setMenuOpen] = useState(false)
   const [profile, setProfile] = useState(readStoredProfile)
   const [notifications, setNotifications] = useState([])
@@ -134,11 +135,13 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
   const isContactPage = currentPage === 'contact'
   const isBlogPage = currentPage === 'blogs'
   const isGroupsPage = currentPage === 'groups'
+  const isThreadsPage = currentPage === 'threads'
   const isEventsPage = currentPage === 'events'
   const isPositionsPage = currentPage === 'positions'
   const isDashboardPage = currentPage === 'dashboard'
 
   const isLoggedIn = !!profile
+  const isAdmin = String(profile?.role || '').toLowerCase() === 'admin'
   const profileAvatar = getProfileAvatar(profile)
   const profileEmail = getProfileEmail(profile)
   const unreadNotifications = notifications.filter((item) => item.unread).length
@@ -391,7 +394,7 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
     }
 
     loadNotifications()
-    const interval = window.setInterval(loadNotifications, 30000)
+    const interval = window.setInterval(loadNotifications, 8000)
 
     return () => {
       isCancelled = true
@@ -521,6 +524,15 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
   }
 
   const handleAccountManagement = () => {
+    if (profile) {
+      try {
+        localStorage.setItem('qsphere_logged_in', '1')
+        localStorage.setItem(storageKey, JSON.stringify(profile))
+      } catch {
+        // ignore storage sync failures and still navigate
+      }
+    }
+
     setDropdownOpen(false)
     setMenuOpen(false)
     navigate('/account', { state: { profile } })
@@ -670,14 +682,14 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
             </div>
 
             {/* Desktop Navigation */}
-            <nav className="hidden md:flex items-center gap-10 text-[14px] tracking-[0.14em]" style={{ fontFamily: "'Syne', 'Inter', sans-serif" }}>
+            <nav className={`type-navText hidden md:flex items-center ${isAdmin ? 'gap-6' : 'gap-10'}`}>
               <Link to="/" className={navItemClassName(isHomePage)}>
                 Home
                 {isHomePage && (
                   <span className="absolute -bottom-2 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
                 )}
               </Link>
-              {isLoggedIn && (
+              {isLoggedIn && !isAdmin && (
                 <Link to="/dashboard" className={navItemClassName(isDashboardPage)}>
                   Dashboard
                   {isDashboardPage && (
@@ -685,6 +697,29 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
                   )}
                 </Link>
               )}
+              {isAdmin && (
+                <>
+                  <Link to="/admin" className={navItemClassName(location.pathname === '/admin')}>
+                    Admin Dashboard
+                    {location.pathname === '/admin' && (
+                      <span className="absolute -bottom-2 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
+                    )}
+                  </Link>
+                  <Link to="/admin/users" className={navItemClassName(location.pathname.startsWith('/admin/users'))}>
+                    Users
+                    {location.pathname.startsWith('/admin/users') && (
+                      <span className="absolute -bottom-2 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
+                    )}
+                  </Link>
+                  <Link to="/admin/blog-management" className={navItemClassName(location.pathname.startsWith('/admin/blog-management'))}>
+                    Blog Management
+                    {location.pathname.startsWith('/admin/blog-management') && (
+                      <span className="absolute -bottom-2 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
+                    )}
+                  </Link>
+                </>
+              )}
+              {!isAdmin && (
               <div
                 ref={blogsMenuRef}
                 className="relative"
@@ -700,7 +735,7 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
                     <span className="absolute -bottom-2 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
                   )}
                 </Link>
-                {isLoggedIn ? (
+                {isLoggedIn && !isAdmin ? (
                   <div
                     className={`${submenuClassName} ${blogsMenuOpen ? 'opacity-100 scale-100 pointer-events-auto' : 'opacity-0 scale-95 pointer-events-none'}`}
                     onMouseEnter={() => clearHoverCloseTimer()}
@@ -717,6 +752,8 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
                   </div>
                 ) : null}
               </div>
+              )}
+              {!isAdmin && (
               <div
                 ref={groupsMenuRef}
                 className="relative"
@@ -732,7 +769,7 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
                     <span className="absolute -bottom-2 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
                   )}
                 </Link>
-                {isLoggedIn ? (
+                {isLoggedIn && !isAdmin ? (
                   <div
                     className={`${submenuClassName} ${groupsMenuOpen ? 'opacity-100 scale-100 pointer-events-auto' : 'opacity-0 scale-95 pointer-events-none'}`}
                     onMouseEnter={() => clearHoverCloseTimer()}
@@ -749,18 +786,31 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
                   </div>
                 ) : null}
               </div>
+              )}
+              {!isAdmin && (
+              <Link to="/threads" className={navItemClassName(isThreadsPage)}>
+                Threads
+                {isThreadsPage && (
+                  <span className="absolute -bottom-2 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
+                )}
+              </Link>
+              )}
+              {!isAdmin && (
               <Link to="/events" className={navItemClassName(isEventsPage)}>
                 Events
                 {isEventsPage && (
                   <span className="absolute -bottom-2 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
                 )}
               </Link>
+              )}
+              {!isAdmin && (
               <Link to="/positions" className={navItemClassName(isPositionsPage)}>
                 Positions
                 {isPositionsPage && (
                   <span className="absolute -bottom-2 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
                 )}
               </Link>
+              )}
               <Link to="/about" className={navItemClassName(isAboutPage)}>
                 About
                 {isAboutPage && (
@@ -981,7 +1031,14 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
                     >
                       {/* User info header */}
                       <div className="px-4 py-3.5" style={{ borderBottom: `1px solid ${isDayMode ? palette.borderPrimary : 'rgba(255,255,255,0.06)'}` }}>
-                        <div className="text-sm font-semibold truncate" style={{ color: palette.textPrimary }}>{profile.fullName || 'Explorer'}</div>
+                        <div className="flex items-center gap-2">
+                          <div className="text-sm font-semibold truncate" style={{ color: palette.textPrimary }}>{profile.fullName || 'Explorer'}</div>
+                          {isAdmin && (
+                            <span className="rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em]" style={{ backgroundColor: palette.accentSoft, color: palette.accentDark }}>
+                              Admin
+                            </span>
+                          )}
+                        </div>
                         <div className="text-[11px] mt-0.5 truncate" style={{ color: palette.accentPrimary }}>{getProfileEmail(profile) || 'Community member'}</div>
                       </div>
 
@@ -1306,43 +1363,64 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="qs-nav-mobile-name text-sm font-semibold text-white truncate">{profile.fullName || 'Explorer'}</div>
+                  <div className="flex items-center gap-2">
+                    <div className="qs-nav-mobile-name text-sm font-semibold text-white truncate">{profile.fullName || 'Explorer'}</div>
+                    {isAdmin && (
+                      <span className="rounded-full px-2 py-0.5 text-[8px] font-bold uppercase tracking-[0.12em] bg-emerald-500/20 text-emerald-300">Admin</span>
+                    )}
+                  </div>
                   <div className="qs-nav-mobile-email text-[11px] text-emerald-300/60 truncate">{getProfileEmail(profile) || 'Member'}</div>
                 </div>
               </div>
             )}
 
-            <nav className="mt-8 flex flex-col gap-5 text-[1.05rem] tracking-[0.06em]" style={{ fontFamily: "'Syne', 'Inter', sans-serif" }}>
+            <nav className="font-heading mt-8 flex flex-col gap-5 text-[1.05rem] tracking-[0.06em]">
               <Link to="/" className={mobileNavItemClassName(isHomePage)} onClick={() => setMenuOpen(false)}>
                 Home
                 {isHomePage && (
                   <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
                 )}
               </Link>
+              {!isAdmin && (
               <Link to="/blogs" className={mobileNavItemClassName(isBlogPage)} onClick={() => setMenuOpen(false)}>
                 Blogs
                 {isBlogPage && (
                   <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
                 )}
               </Link>
+              )}
+              {!isAdmin && (
               <Link to="/groups" className={mobileNavItemClassName(isGroupsPage)} onClick={() => setMenuOpen(false)}>
                 Groups
                 {isGroupsPage && (
                   <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
                 )}
               </Link>
+              )}
+              {!isAdmin && (
+              <Link to="/threads" className={mobileNavItemClassName(isThreadsPage)} onClick={() => setMenuOpen(false)}>
+                Threads
+                {isThreadsPage && (
+                  <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
+                )}
+              </Link>
+              )}
+              {!isAdmin && (
               <Link to="/events" className={mobileNavItemClassName(isEventsPage)} onClick={() => setMenuOpen(false)}>
                 Events
                 {isEventsPage && (
                   <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
                 )}
               </Link>
+              )}
+              {!isAdmin && (
               <Link to="/positions" className={mobileNavItemClassName(isPositionsPage)} onClick={() => setMenuOpen(false)}>
                 Positions
                 {isPositionsPage && (
                   <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
                 )}
               </Link>
+              )}
               <Link to="/about" className={mobileNavItemClassName(isAboutPage)} onClick={() => setMenuOpen(false)}>
                 About
                 {isAboutPage && (
@@ -1355,13 +1433,35 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
                   <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
                 )}
               </Link>
-              {isLoggedIn && (
+              {isLoggedIn && !isAdmin && (
                 <Link to="/dashboard" className={mobileNavItemClassName(isDashboardPage)} onClick={() => setMenuOpen(false)}>
                   Dashboard
                   {isDashboardPage && (
                     <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
                   )}
                 </Link>
+              )}
+              {isAdmin && (
+                <>
+                  <Link to="/admin" className={mobileNavItemClassName(location.pathname === '/admin')} onClick={() => setMenuOpen(false)}>
+                    Admin Dashboard
+                    {location.pathname === '/admin' && (
+                      <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
+                    )}
+                  </Link>
+                  <Link to="/admin/users" className={mobileNavItemClassName(location.pathname.startsWith('/admin/users'))} onClick={() => setMenuOpen(false)}>
+                    Users
+                    {location.pathname.startsWith('/admin/users') && (
+                      <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
+                    )}
+                  </Link>
+                  <Link to="/admin/blog-management" className={mobileNavItemClassName(location.pathname.startsWith('/admin/blog-management'))} onClick={() => setMenuOpen(false)}>
+                    Blog Management
+                    {location.pathname.startsWith('/admin/blog-management') && (
+                      <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
+                    )}
+                  </Link>
+                </>
               )}
 
               {/* Mobile-only: Account, Logout when logged in */}
@@ -1445,7 +1545,7 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
           display: inline-flex;
           align-items: baseline;
           gap: 0.04em;
-          font-family: 'Syne', sans-serif;
+          font-family: var(--font-heading);
           letter-spacing: -0.04em;
           text-transform: none;
         }

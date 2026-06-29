@@ -116,7 +116,7 @@ const HomePage = () => {
   const videoPlayingRef = useRef(false)
   const quoteVisible = useInView(quoteRef, { amount: 0.2, once: false })
 
-  const heroWordmarkFontSize = 'clamp(3.05rem, 9.9vw, 9.1rem)'
+  const heroWordmarkFontSize = 'var(--type-wordmark-size)'
   const heroWordmarkShadow = isDayMode
     ? '0 2px 0 rgba(255,255,255,0.75), 0 10px 28px rgba(3,10,34,0.18), 0 0 60px rgba(3,10,34,0.08)'
     : '0 2px 0 rgba(255,255,255,0.65), 0 10px 28px rgba(3,10,34,0.42), 0 0 60px rgba(3,10,34,0.18)'
@@ -467,15 +467,16 @@ const HomePage = () => {
 
             <div className="relative z-10 h-full w-full flex flex-col justify-between p-8 md:p-14">
               <div className="max-w-5xl pointer-events-auto mt-12 md:mt-20">
-                <div className="text-emerald-400 text-[11px] tracking-[0.4em] mb-6 font-semibold" style={{ fontFamily: "'Syne', 'Inter', sans-serif" }}>
+                <div className="text-emerald-400 text-[11px] tracking-[0.4em] mb-6 font-semibold" style={{ fontFamily: 'var(--font-heading)' }}>
                   — BEYOND THE GRID
                 </div>
                 <h2
                   className="text-white font-bold leading-[0.95] tracking-tight"
                   style={{
-                    fontSize: 'clamp(2.1rem, 5.6vw, 5.4rem)',
-                    fontFamily: "'Syne', 'Inter', sans-serif",
-                    letterSpacing: '-0.03em',
+                    fontSize: 'clamp(2.8rem, 6.5vw, 6.5rem)',
+                    fontFamily: 'var(--font-heading)',
+                    lineHeight: 'var(--type-heading-lineHeight)',
+                    letterSpacing: 'var(--type-heading-letterSpacing)',
                     maxWidth: 'fit-content',
                   }}
                 >
@@ -492,9 +493,9 @@ const HomePage = () => {
                   </span>
                   <span className="block">Science</span>
                 </h2>
-                <p className="text-white/60 mt-8 max-w-xl text-lg md:text-xl leading-relaxed" style={{ fontFamily: "'Syne', 'Inter', sans-serif" }}>
-                  A global community of students, researchers, and innovators collaborating to
-                  advance quantum technologies and turn breakthrough ideas into real-world impact.
+<p className="text-white/60 mt-8 max-w-xl leading-relaxed" style={{ fontFamily: 'var(--font-body)', fontSize: 'clamp(1.05rem, 2vw, 1.35rem)', lineHeight: 'var(--type-bodyText-lineHeight)' }}>
+                   A global community of students, researchers, and innovators collaborating to
+                   advance quantum technologies and turn breakthrough ideas into real-world impact.
                 </p>
                 <div className="mt-10" />
               </div>
@@ -532,7 +533,7 @@ const HomePage = () => {
           left: '0px',
           top: '0px',
           fontSize: heroWordmarkFontSize,
-          fontFamily: "'Syne', 'Inter', sans-serif",
+          fontFamily: 'var(--font-heading)',
           transform: `translate3d(50vw, 50vh, 0) translate(-50%, -50%) scale(${TITLE_START_SCALE}) translateZ(0)`,
           transformOrigin: 'center center',
           letterSpacing: `${HERO_LETTER_SPACING}em`,
@@ -554,7 +555,7 @@ const HomePage = () => {
           left: '0px',
           top: '0px',
           fontSize: heroWordmarkFontSize,
-          fontFamily: "'Syne', 'Inter', sans-serif",
+          fontFamily: 'var(--font-heading)',
           transform: `translate3d(50vw, 50vh, 0) translate(-50%, -50%) scale(${TITLE_START_SCALE}) translateZ(0)`,
           transformOrigin: 'center center',
           letterSpacing: `${HERO_LETTER_SPACING}em`,
@@ -576,7 +577,7 @@ const HomePage = () => {
           left: '0px',
           top: '0px',
           fontSize: heroWordmarkFontSize,
-          fontFamily: "'Syne', 'Inter', sans-serif",
+          fontFamily: 'var(--font-heading)',
           transform: `translate3d(50vw, 50vh, 0) translate(-50%, -50%) scale(${TITLE_START_SCALE}) translateZ(0)`,
           transformOrigin: 'center center',
           letterSpacing: `${HERO_LETTER_SPACING}em`,
@@ -612,7 +613,7 @@ const HomePage = () => {
           <span className="text-[11px] font-semibold uppercase tracking-[0.45em]" style={{ color: palette.accentPrimary }}>
             Quantum Reflection
           </span>
-          <blockquote className="max-w-3xl text-balance text-3xl font-black leading-tight tracking-tight md:text-5xl" style={{ fontFamily: "'Archivo Black', 'Inter', sans-serif" }}>
+          <blockquote className="max-w-3xl text-balance text-3xl font-black leading-tight tracking-tight md:text-5xl" style={{ fontFamily: 'var(--font-accent)' }}>
             If you are not completely confused by quantum mechanics, you do not understand it
           </blockquote>
           <p className="text-sm uppercase tracking-[0.35em] md:text-base" style={{ color: palette.textSecondary }}>

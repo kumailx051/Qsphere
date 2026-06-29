@@ -1,0 +1,11 @@
+ALTER TABLE projects
+ADD COLUMN IF NOT EXISTS "completedAt" TIMESTAMPTZ;
+
+ALTER TABLE task_submissions
+ADD COLUMN IF NOT EXISTS "reviewRemarks" TEXT;
+
+ALTER TABLE task_submissions
+ADD COLUMN IF NOT EXISTS "reviewedAt" TIMESTAMPTZ;
+
+ALTER TABLE task_submissions
+ADD COLUMN IF NOT EXISTS "reviewedByEmail" VARCHAR(255) REFERENCES users("emailAddress") ON DELETE SET NULL;

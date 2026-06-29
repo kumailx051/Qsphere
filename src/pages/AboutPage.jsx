@@ -163,7 +163,7 @@ export default function AboutPage() {
       </div>
 
       <main className="relative z-10 flex-grow px-6 pt-32 pb-24 md:px-10 lg:px-14 xl:px-20">
-        <div className="mx-auto max-w-[1500px]">
+        <div className="qs-page-container">
           <section
             className="relative overflow-hidden rounded-[40px]"
             style={{
@@ -217,9 +217,9 @@ export default function AboutPage() {
                 </div>
 
                 <h1
-                  className="max-w-5xl text-5xl font-bold leading-[0.9] md:text-6xl xl:text-[5.35rem]"
+                  className="type-heading-soft max-w-4xl"
                   style={{
-                    fontFamily: "'Syne', sans-serif",
+                    fontFamily: 'var(--font-heading)',
                     color: palette.textPrimary,
                     textShadow: isDayMode ? '0 12px 36px rgba(255,255,255,0.6)' : '0 0 40px rgba(16,185,129,0.08)',
                   }}
@@ -229,10 +229,7 @@ export default function AboutPage() {
                   <span style={{ color: palette.accentPrimary }}>through quantum possibility.</span>
                 </h1>
 
-                <p
-                  className="mt-7 max-w-3xl text-base leading-8 md:text-lg xl:text-[1.12rem]"
-                  style={{ color: palette.textSecondary }}
-                >
+                <p className="mt-7 max-w-3xl text-base leading-8" style={{ color: palette.textSecondary }}>
                   We are a collective of researchers, engineers, and visionaries working to turn quantum science into a living, collaborative force for progress.
                 </p>
 
@@ -328,7 +325,7 @@ export default function AboutPage() {
                     >
                       Why we exist
                     </div>
-                    <h2 className="mt-4 text-3xl font-bold" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
+                    <h2 className="type-sectionHeading mt-4" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
                       A quantum community built to turn hard ideas into real progress.
                     </h2>
                     <p className="mt-4 text-sm leading-7" style={{ color: palette.textSecondary }}>
@@ -367,7 +364,7 @@ export default function AboutPage() {
                     >
                       <div className="flex items-center justify-between gap-4">
                         <div>
-                          <div className="text-4xl font-bold" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
+                          <div className="type-statValue" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
                             {stat.number}
                           </div>
                           <div className="mt-2 text-sm font-semibold" style={{ color: palette.textPrimary }}>
@@ -409,7 +406,7 @@ export default function AboutPage() {
               <div className="text-[10px] font-bold uppercase tracking-[0.32em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.78)' }}>
                 Who we are
               </div>
-              <h2 className="mt-5 text-4xl font-bold leading-[0.95] md:text-5xl" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
+              <h2 className="mt-5 type-sectionHeading" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
                 A quantum community shaped for depth, not noise.
               </h2>
               <div className="mt-7 space-y-6 text-base leading-8" style={{ color: palette.textSecondary }}>
@@ -480,7 +477,7 @@ export default function AboutPage() {
                 <div className="text-[10px] font-bold uppercase tracking-[0.32em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.78)' }}>
                   How we move
                 </div>
-                <h2 className="mt-4 text-4xl font-bold leading-[0.95] md:text-5xl" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
+                <h2 className="type-sectionHeading mt-4" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
                   Operating principles for serious progress.
                 </h2>
               </div>
@@ -513,7 +510,7 @@ export default function AboutPage() {
                     >
                       <Icon size={22} />
                     </div>
-                    <h3 className="mt-5 text-2xl font-bold" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
+                    <h3 className="type-statValue mt-5" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
                       {principle.title}
                     </h3>
                     <p className="mt-4 text-sm leading-7" style={{ color: palette.textSecondary }}>

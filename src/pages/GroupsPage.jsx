@@ -202,7 +202,7 @@ const GroupsPage = () => {
       </div>
 
       <main className="relative z-10 flex-grow px-6 pt-32 pb-24 md:px-10 lg:px-14 xl:px-20">
-        <div className="mx-auto max-w-[1500px]">
+        <div className="qs-page-container">
           <motion.section
             variants={heroVariants}
             initial="hidden"
@@ -230,15 +230,15 @@ const GroupsPage = () => {
                 </div>
 
                 <h1
-                  className="max-w-5xl text-5xl font-bold leading-[0.9] md:text-6xl xl:text-[5.35rem]"
-                  style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary, textShadow: isDayMode ? '0 12px 36px rgba(255,255,255,0.6)' : '0 0 40px rgba(16,185,129,0.08)' }}
+                  className="type-heading-soft max-w-3xl xl:max-w-[54rem]"
+                  style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary, textShadow: isDayMode ? '0 12px 36px rgba(255,255,255,0.6)' : '0 0 40px rgba(16,185,129,0.08)' }}
                 >
                   Research groups with
                   <br />
                   <span style={{ color: palette.accentPrimary }}>real collaborative gravity.</span>
                 </h1>
 
-                <p className="mt-7 max-w-3xl text-base leading-8 md:text-lg xl:text-[1.12rem]" style={{ color: palette.textSecondary }}>
+                <p className="mt-7 max-w-3xl text-base leading-8" style={{ color: palette.textSecondary }}>
                   Discover focused workspaces, join live quantum initiatives, and move from passive browsing into meaningful research collaboration.
                 </p>
 
@@ -270,7 +270,7 @@ const GroupsPage = () => {
                   ].map((item) => (
                     <motion.div key={item.label} variants={itemVariants} className="rounded-[28px] p-5 backdrop-blur-xl" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: isDayMode ? 'rgba(255,255,255,0.72)' : 'rgba(0,0,0,0.2)' }}>
                       <div className="text-[10px] font-bold uppercase tracking-[0.24em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.8)' }}>{item.label}</div>
-                      <div className="mt-4 text-4xl font-bold" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
+                      <div className="type-statValue mt-4" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
                         {item.value}
                       </div>
                     </motion.div>
@@ -377,7 +377,7 @@ const GroupsPage = () => {
               <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: isDayMode ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)' }}>
                 <Users size={32} style={{ color: palette.textFaint }} />
               </div>
-              <h3 className="mb-3 text-3xl font-bold" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
+              <h3 className="type-sectionHeading mb-3" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
                 No groups match these filters.
               </h3>
               <p className="max-w-xl text-sm leading-7" style={{ color: palette.textSecondary }}>
@@ -405,7 +405,7 @@ const GroupsPage = () => {
               <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                 <div>
                   <div className="text-[10px] font-bold uppercase tracking-[0.32em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.78)' }}>Group grid</div>
-                  <h2 className="mt-4 text-3xl font-bold md:text-4xl" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
+                  <h2 className="type-sectionHeading mt-4" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
                     Collaborative rooms worth stepping into.
                   </h2>
                 </div>
@@ -449,7 +449,7 @@ const GroupsPage = () => {
                             >
                               {group.groupType || 'Research Group'}
                             </span>
-                            <h3 className="mt-5 text-2xl font-bold leading-tight transition-colors duration-300" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
+                            <h3 className="type-statValue mt-5 leading-tight transition-colors duration-300" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
                               {group.groupTitle}
                             </h3>
                           </div>

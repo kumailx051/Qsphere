@@ -90,11 +90,13 @@ export default function AdminUserDetailPage() {
       <div className="grid gap-7 xl:grid-cols-[0.82fr_1.18fr]">
         <section className="rounded-[34px] p-7" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.bgSurface, boxShadow: isDayMode ? palette.shadowCard : '0 24px 80px rgba(0,0,0,0.25)' }}>
           <div className="flex items-center gap-5">
-            <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-[28px] text-3xl font-bold" style={{ backgroundColor: palette.accentSoft, color: palette.accentDark }}>
+            <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-[28px] text-2xl font-bold" style={{ backgroundColor: palette.accentSoft, color: palette.accentDark }}>
               {user.profileImage ? <img src={user.profileImage} alt="" className="h-full w-full object-cover" /> : String(user.fullName || '?').slice(0, 1).toUpperCase()}
             </div>
             <div className="min-w-0">
-              <div className="truncate text-2xl font-bold" style={{ fontFamily: "'Syne', sans-serif" }}>{user.fullName}</div>
+              <div className="type-heading truncate" style={{ color: palette.textPrimary }}>
+                {user.fullName}
+              </div>
               <div className="mt-2 truncate text-sm" style={{ color: palette.textMuted }}>{user.emailAddress}</div>
               <div className="mt-3 flex flex-wrap gap-2">
                 <span className="rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em]" style={{ backgroundColor: palette.accentSoft, color: palette.accentDark }}>{user.role || 'unassigned'}</span>
@@ -120,7 +122,7 @@ export default function AdminUserDetailPage() {
             <ShieldCheck size={21} style={{ color: palette.accentPrimary }} />
             <div>
               <div className="text-[10px] font-bold uppercase tracking-[0.28em]" style={{ color: palette.accentDark }}>Access configuration</div>
-              <h2 className="mt-2 text-2xl font-bold" style={{ fontFamily: "'Syne', sans-serif" }}>Account controls</h2>
+              <h2 className="type-cardHeading mt-2" style={{ fontFamily: 'var(--font-heading)' }}>Account controls</h2>
             </div>
           </div>
 

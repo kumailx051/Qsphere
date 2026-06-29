@@ -5,7 +5,7 @@ import { sendOtpEmail } from './emailService.js'
 import { hashPassword } from './securityService.js'
 import { getUserByEmail, sanitizeUser } from './usersService.js'
 
-export const issueOtpForEmail = async (emailAddress) => {
+export const issueOtpForEmail = async (emailAddress, options = {}) => {
   const normalizedEmail = normalizeEmail(emailAddress)
   const otp = Math.floor(100000 + Math.random() * 900000).toString()
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000)
@@ -17,7 +17,7 @@ export const issueOtpForEmail = async (emailAddress) => {
     [normalizedEmail, otp, expiresAt],
   )
 
-  await sendOtpEmail(normalizedEmail, otp)
+  await sendOtpEmail(normalizedEmail, otp, options)
   return otp
 }
 
@@ -58,7 +58,7 @@ export const registerUser = async ({ fullName, emailAddress, password }) => {
     )
   }
 
-  await issueOtpForEmail(normalizedEmail)
+  await issueOtpForEmail(normalizedEmail, { purpose: 'verification' })
   return { emailAddress: normalizedEmail, pendingRegistration: pendingExisting.rowCount > 0 }
 }
 
@@ -114,6 +114,7 @@ export const verifyOtpAndApply = async ({ emailAddress, otp }) => {
 export const resendOtp = async ({ emailAddress }) => {
   const normalizedEmail = normalizeEmail(emailAddress)
   if (!normalizedEmail) throw createHttpError(400, 'emailAddress is required')
+  let otpPurpose = 'verification'
 
   const pendingRes = await pool.query('SELECT * FROM pending_registrations WHERE "emailAddress" = $1', [normalizedEmail])
   if (pendingRes.rowCount === 0) {
@@ -124,6 +125,8 @@ export const resendOtp = async ({ emailAddress }) => {
     if (!isAdminSetup) {
       throw createHttpError(404, 'No pending verification found for this email address.')
     }
+
+    otpPurpose = 'admin-setup'
 
     if (user.isVerified) {
       return {
@@ -136,7 +139,7 @@ export const resendOtp = async ({ emailAddress }) => {
     }
   }
 
-  await issueOtpForEmail(normalizedEmail)
+  await issueOtpForEmail(normalizedEmail, { purpose: otpPurpose })
   return { success: true, emailAddress: normalizedEmail, message: 'A new OTP has been sent to your email.' }
 }
 
@@ -191,7 +194,7 @@ export const startForgotPassword = async ({ emailAddress }) => {
     throw createHttpError(403, 'Please verify your email address before resetting your password.')
   }
 
-  await issueOtpForEmail(normalizedEmail)
+  await issueOtpForEmail(normalizedEmail, { purpose: 'reset-password' })
   return {
     success: true,
     emailAddress: normalizedEmail,
@@ -254,7 +257,7 @@ export const loginUser = async ({ emailAddress, password }) => {
   const isAdmin = String(user.role || '').toLowerCase() === 'admin'
   if (isAdmin && user.mustChangePassword === true) {
     if (!user.isVerified) {
-      await issueOtpForEmail(normalizedEmail)
+      await issueOtpForEmail(normalizedEmail, { purpose: 'admin-setup' })
       return {
         type: 'adminOtp',
         status: 403,

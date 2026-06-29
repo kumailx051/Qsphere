@@ -117,6 +117,14 @@ const fieldLabelMap = {
   cellAlternative: 'Cell No. (Alternative)',
 }
 
+const adminRoleConfig = {
+  id: 'admin',
+  label: 'Administrator',
+  eyebrow: 'Admin track',
+  title: 'Manage platform operations.',
+  description: 'Control security, moderation, and member management from the administrator workspace.',
+}
+
 const formatDateLabel = (value) => {
   if (!value) return 'Recently joined'
   const timestamp = new Date(value).getTime()
@@ -156,7 +164,8 @@ const makeBlogDraft = (blog) => ({
 const makeGroupDraft = (group) => ({
   id: group?.id ?? null,
   title: group?.groupTitle ?? group?.title ?? '',
-  description: group?.groupScope ?? group?.description ?? '',
+  description: group?.groupDescription ?? group?.description ?? group?.groupScope ?? '',
+  scope: group?.groupScope ?? '',
   owner: group?.owner ?? '',
   avatar: group?.avatar ?? '',
 })
@@ -211,11 +220,50 @@ const AccountManagementPage = () => {
   const [groups, setGroups] = useState([])
   
   useEffect(() => {
-    const logged = localStorage.getItem('qsphere_logged_in') === '1'
-    if (!logged) {
-      navigate('/auth', { state: { redirectTo: '/account' } })
+    let cancelled = false
+
+    const ensureSessionAccess = async () => {
+      const storedProfile = location.state?.profile ?? readStoredProfile()
+
+      if (storedProfile?.emailAddress || storedProfile?.email) {
+        try {
+          localStorage.setItem('qsphere_logged_in', '1')
+          localStorage.setItem(storageKey, JSON.stringify(storedProfile))
+        } catch {
+          // ignore storage sync failures
+        }
+        return
+      }
+
+      try {
+        const response = await fetch('/api/auth/me')
+        const data = await response.json().catch(() => ({}))
+
+        if (!cancelled && response.ok && data?.user) {
+          setProfile(data.user)
+          try {
+            localStorage.setItem('qsphere_logged_in', '1')
+            localStorage.setItem(storageKey, JSON.stringify(data.user))
+          } catch {
+            // ignore storage sync failures
+          }
+          return
+        }
+      } catch {
+        // fall through to auth redirect
+      }
+
+      if (!cancelled) {
+        navigate('/auth', { state: { redirectTo: '/account' } })
+      }
     }
-  }, [navigate])
+
+    void ensureSessionAccess()
+
+    return () => {
+      cancelled = true
+    }
+  }, [location.state, navigate])
   const [selectedBlogId, setSelectedBlogId] = useState(null)
   const [selectedGroupId, setSelectedGroupId] = useState(null)
   const [blogDraft, setBlogDraft] = useState(() => makeBlogDraft(null))
@@ -239,6 +287,7 @@ const AccountManagementPage = () => {
   const [blogSaving, setBlogSaving] = useState(false)
   const [groupSaving, setGroupSaving] = useState(false)
   const isDayMode = theme === 'light'
+  const isAdmin = String(profile?.role || '').toLowerCase() === 'admin'
   const palette = isDayMode ? dayTheme : darkTheme
   const pageBg = isDayMode
     ? 'linear-gradient(180deg, #faf9f7 0%, #f4f2ec 48%, #eeece6 100%)'
@@ -450,6 +499,7 @@ const AccountManagementPage = () => {
   `
 
   const roleConfig = useMemo(() => {
+    if (String(profile?.role || '').toLowerCase() === 'admin') return adminRoleConfig
     if (!profile?.role) return onboardingRoles[0]
     return onboardingRoles.find((role) => role.id === profile.role) ?? onboardingRoles[0]
   }, [profile])
@@ -925,7 +975,8 @@ const AccountManagementPage = () => {
     setGroupSaving(true)
     const payload = {
       groupTitle: groupDraft.title.trim(),
-      groupScope: groupDraft.description.trim()
+      groupDescription: groupDraft.description.trim(),
+      groupScope: groupDraft.scope?.trim() || selectedGroup?.groupScope || groupDraft.description.trim(),
     }
 
     try {
@@ -941,7 +992,12 @@ const AccountManagementPage = () => {
         // We can manually map it back to the existing group state preserving owner/avatar.
         setGroups(prev => prev.map(g => {
           if (g.id === updated.id) {
-            return { ...g, groupTitle: updated.groupTitle, groupScope: updated.groupScope }
+            return {
+              ...g,
+              groupTitle: updated.groupTitle,
+              groupDescription: updated.groupDescription,
+              groupScope: updated.groupScope,
+            }
           }
           return g
         }))
@@ -1043,7 +1099,7 @@ const AccountManagementPage = () => {
               <UserCog size={24} />
             </div>
             <div className="mt-6 text-[10px] font-bold uppercase tracking-[0.3em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.78)' }}>Account management</div>
-            <h1 className="mt-4 text-4xl font-bold leading-[0.95] md:text-5xl" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
+            <h1 className="type-heading-soft mx-auto mt-4 max-w-3xl" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
               This account surface needs
               <br />
               <span style={{ color: palette.accentPrimary }}>your profile context first.</span>
@@ -1090,11 +1146,11 @@ const AccountManagementPage = () => {
       <main className="flex-1 relative z-10 w-full px-6 py-28 sm:px-8 lg:px-12 xl:px-20">
         <button
           type="button"
-          onClick={() => navigate('/dashboard')}
+          onClick={() => navigate(isAdmin ? '/admin' : '/dashboard')}
           className="qs-account-secondary-btn mb-6 inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm transition"
         >
           <ArrowLeft size={16} />
-          Back to dashboard
+          Back to {isAdmin ? 'admin dashboard' : 'dashboard'}
         </button>
 
         <motion.section
@@ -1114,7 +1170,7 @@ const AccountManagementPage = () => {
               <div className="flex flex-wrap items-center gap-3 mb-6">
                 <span className="inline-flex items-center gap-3 rounded-full border px-4 py-2 text-[10px] font-bold uppercase tracking-[0.34em]" style={{ border: `1px solid ${palette.accentBorder}`, backgroundColor: palette.accentSoft, color: isDayMode ? palette.accentDark : palette.accentLight }}>
                   <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: palette.accentPrimary, boxShadow: isDayMode ? '0 0 18px rgba(46,197,138,0.45)' : '0 0 18px rgba(16,185,129,0.8)' }} />
-                  Account Management
+                  {isAdmin ? 'Administrator Account' : 'Account Management'}
                 </span>
                 <span className="inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.24em]" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.btnSecondaryBg, color: palette.textMuted }}>
                   <Sparkles size={14} style={{ color: palette.accentPrimary }} />
@@ -1122,14 +1178,33 @@ const AccountManagementPage = () => {
                 </span>
               </div>
 
-              <h1 className="max-w-5xl text-5xl font-bold leading-[0.9] md:text-6xl xl:text-[5.15rem]" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary, textShadow: titleShadow }}>
-                Tune your profile,
-                <br />
-                <span style={{ color: palette.accentPrimary }}>content, and access from one room.</span>
+              <h1
+                className="type-heading-soft max-w-3xl xl:max-w-[54rem]"
+                style={{
+                  fontFamily: 'var(--font-heading)',
+                  color: palette.textPrimary,
+                  textShadow: titleShadow,
+                }}
+              >
+                {isAdmin ? (
+                  <>
+                    Secure your admin profile,
+                    <br />
+                    <span style={{ color: palette.accentPrimary }}>then steer platform operations from here.</span>
+                  </>
+                ) : (
+                  <>
+                    Tune your profile,
+                    <br />
+                    <span style={{ color: palette.accentPrimary }}>content, and access from one room.</span>
+                  </>
+                )}
               </h1>
 
-              <p className="mt-7 max-w-3xl text-base leading-8 md:text-lg xl:text-[1.12rem]" style={{ color: palette.textSecondary }}>
-                Switch between account details, blog management, and group management without dropping into a cluttered admin surface.
+              <p className="mt-7 max-w-3xl text-base leading-8" style={{ color: palette.textSecondary }}>
+                {isAdmin
+                  ? 'Review your administrator identity, update security details, and jump straight into moderation and user management without mixing in member-only content tools.'
+                  : 'Switch between account details, blog management, and group management without dropping into a cluttered admin surface.'}
               </p>
 
               <div className="mt-8 flex flex-wrap gap-4">
@@ -1173,11 +1248,20 @@ const AccountManagementPage = () => {
                 {[
                   { label: 'Role track', value: roleConfig.label, tone: isDayMode ? palette.accentDark : palette.accentLight },
                   { label: 'Profile completion', value: `${completion}%`, tone: palette.textPrimary },
-                  { label: 'Member since', value: joinedLabel, tone: palette.textPrimary },
+                  { label: isAdmin ? 'Admin access' : 'Member since', value: isAdmin ? 'Enabled' : joinedLabel, tone: palette.textPrimary },
                 ].map((item) => (
                   <motion.div key={item.label} variants={itemVariants} className="rounded-[28px] border p-5 backdrop-blur-xl" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: isDayMode ? 'rgba(255,255,255,0.82)' : 'rgba(0,0,0,0.2)' }}>
                     <div className="text-[10px] font-bold uppercase tracking-[0.24em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.8)' }}>{item.label}</div>
-                    <div className="mt-4 text-4xl font-bold" style={{ fontFamily: "'Syne', sans-serif", color: item.tone }}>{item.value}</div>
+                    <div
+                      className="type-statValue mt-4"
+                      style={{
+                        fontFamily: 'var(--font-heading)',
+                        color: item.tone,
+                        overflowWrap: 'anywhere',
+                      }}
+                    >
+                      {item.value}
+                    </div>
                   </motion.div>
                 ))}
               </motion.div>
@@ -1191,7 +1275,13 @@ const AccountManagementPage = () => {
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <div className="text-[10px] font-bold uppercase tracking-[0.28em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.8)' }}>Identity signal</div>
-                    <h2 className="mt-4 text-3xl font-bold leading-tight md:text-[2.1rem]" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
+                    <h2
+                      className="type-sectionHeading mt-4 max-w-xl leading-tight"
+                      style={{
+                        fontFamily: 'var(--font-heading)',
+                        color: palette.textPrimary,
+                      }}
+                    >
                       {profile.fullName || 'Explorer'}
                     </h2>
                   </div>
@@ -1238,11 +1328,13 @@ const AccountManagementPage = () => {
 
           <motion.div variants={containerVariants} initial="hidden" whileInView="visible" viewport={{ once: true }} className="relative z-10 mt-8 grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
             <motion.div variants={itemVariants} className="flex flex-wrap gap-3">
-              {[
-                { id: 'account', label: 'Account', icon: UserCog },
-                { id: 'blogs', label: 'Blog management', icon: BookOpen },
-                { id: 'groups', label: 'Group management', icon: Users2 },
-              ].map((tab) => (
+              {(isAdmin
+                ? [{ id: 'account', label: 'Admin account', icon: ShieldCheck }]
+                : [
+                    { id: 'account', label: 'Account', icon: UserCog },
+                    { id: 'blogs', label: 'Blog management', icon: BookOpen },
+                    { id: 'groups', label: 'Group management', icon: Users2 },
+                  ]).map((tab) => (
                 <button
                   key={tab.id}
                   type="button"
@@ -1438,13 +1530,44 @@ const AccountManagementPage = () => {
                 </div>
               </div>
 
-              <div className="mt-4 space-y-3">
-              </div>
+              {isAdmin ? (
+                <div className="mt-4 grid gap-3">
+                  <div className="qs-account-soft-panel rounded-2xl border p-4">
+                    <div className="mb-2 flex items-center gap-2 text-sm font-semibold" style={{ color: palette.textPrimary }}>
+                      <ShieldCheck size={16} style={{ color: palette.accentPrimary }} />
+                      Administrator controls
+                    </div>
+                    <p className="text-xs leading-6" style={{ color: palette.textMuted }}>
+                      Your profile stays here, while platform operations stay in the dedicated admin area.
+                    </p>
+                    <div className="mt-4 flex flex-wrap gap-3">
+                      <button
+                        type="button"
+                        onClick={() => navigate('/admin')}
+                        className="qs-account-primary-btn inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition"
+                      >
+                        <ShieldCheck size={15} />
+                        Open admin dashboard
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => navigate('/admin/users')}
+                        className="qs-account-secondary-btn inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition"
+                      >
+                        <Users2 size={15} />
+                        Manage users
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-4 space-y-3" />
+              )}
             </div>
           </motion.section>
         ) : null}
 
-        {activeTab === 'blogs' ? (
+        {!isAdmin && activeTab === 'blogs' ? (
           <motion.section
             variants={containerVariants}
             initial="hidden"
@@ -1456,7 +1579,7 @@ const AccountManagementPage = () => {
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <div className="text-[10px] uppercase tracking-[0.28em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.7)' }}>Blog management</div>
-                  <h2 className="mt-2 text-2xl font-black tracking-tight" style={{ color: palette.textPrimary }}>Manage blog content</h2>
+                  <h2 className="type-statValue mt-2" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>Manage blog content</h2>
                 </div>
                 <BookOpen size={18} style={{ color: palette.accentPrimary }} />
               </div>
@@ -1495,7 +1618,7 @@ const AccountManagementPage = () => {
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <div className="text-[10px] uppercase tracking-[0.28em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.7)' }}>Selected blog</div>
-                  <h2 className="mt-2 text-2xl font-black tracking-tight" style={{ color: palette.textPrimary }}>{selectedBlog?.title || 'No blog selected'}</h2>
+                  <h2 className="type-statValue mt-2" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>{selectedBlog?.title || 'No blog selected'}</h2>
                 </div>
                 <div className="flex gap-2">
                   <button
@@ -1690,7 +1813,7 @@ const AccountManagementPage = () => {
                         onKeyUp={handleEditorChange}
                         onClick={handleEditorChange}
                         className={`qs-account-editor w-full min-h-[420px] p-6 leading-relaxed outline-none transition-all prose max-w-none ${isDayMode ? '' : 'prose-invert'}`}
-                        style={{ overflowY: 'auto', fontFamily: "'Inter', sans-serif" }}
+                        style={{ overflowY: 'auto', fontFamily: 'var(--font-body)' }}
                         data-placeholder="Edit the article body..."
                       />
 
@@ -1718,7 +1841,7 @@ const AccountManagementPage = () => {
           </motion.section>
         ) : null}
 
-        {activeTab === 'groups' ? (
+        {!isAdmin && activeTab === 'groups' ? (
           <motion.section
             variants={containerVariants}
             initial="hidden"
@@ -1730,7 +1853,7 @@ const AccountManagementPage = () => {
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <div className="text-[10px] uppercase tracking-[0.28em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.7)' }}>Group management</div>
-                  <h2 className="mt-2 text-2xl font-black tracking-tight" style={{ color: palette.textPrimary }}>Manage groups</h2>
+                  <h2 className="type-statValue mt-2" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>Manage groups</h2>
                 </div>
                 <Users2 size={18} style={{ color: palette.accentPrimary }} />
               </div>
@@ -1769,7 +1892,7 @@ const AccountManagementPage = () => {
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <div className="text-[10px] uppercase tracking-[0.28em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.7)' }}>Selected group</div>
-                  <h2 className="mt-2 text-2xl font-black tracking-tight" style={{ color: palette.textPrimary }}>{selectedGroup?.groupTitle || selectedGroup?.title || 'No group selected'}</h2>
+                  <h2 className="type-statValue mt-2" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>{selectedGroup?.groupTitle || selectedGroup?.title || 'No group selected'}</h2>
                 </div>
                 <div className="flex gap-2">
                   <button

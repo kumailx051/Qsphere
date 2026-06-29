@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom'
-import { ArrowLeft, ArrowUpRight, BookOpenText, Calendar, Clock3, Download, MessageSquareText, Share2, Sparkles, UserRound } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, ArrowUpRight, BookOpenText, Calendar, Clock3, Download, Flag, MessageSquareText, Share2, Sparkles, UserRound, X } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { jsPDF } from 'jspdf'
@@ -15,6 +15,15 @@ const formatDate = (dateStr) => {
     return dateStr
   }
 }
+
+const reportReasonOptions = [
+  { value: 'misinformation', label: 'Misinformation or misleading claims' },
+  { value: 'abuse', label: 'Harassment, abuse, or hateful language' },
+  { value: 'spam', label: 'Spam or promotional misuse' },
+  { value: 'copyright', label: 'Copyright or stolen content' },
+  { value: 'unsafe', label: 'Unsafe, harmful, or inappropriate content' },
+  { value: 'other', label: 'Something else' },
+]
 
 export default function BlogDetail() {
   const { id } = useParams()
@@ -36,6 +45,9 @@ export default function BlogDetail() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [editingCommentId, setEditingCommentId] = useState(null)
   const [editText, setEditText] = useState('')
+  const [reportOpen, setReportOpen] = useState(false)
+  const [reportSubmitting, setReportSubmitting] = useState(false)
+  const [reportForm, setReportForm] = useState({ reason: reportReasonOptions[0].value, details: '' })
   const nameRef = useRef(null)
   const commentRef = useRef(null)
   const commentsSectionRef = useRef(null)
@@ -245,6 +257,60 @@ export default function BlogDetail() {
       }
     } catch (e) {
       console.error('Failed to delete comment:', e)
+    }
+  }
+
+  const handleOpenReport = () => {
+    if (!isLoggedIn) {
+      window.dispatchEvent(new CustomEvent('qsphere-snackbar', { detail: { message: 'Please sign in to report this article.', type: 'error' } }))
+      navigate('/auth', {
+        state: {
+          redirectTo: `/blogs/${postId}`,
+          authMessage: 'Please sign in to report this article.',
+          authMessageType: 'info',
+        }
+      })
+      return
+    }
+
+    setReportOpen(true)
+  }
+
+  const handleSubmitReport = async (event) => {
+    event.preventDefault()
+
+    if (!reportForm.reason) {
+      window.dispatchEvent(new CustomEvent('qsphere-snackbar', { detail: { message: 'Select a report reason first.', type: 'error' } }))
+      return
+    }
+
+    setReportSubmitting(true)
+    try {
+      const response = await fetch(`/api/blogs/${postId}/report`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          reportedByEmail: viewerEmail,
+          reportedByName: viewerName,
+          reason: reportForm.reason,
+          details: reportForm.details,
+        }),
+      })
+
+      const result = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        window.dispatchEvent(new CustomEvent('qsphere-snackbar', { detail: { message: result.error || 'Unable to submit this report right now.', type: 'error' } }))
+        return
+      }
+
+      setReportOpen(false)
+      setReportForm({ reason: reportReasonOptions[0].value, details: '' })
+      window.dispatchEvent(new CustomEvent('qsphere-snackbar', { detail: { message: 'Report submitted. Our admin team will review it.', type: 'success' } }))
+    } catch (error) {
+      console.error('Failed to submit blog report:', error)
+      window.dispatchEvent(new CustomEvent('qsphere-snackbar', { detail: { message: 'Unable to submit this report right now.', type: 'error' } }))
+    } finally {
+      setReportSubmitting(false)
     }
   }
 
@@ -612,7 +678,7 @@ export default function BlogDetail() {
         <Navbar currentPage="blogs" />
         <main className="flex-1 pt-28 px-6 md:px-12 lg:px-20">
           <div className="max-w-4xl mx-auto py-40 text-center">
-            <h1 className="text-3xl font-bold mb-4">Article not found</h1>
+            <h1 className="type-sectionHeading mb-4">Article not found</h1>
             <p className="mb-8" style={{ color: palette.textSecondary }}>We couldn't find the article you're looking for.</p>
             <Link to="/blogs" className="inline-flex items-center px-6 py-3 rounded-xl font-semibold transition" style={{ backgroundColor: palette.textPrimary, color: palette.bgPrimary }}>Back to articles</Link>
           </div>
@@ -636,9 +702,9 @@ export default function BlogDetail() {
 
         .blog-prose {
           color: ${isDayMode ? 'rgba(30, 41, 59, 0.88)' : 'rgba(236, 253, 245, 0.88)'};
-          font-family: Georgia, 'Times New Roman', serif;
-          font-size: clamp(1.08rem, 1vw + 0.78rem, 1.22rem);
-          line-height: 2.02;
+          font-family: var(--font-body);
+          font-size: var(--type-proseBody-size);
+          line-height: var(--type-proseBody-lineHeight);
           letter-spacing: 0.002em;
         }
 
@@ -656,7 +722,7 @@ export default function BlogDetail() {
         .blog-prose h3,
         .blog-prose h4 {
           color: ${isDayMode ? '#0f172a' : '#f7fffb'};
-          font-family: 'Syne', 'Inter', 'Segoe UI', sans-serif;
+          font-family: var(--font-heading);
           font-weight: 800;
           letter-spacing: -0.03em;
           line-height: 1.12;
@@ -665,19 +731,19 @@ export default function BlogDetail() {
         }
 
         .blog-prose h1 {
-          font-size: clamp(2rem, 3vw, 2.8rem);
+          font-size: var(--type-proseH1-size);
         }
 
         .blog-prose h2 {
-          font-size: clamp(1.78rem, 2.2vw, 2.4rem);
+          font-size: var(--type-proseH2-size);
         }
 
         .blog-prose h3 {
-          font-size: clamp(1.35rem, 1.6vw, 1.7rem);
+          font-size: var(--type-proseH3-size);
         }
 
         .blog-prose h4 {
-          font-size: clamp(1.15rem, 1.2vw, 1.3rem);
+          font-size: var(--type-proseH4-size);
         }
 
         .blog-prose a {
@@ -795,7 +861,7 @@ export default function BlogDetail() {
         .blog-prose th {
           background: ${isDayMode ? 'rgba(16, 185, 129, 0.08)' : 'rgba(16, 185, 129, 0.13)'};
           color: ${isDayMode ? '#065f46' : '#d1fae5'};
-          font-family: 'Inter', 'Segoe UI', sans-serif;
+          font-family: var(--font-body);
           font-size: 0.8rem;
           font-weight: 700;
           letter-spacing: 0.08em;
@@ -855,7 +921,7 @@ export default function BlogDetail() {
 
                 <h1
                   className="font-bold leading-[0.9]"
-                  style={{ color: palette.textPrimary, fontSize: 'clamp(2.7rem, 5vw, 5.6rem)', fontFamily: "'Syne', 'Inter', sans-serif" }}
+                  style={{ color: palette.textPrimary, fontSize: 'var(--type-heroHeading-size)', fontFamily: 'var(--font-heading)' }}
                 >
                   {post.title}
                 </h1>
@@ -866,7 +932,7 @@ export default function BlogDetail() {
                   {post?.readingTime ? <span className="inline-flex items-center gap-2"><Clock3 size={15} style={{ color: palette.accentPrimary, opacity: 0.8 }} /> {post.readingTime}</span> : null}
                 </div>
 
-                <div className="mt-8 max-w-4xl rounded-[24px] px-5 py-5 text-[1.03rem] leading-8 md:px-6" style={{ border: `1px solid ${palette.accentBorder}`, backgroundColor: palette.accentSoft, color: isDayMode ? palette.textSecondary : 'rgba(236,253,245,0.84)', boxShadow: isDayMode ? 'none' : 'inset 0 1px 0 rgba(255,255,255,0.03)' }}>
+                <div className="mt-8 max-w-4xl rounded-[24px] px-5 py-5 md:px-6" style={{ border: `1px solid ${palette.accentBorder}`, backgroundColor: palette.accentSoft, color: isDayMode ? palette.textSecondary : 'rgba(236,253,245,0.84)', boxShadow: isDayMode ? 'none' : 'inset 0 1px 0 rgba(255,255,255,0.03)', fontSize: 'var(--type-bodyText-size)', lineHeight: 'var(--type-bodyText-lineHeight)' }}>
                   {post.excerpt || 'Read the full article with a cleaner, more comfortable layout tailored to the QSphere visual theme.'}
                 </div>
               </div>
@@ -973,6 +1039,15 @@ export default function BlogDetail() {
                           </div>
                         )}
                       </div>
+
+                      <button
+                        onClick={handleOpenReport}
+                        className="inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition"
+                        style={{ border: `1px solid ${isDayMode ? 'rgba(239,68,68,0.18)' : 'rgba(248,113,113,0.2)'}`, backgroundColor: isDayMode ? 'rgba(254,242,242,0.92)' : 'rgba(127,29,29,0.18)', color: isDayMode ? '#dc2626' : '#fca5a5' }}
+                      >
+                        <Flag size={15} />
+                        Report article
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -985,7 +1060,7 @@ export default function BlogDetail() {
                       <MessageSquareText size={14} />
                       Discussion
                     </div>
-                    <h4 className="mt-2 text-2xl font-bold tracking-tight" style={{ color: palette.textPrimary }}>Comments</h4>
+                    <h4 className="type-cardHeading mt-2 tracking-tight" style={{ color: palette.textPrimary }}>Comments</h4>
                     <p className="mt-2 max-w-2xl text-sm leading-6" style={{ color: palette.textSecondary }}>Share your thoughts, add context, or continue the conversation around this article.</p>
                   </div>
 
@@ -1018,7 +1093,7 @@ export default function BlogDetail() {
                   ) : (
                     <div className="rounded-[24px] border border-dashed px-5 py-6 sm:px-6" style={{ borderColor: palette.accentBorder, backgroundColor: palette.accentSoft }}>
                       <div className="max-w-2xl">
-                        <div className="text-lg font-semibold" style={{ color: palette.textPrimary }}>Sign in to join the conversation</div>
+                        <div className="type-cardHeading" style={{ color: palette.textPrimary }}>Sign in to join the conversation</div>
                         <p className="mt-2 text-sm leading-6" style={{ color: palette.textSecondary }}>
                           Only logged-in QSphere members can comment on blog posts. Sign in to share your thoughts and keep the discussion trusted.
                         </p>
@@ -1124,7 +1199,7 @@ export default function BlogDetail() {
                     <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                       <div>
                         <div className="text-[10px] font-semibold uppercase tracking-[0.34em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(167,243,208,0.7)' }}>Continue reading</div>
-                        <h4 className="mt-2 text-2xl font-bold tracking-tight" style={{ color: palette.textPrimary }}>More Blogs</h4>
+                        <h4 className="type-cardHeading mt-2 tracking-tight" style={{ color: palette.textPrimary }}>More Blogs</h4>
                         <p className="mt-2 text-sm" style={{ color: palette.textSecondary }}>Explore related writing from the QSphere community.</p>
                       </div>
                       <div className="flex items-center gap-2">
@@ -1150,7 +1225,7 @@ export default function BlogDetail() {
                             )}
                             <div className="flex flex-1 flex-col p-5">
                               <div className="text-[10px] font-semibold uppercase tracking-[0.32em]" style={{ color: palette.accentPrimary }}>{item.category}</div>
-                              <h5 className="mt-3 text-lg font-bold leading-7 transition group-hover:opacity-80" style={{ color: palette.textPrimary, fontFamily: "'Syne', 'Inter', sans-serif" }}>{item.title}</h5>
+                              <h5 className="type-cardHeading mt-3 transition group-hover:opacity-80" style={{ color: palette.textPrimary, fontFamily: 'var(--font-heading)' }}>{item.title}</h5>
                               <p className="mt-3 line-clamp-4 text-sm leading-6" style={{ color: palette.textSecondary }}>{item.excerpt}</p>
                               <div className="mt-4 inline-flex items-center gap-2 text-sm font-semibold transition-all group-hover:gap-3 group-hover:brightness-125" style={{ color: palette.accentPrimary }}>
                                 Read article
@@ -1168,6 +1243,95 @@ export default function BlogDetail() {
           </div>
         </div>
       </main>
+
+      {reportOpen && (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center px-4 py-8" style={{ backgroundColor: isDayMode ? 'rgba(255,255,255,0.6)' : 'rgba(2,8,6,0.72)', backdropFilter: 'blur(10px)' }}>
+          <div className="relative w-full max-w-2xl overflow-hidden rounded-[34px] p-6 md:p-7" style={{ border: `1px solid ${palette.borderPrimary}`, background: isDayMode ? 'linear-gradient(145deg, rgba(255,255,255,0.98), rgba(247,247,245,0.95))' : 'linear-gradient(145deg, rgba(7,12,10,0.98), rgba(4,8,7,0.94))', boxShadow: palette.shadowCard }}>
+            <div className="absolute inset-x-0 top-0 h-px" style={{ background: `linear-gradient(to right, transparent, ${isDayMode ? 'rgba(239,68,68,0.45)' : 'rgba(248,113,113,0.4)'}, transparent)` }} />
+
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.3em]" style={{ color: isDayMode ? '#b91c1c' : '#fca5a5' }}>
+                  <AlertTriangle size={14} />
+                  Report article
+                </div>
+                <h3 className="type-sectionHeading-soft mt-4" style={{ color: palette.textPrimary }}>
+                  Help us review this blog responsibly.
+                </h3>
+                <p className="mt-3 max-w-xl text-sm leading-7" style={{ color: palette.textSecondary }}>
+                  Tell the admin team what looks wrong with <span className="font-semibold" style={{ color: palette.textPrimary }}>{post?.title}</span>. Your report will land in the admin moderation queue.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => !reportSubmitting && setReportOpen(false)}
+                className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border transition"
+                style={{ borderColor: palette.borderPrimary, backgroundColor: palette.bgSecondary, color: palette.textSecondary }}
+              >
+                <X size={17} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitReport} className="mt-7 space-y-4">
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-[0.24em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(167,243,208,0.7)' }}>
+                  Reason
+                </label>
+                <select
+                  value={reportForm.reason}
+                  onChange={(event) => setReportForm((current) => ({ ...current, reason: event.target.value }))}
+                  className="mt-2 w-full rounded-2xl px-4 py-3 text-sm outline-none transition"
+                  style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.bgSecondary, color: palette.textPrimary }}
+                >
+                  {reportReasonOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-[0.24em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(167,243,208,0.7)' }}>
+                  What should the admin know?
+                </label>
+                <textarea
+                  rows={5}
+                  value={reportForm.details}
+                  onChange={(event) => setReportForm((current) => ({ ...current, details: event.target.value }))}
+                  placeholder="Share the context behind this report. For example: which claim is misleading, what part is harmful, or what action you think is needed."
+                  className="mt-2 w-full rounded-2xl px-4 py-3 text-sm leading-7 outline-none transition"
+                  style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.bgSecondary, color: palette.textPrimary }}
+                />
+              </div>
+
+              <div className="rounded-[22px] px-4 py-3 text-sm leading-7" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.bgSecondary, color: palette.textSecondary }}>
+                Reporting as <span className="font-semibold" style={{ color: palette.textPrimary }}>{viewerName}</span>
+              </div>
+
+              <div className="flex flex-wrap justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setReportOpen(false)}
+                  className="inline-flex items-center rounded-xl px-4 py-3 text-sm font-semibold transition"
+                  style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.bgSecondary, color: palette.textPrimary }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={reportSubmitting}
+                  className="inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-70"
+                  style={{ backgroundColor: palette.btnPrimaryBg, color: palette.btnPrimaryText }}
+                >
+                  <Flag size={15} />
+                  {reportSubmitting ? 'Submitting report...' : 'Submit report'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       <Footer />
     </div>

@@ -364,7 +364,7 @@ const OnboardingPage = () => {
 
             <div className="mt-8">
               <p className="text-xs uppercase tracking-[0.28em]" style={{ color: palette.accentPrimary }}>Profile setup</p>
-              <h1 className="mt-3 text-3xl leading-tight" style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, color: palette.textPrimary }}>
+              <h1 className="type-heading mt-3" style={{ color: palette.textPrimary }}>
                 Finish your <span style={{ color: palette.accentPrimary }}>membership</span> profile.
               </h1>
               <p className="mt-4 text-sm leading-6" style={{ color: palette.textSecondary }}>
@@ -439,7 +439,7 @@ const OnboardingPage = () => {
             <div className="flex flex-col gap-4 border-b pb-6 lg:flex-row lg:items-start lg:justify-between" style={{ borderColor: palette.borderPrimary }}>
               <div>
                 <p className="text-xs uppercase tracking-[0.3em]" style={{ color: palette.accentPrimary }}>Personal information</p>
-                <h2 className="mt-3 text-3xl leading-tight" style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, color: palette.textPrimary }}>
+                <h2 className="type-sectionHeading mt-3" style={{ color: palette.textPrimary }}>
                   Share the details your role needs.
                 </h2>
                 <p className="mt-3 max-w-2xl text-sm leading-6" style={{ color: palette.textSecondary }}>

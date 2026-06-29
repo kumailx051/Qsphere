@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowUpRight, BookOpenText, FolderKanban, MessageSquareText, ShieldCheck, UserCheck, UserRoundX, Users } from 'lucide-react'
+import { ArrowUpRight, BookOpenText, FileWarning, FolderKanban, MessageSquareText, ShieldCheck, UserCheck, UserRoundX, Users } from 'lucide-react'
 import AdminPageShell from './AdminPageShell'
 import { useTheme } from '../../contexts/ThemeContext'
 import { dayTheme, darkTheme } from '../../themeColors'
 
 const EMPTY_SUMMARY = {
   users: { total: 0, active: 0, suspended: 0, admins: 0, verified: 0, onboarded: 0 },
-  content: { blogs: 0, groups: 0, projects: 0, comments: 0 },
+  content: { blogs: 0, groups: 0, projects: 0, comments: 0, blogReports: 0 },
   recentUsers: [],
 }
 
@@ -46,13 +46,20 @@ export default function AdminDashboardPage() {
   return (
     <AdminPageShell
       eyebrow="Administration"
-      title="A clearer view of the whole QSphere ecosystem."
+      title="A clearer view of the"
+      titleAccent="whole QSphere ecosystem."
       description="Monitor membership, account health, and community activity from one focused control surface."
       actions={(
-        <Link to="/admin/users" className="inline-flex items-center gap-2 rounded-full px-5 py-3 text-sm font-semibold no-underline" style={{ backgroundColor: palette.btnPrimaryBg, color: palette.btnPrimaryText }}>
-          Manage users
-          <ArrowUpRight size={16} />
-        </Link>
+        <>
+          <Link to="/admin/users" className="inline-flex items-center gap-2 rounded-full px-5 py-3 text-sm font-semibold no-underline" style={{ backgroundColor: palette.btnPrimaryBg, color: palette.btnPrimaryText }}>
+            Manage users
+            <ArrowUpRight size={16} />
+          </Link>
+          <Link to="/admin/blog-management" className="inline-flex items-center gap-2 rounded-full px-5 py-3 text-sm font-semibold no-underline" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.bgSurface, color: palette.textPrimary }}>
+            Review blog reports
+            <ArrowUpRight size={16} />
+          </Link>
+        </>
       )}
     >
       <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
@@ -62,7 +69,9 @@ export default function AdminDashboardPage() {
               <div className="text-[10px] font-bold uppercase tracking-[0.24em]" style={{ color: palette.textMuted }}>{label}</div>
               <span className="flex h-11 w-11 items-center justify-center rounded-2xl" style={{ backgroundColor: `${tone}18`, color: tone }}><Icon size={20} /></span>
             </div>
-            <div className="mt-7 text-4xl font-bold" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>{loading ? '—' : value}</div>
+            <div className="type-statValue mt-7 break-words" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
+              {loading ? '—' : value}
+            </div>
           </div>
         ))}
       </div>
@@ -72,7 +81,7 @@ export default function AdminDashboardPage() {
           <div className="flex items-end justify-between gap-4">
             <div>
               <div className="text-[10px] font-bold uppercase tracking-[0.28em]" style={{ color: palette.accentDark }}>Newest members</div>
-              <h2 className="mt-3 text-2xl font-bold" style={{ fontFamily: "'Syne', sans-serif" }}>Recent registrations</h2>
+              <h2 className="type-cardHeading mt-3" style={{ fontFamily: 'var(--font-heading)' }}>Recent registrations</h2>
             </div>
             <Link to="/admin/users" className="text-sm font-semibold no-underline" style={{ color: palette.accentDark }}>View all</Link>
           </div>
@@ -96,16 +105,30 @@ export default function AdminDashboardPage() {
 
         <section className="rounded-[34px] p-7" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.bgSurface }}>
           <div className="text-[10px] font-bold uppercase tracking-[0.28em]" style={{ color: palette.accentDark }}>Community output</div>
-          <h2 className="mt-3 text-2xl font-bold" style={{ fontFamily: "'Syne', sans-serif" }}>Content pulse</h2>
+          <h2 className="type-cardHeading mt-3" style={{ fontFamily: 'var(--font-heading)' }}>Content pulse</h2>
           <div className="mt-6 grid gap-4 sm:grid-cols-2">
             {contentStats.map(({ label, value, icon: Icon }) => (
               <div key={label} className="rounded-[24px] p-5" style={{ border: `1px solid ${palette.borderSoft}`, backgroundColor: palette.bgSecondary }}>
                 <Icon size={19} style={{ color: palette.accentPrimary }} />
-                <div className="mt-5 text-3xl font-bold" style={{ fontFamily: "'Syne', sans-serif" }}>{loading ? '—' : value}</div>
+                <div className="type-statValue mt-5 break-words" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
+                  {loading ? '—' : value}
+                </div>
                 <div className="mt-2 text-xs" style={{ color: palette.textMuted }}>{label}</div>
               </div>
             ))}
           </div>
+          <Link to="/admin/blog-management" className="mt-5 flex items-center justify-between rounded-[24px] p-5 no-underline transition" style={{ border: `1px solid ${palette.borderSoft}`, backgroundColor: palette.bgSecondary }}>
+            <div>
+              <div className="text-sm font-semibold" style={{ color: palette.textPrimary }}>Pending blog reports</div>
+              <p className="mt-2 text-xs leading-6" style={{ color: palette.textMuted }}>Moderation requests waiting for review from the community blog feed.</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="type-statValue" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>{summary.content.blogReports || 0}</span>
+              <span className="flex h-11 w-11 items-center justify-center rounded-2xl" style={{ backgroundColor: `${palette.accentPrimary}18`, color: palette.accentPrimary }}>
+                <FileWarning size={19} />
+              </span>
+            </div>
+          </Link>
           <div className="mt-5 rounded-[24px] p-5" style={{ border: `1px solid ${palette.accentBorder}`, backgroundColor: palette.accentSoft }}>
             <div className="text-sm font-semibold" style={{ color: palette.textPrimary }}>{summary.users.verified} verified · {summary.users.onboarded} onboarded</div>
             <p className="mt-2 text-xs leading-6" style={{ color: palette.textSecondary }}>Account readiness across the current member base.</p>

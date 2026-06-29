@@ -1,0 +1,356 @@
+:root {
+  --font-body: 'DM Sans', 'Inter', 'Segoe UI', sans-serif;
+  --font-heading: 'Syne', 'Inter', 'Segoe UI', sans-serif;
+  --font-accent: 'Archivo Black', 'Inter', 'Segoe UI', sans-serif;
+
+  /* tinyText */
+  --type-tinyText-size: 0.72rem;
+  --type-tinyText-lineHeight: 1.35;
+  --type-tinyText-letterSpacing: 0.01em;
+  --type-tinyText-weight: 500;
+
+  /* microText */
+  --type-microText-size: 0.625rem;
+  --type-microText-lineHeight: 1.45;
+  --type-microText-letterSpacing: 0.02em;
+  --type-microText-weight: 500;
+
+  /* metaText */
+  --type-metaText-size: 0.6875rem;
+  --type-metaText-lineHeight: 1.5;
+  --type-metaText-letterSpacing: 0.015em;
+  --type-metaText-weight: 500;
+
+  /* helperText */
+  --type-helperText-size: 0.75rem;
+  --type-helperText-lineHeight: 1.58;
+  --type-helperText-letterSpacing: 0.012em;
+  --type-helperText-weight: 500;
+
+  /* uiText */
+  --type-uiText-size: 0.8125rem;
+  --type-uiText-lineHeight: 1.6;
+  --type-uiText-letterSpacing: 0.012em;
+  --type-uiText-weight: 500;
+
+  /* heroHeading */
+  --type-heroHeading-size: clamp(2rem, 3.8vw, 3.8rem);
+  --type-heroHeading-lineHeight: 1.02;
+  --type-heroHeading-letterSpacing: -0.02em;
+  --type-heroHeading-weight: 800;
+
+  /* wordmark */
+  --type-wordmark-size: clamp(3.05rem, 9.9vw, 9.1rem);
+  --type-wordmark-lineHeight: 0.9;
+  --type-wordmark-letterSpacing: -0.06em;
+  --type-wordmark-weight: 900;
+
+  /* displayNumber */
+  --type-displayNumber-size: clamp(5rem, 12vw, 9rem);
+  --type-displayNumber-lineHeight: 1;
+  --type-displayNumber-letterSpacing: -0.045em;
+  --type-displayNumber-weight: 900;
+
+  /* Heading */
+  --type-heading-size: clamp(1.72rem, 2.8vw, 2.9rem);
+  --type-heading-lineHeight: 1.05;
+  --type-heading-letterSpacing: -0.016em;
+  --type-heading-weight: 800;
+
+  /* headingSoft (used by most page hero titles) */
+  --type-heading-soft-size: clamp(1.65rem, 2.5vw, 2.7rem);
+  --type-heading-soft-lineHeight: 1.12;
+  --type-heading-soft-letterSpacing: -0.01em;
+
+  /* sectionHeading */
+  --type-sectionHeading-size: clamp(1.26rem, 1.72vw, 1.78rem);
+  --type-sectionHeading-lineHeight: 1.14;
+  --type-sectionHeading-letterSpacing: -0.01em;
+  --type-sectionHeading-weight: 800;
+
+  /* cardHeading */
+  --type-cardHeading-size: clamp(1.02rem, 1.14vw, 1.28rem);
+  --type-cardHeading-lineHeight: 1.26;
+  --type-cardHeading-letterSpacing: -0.006em;
+  --type-cardHeading-weight: 700;
+
+  /* bodyText */
+  --type-bodyText-size: 1rem;
+  --type-bodyText-lineHeight: 1.7;
+  --type-bodyText-letterSpacing: 0;
+  --type-bodyText-weight: 400;
+
+  /* bodyLarge */
+  --type-bodyLarge-size: 1.125rem;
+  --type-bodyLarge-lineHeight: 1.65;
+  --type-bodyLarge-letterSpacing: 0;
+  --type-bodyLarge-weight: 400;
+
+  /* cardBody */
+  --type-cardBody-size: 0.875rem;
+  --type-cardBody-lineHeight: 1.6;
+  --type-cardBody-letterSpacing: 0;
+  --type-cardBody-weight: 400;
+
+  /* navText */
+  --type-navText-size: 0.875rem;
+  --type-navText-lineHeight: 1.25;
+  --type-navText-letterSpacing: 0.14em;
+  --type-navText-weight: 600;
+
+  /* labelText */
+  --type-labelText-size: 0.72rem;
+  --type-labelText-lineHeight: 1.2;
+  --type-labelText-letterSpacing: 0.3em;
+  --type-labelText-weight: 700;
+
+  /* titleSm */
+  --type-titleSm-size: 1.125rem;
+  --type-titleSm-lineHeight: 1.5;
+  --type-titleSm-letterSpacing: -0.01em;
+  --type-titleSm-weight: 700;
+
+  /* titleMd */
+  --type-titleMd-size: 1.25rem;
+  --type-titleMd-lineHeight: 1.4;
+  --type-titleMd-letterSpacing: -0.015em;
+  --type-titleMd-weight: 700;
+
+  /* statValue */
+  --type-statValue-size: clamp(1.22rem, 1.48vw, 1.72rem);
+  --type-statValue-lineHeight: 1.06;
+  --type-statValue-letterSpacing: -0.012em;
+  --type-statValue-weight: 800;
+
+  /* captionText */
+  --type-captionText-size: 0.8rem;
+  --type-captionText-lineHeight: 1.5;
+  --type-captionText-letterSpacing: 0.01em;
+  --type-captionText-weight: 500;
+
+  /* prose */
+  --type-proseBody-size: clamp(1rem, 0.45vw + 0.92rem, 1.08rem);
+  --type-proseBody-lineHeight: 1.86;
+  --type-proseH1-size: clamp(1.85rem, 2.6vw, 2.45rem);
+  --type-proseH2-size: clamp(1.55rem, 2vw, 2rem);
+  --type-proseH3-size: clamp(1.22rem, 1.4vw, 1.5rem);
+  --type-proseH4-size: clamp(1.08rem, 1vw, 1.2rem);
+}
+
+html,
+body,
+input,
+textarea,
+select,
+button {
+  font-family: var(--font-body);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-heading);
+}
+
+.font-body {
+  font-family: var(--font-body) !important;
+}
+
+.font-heading,
+.font-display {
+  font-family: var(--font-heading) !important;
+}
+
+.font-accent {
+  font-family: var(--font-accent) !important;
+}
+
+.type-heroHeading {
+  font-family: var(--font-heading);
+  font-size: var(--type-heroHeading-size);
+  line-height: var(--type-heroHeading-lineHeight);
+  letter-spacing: var(--type-heroHeading-letterSpacing);
+  font-weight: var(--type-heroHeading-weight);
+}
+
+.type-heading {
+  font-family: var(--font-heading);
+  font-size: var(--type-heading-size);
+  line-height: var(--type-heading-lineHeight);
+  letter-spacing: var(--type-heading-letterSpacing);
+  font-weight: var(--type-heading-weight);
+}
+
+.type-heading-soft {
+  font-family: var(--font-heading);
+  font-size: var(--type-heading-soft-size);
+  line-height: var(--type-heading-soft-lineHeight);
+  letter-spacing: var(--type-heading-soft-letterSpacing);
+  font-weight: var(--type-heading-weight);
+  text-wrap: balance;
+}
+
+.type-wordmark {
+  font-family: var(--font-heading);
+  font-size: var(--type-wordmark-size);
+  line-height: var(--type-wordmark-lineHeight);
+  letter-spacing: var(--type-wordmark-letterSpacing);
+  font-weight: var(--type-wordmark-weight);
+}
+
+.type-sectionHeading {
+  font-family: var(--font-heading);
+  font-size: var(--type-sectionHeading-size);
+  line-height: var(--type-sectionHeading-lineHeight);
+  letter-spacing: var(--type-sectionHeading-letterSpacing);
+  font-weight: var(--type-sectionHeading-weight);
+}
+
+.type-cardHeading {
+  font-family: var(--font-heading);
+  font-size: var(--type-cardHeading-size);
+  line-height: var(--type-cardHeading-lineHeight);
+  letter-spacing: var(--type-cardHeading-letterSpacing);
+  font-weight: var(--type-cardHeading-weight);
+}
+
+.type-titleSm {
+  font-size: var(--type-titleSm-size);
+  line-height: var(--type-titleSm-lineHeight);
+  letter-spacing: var(--type-titleSm-letterSpacing);
+  font-weight: var(--type-titleSm-weight);
+}
+
+.type-titleMd {
+  font-size: var(--type-titleMd-size);
+  line-height: var(--type-titleMd-lineHeight);
+  letter-spacing: var(--type-titleMd-letterSpacing);
+  font-weight: var(--type-titleMd-weight);
+}
+
+.type-bodyLarge {
+  font-size: var(--type-bodyLarge-size);
+  line-height: var(--type-bodyLarge-lineHeight);
+  letter-spacing: var(--type-bodyLarge-letterSpacing);
+  font-weight: var(--type-bodyLarge-weight);
+}
+
+.type-bodyText {
+  font-family: var(--font-body);
+  font-size: var(--type-bodyText-size);
+  line-height: var(--type-bodyText-lineHeight);
+  letter-spacing: var(--type-bodyText-letterSpacing);
+  font-weight: var(--type-bodyText-weight);
+}
+
+.type-cardBody {
+  font-family: var(--font-body);
+  font-size: var(--type-cardBody-size);
+  line-height: var(--type-cardBody-lineHeight);
+  letter-spacing: var(--type-cardBody-letterSpacing);
+  font-weight: var(--type-cardBody-weight);
+}
+
+.qs-page-container {
+  width: min(100%, 1760px);
+  margin-inline: auto;
+}
+
+.type-navText {
+  font-family: var(--font-heading);
+  font-size: var(--type-navText-size);
+  line-height: var(--type-navText-lineHeight);
+  letter-spacing: var(--type-navText-letterSpacing);
+  font-weight: var(--type-navText-weight);
+}
+
+.type-labelText {
+  font-family: var(--font-heading);
+  font-size: var(--type-labelText-size);
+  line-height: var(--type-labelText-lineHeight);
+  letter-spacing: var(--type-labelText-letterSpacing);
+  font-weight: var(--type-labelText-weight);
+  text-transform: uppercase;
+}
+
+.type-statValue {
+  font-family: var(--font-heading);
+  font-size: var(--type-cardHeading-size);
+  line-height: var(--type-cardHeading-lineHeight);
+  letter-spacing: var(--type-cardHeading-letterSpacing);
+  font-weight: var(--type-cardHeading-weight);
+}
+
+.type-displayNumber {
+  font-family: var(--font-accent);
+  font-size: var(--type-displayNumber-size);
+  line-height: var(--type-displayNumber-lineHeight);
+  letter-spacing: var(--type-displayNumber-letterSpacing);
+  font-weight: var(--type-displayNumber-weight);
+}
+
+.type-captionText {
+  font-family: var(--font-body);
+  font-size: var(--type-captionText-size);
+  line-height: var(--type-captionText-lineHeight);
+  letter-spacing: var(--type-captionText-letterSpacing);
+  font-weight: var(--type-captionText-weight);
+}
+
+.type-uiText {
+  font-size: var(--type-uiText-size);
+  line-height: var(--type-uiText-lineHeight);
+  letter-spacing: var(--type-uiText-letterSpacing);
+  font-weight: var(--type-uiText-weight);
+}
+
+.type-helperText {
+  font-size: var(--type-helperText-size);
+  line-height: var(--type-helperText-lineHeight);
+  letter-spacing: var(--type-helperText-letterSpacing);
+  font-weight: var(--type-helperText-weight);
+}
+
+.type-metaText {
+  font-size: var(--type-metaText-size);
+  line-height: var(--type-metaText-lineHeight);
+  letter-spacing: var(--type-metaText-letterSpacing);
+  font-weight: var(--type-metaText-weight);
+}
+
+.type-microText {
+  font-size: var(--type-microText-size);
+  line-height: var(--type-microText-lineHeight);
+  letter-spacing: var(--type-microText-letterSpacing);
+  font-weight: var(--type-microText-weight);
+}
+
+.type-tinyText {
+  font-size: var(--type-tinyText-size);
+  line-height: var(--type-tinyText-lineHeight);
+  letter-spacing: var(--type-tinyText-letterSpacing);
+  font-weight: var(--type-tinyText-weight);
+}
+
+.text-\[10px\] {
+  font-size: var(--type-microText-size) !important;
+  line-height: var(--type-microText-lineHeight) !important;
+}
+
+.text-\[11px\] {
+  font-size: var(--type-metaText-size) !important;
+  line-height: var(--type-metaText-lineHeight) !important;
+}
+
+.text-\[12px\] {
+  font-size: var(--type-helperText-size) !important;
+  line-height: var(--type-helperText-lineHeight) !important;
+}
+
+.text-\[13px\] {
+  font-size: var(--type-uiText-size) !important;
+  line-height: var(--type-uiText-lineHeight) !important;
+}

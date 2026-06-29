@@ -3,7 +3,7 @@ import { createHttpError } from '../utils/errors.js'
 import { sanitizeUser } from './usersService.js'
 
 export const getAdminSummary = async () => {
-  const [usersResult, blogsResult, groupsResult, projectsResult, commentsResult, recentUsersResult] = await Promise.all([
+  const [usersResult, blogsResult, groupsResult, projectsResult, commentsResult, reportsResult, recentUsersResult] = await Promise.all([
     pool.query(`
       SELECT
         COUNT(*)::int AS total,
@@ -18,6 +18,7 @@ export const getAdminSummary = async () => {
     pool.query('SELECT COUNT(*)::int AS count FROM groups'),
     pool.query('SELECT COUNT(*)::int AS count FROM projects'),
     pool.query('SELECT COUNT(*)::int AS count FROM blog_comments'),
+    pool.query(`SELECT COUNT(*)::int AS count FROM blog_reports WHERE LOWER(COALESCE(status, 'pending')) = 'pending'`),
     pool.query(`
       SELECT id, "fullName", "emailAddress", "profileImage", role, "isVerified", "isOnboarded",
              COALESCE("isActive", TRUE) AS "isActive", created_at
@@ -34,6 +35,7 @@ export const getAdminSummary = async () => {
       groups: groupsResult.rows[0]?.count || 0,
       projects: projectsResult.rows[0]?.count || 0,
       comments: commentsResult.rows[0]?.count || 0,
+      blogReports: reportsResult.rows[0]?.count || 0,
     },
     recentUsers: recentUsersResult.rows.map(sanitizeUser),
   }
@@ -118,4 +120,143 @@ export const updateAdminUser = async (id, payload, adminUser) => {
   )
 
   return { success: true, user: sanitizeUser(result.rows[0]) }
+}
+
+export const listAdminBlogReports = async ({ status = 'all', search = '' }) => {
+  const values = []
+  const clauses = []
+
+  const normalizedStatus = String(status || 'all').trim().toLowerCase()
+  if (normalizedStatus !== 'all') {
+    values.push(normalizedStatus)
+    clauses.push(`LOWER(COALESCE(br.status, 'pending')) = $${values.length}`)
+  }
+
+  if (String(search || '').trim()) {
+    values.push(`%${String(search).trim()}%`)
+    clauses.push(`(
+      COALESCE(br."blogTitle", '') ILIKE $${values.length}
+      OR COALESCE(br."reportedByName", '') ILIKE $${values.length}
+      OR COALESCE(br."reportedByEmail", '') ILIKE $${values.length}
+      OR COALESCE(br.reason, '') ILIKE $${values.length}
+    )`)
+  }
+
+  const whereClause = clauses.length ? `WHERE ${clauses.join(' AND ')}` : ''
+  const result = await pool.query(
+    `SELECT
+      br.*,
+      b.title AS "currentBlogTitle",
+      b.author AS "currentBlogAuthor",
+      b."coverImage" AS "currentBlogCoverImage",
+      b."dateOfPublish" AS "currentBlogPublishedAt",
+      (b.id IS NOT NULL) AS "blogStillLive"
+     FROM blog_reports br
+     LEFT JOIN blogs b ON b.id = br."blogId"
+     ${whereClause}
+     ORDER BY
+       CASE LOWER(COALESCE(br.status, 'pending'))
+         WHEN 'pending' THEN 0
+         WHEN 'under_review' THEN 1
+         WHEN 'resolved' THEN 2
+         WHEN 'dismissed' THEN 3
+         ELSE 4
+       END,
+       br.created_at DESC`,
+    values,
+  )
+
+  return result.rows
+}
+
+export const reviewAdminBlogReport = async (id, payload, adminUser) => {
+  const reportId = Number(id)
+  if (!reportId) throw createHttpError(400, 'Invalid report id')
+
+  const status = String(payload?.status || '').trim().toLowerCase()
+  const adminAction = String(payload?.adminAction || '').trim().toLowerCase()
+  const adminNote = String(payload?.adminNote || '').trim()
+
+  if (!status) throw createHttpError(400, 'Status is required')
+  if (!['pending', 'under_review', 'resolved', 'dismissed'].includes(status)) {
+    throw createHttpError(400, 'Invalid report status')
+  }
+
+  if (adminAction && !['none', 'kept', 'deleted'].includes(adminAction)) {
+    throw createHttpError(400, 'Invalid admin action')
+  }
+
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+
+    const reportResult = await client.query(
+      `SELECT br.*, b.id AS "blogStillExists"
+       FROM blog_reports br
+       LEFT JOIN blogs b ON b.id = br."blogId"
+       WHERE br.id = $1
+       LIMIT 1`,
+      [reportId],
+    )
+
+    if (reportResult.rowCount === 0) throw createHttpError(404, 'Report not found')
+    const report = reportResult.rows[0]
+
+    let finalStatus = status
+    let finalAction = adminAction || 'none'
+
+    if (finalAction === 'deleted' && report.blogId && report.blogStillExists) {
+      await client.query('DELETE FROM blogs WHERE id = $1', [report.blogId])
+
+      await client.query(
+        `UPDATE blog_reports
+         SET status = 'resolved',
+             "adminAction" = 'deleted',
+             "adminNote" = COALESCE($2, "adminNote"),
+             "reviewedAt" = NOW(),
+             "reviewedByEmail" = $3,
+             "blogId" = NULL,
+             updated_at = NOW()
+         WHERE "blogId" = $1`,
+        [report.blogId, adminNote || null, adminUser.emailAddress],
+      )
+
+      finalStatus = 'resolved'
+    } else {
+      await client.query(
+        `UPDATE blog_reports
+         SET status = $2,
+             "adminAction" = $3,
+             "adminNote" = $4,
+             "reviewedAt" = NOW(),
+             "reviewedByEmail" = $5,
+             updated_at = NOW()
+         WHERE id = $1`,
+        [reportId, finalStatus, finalAction || 'none', adminNote || null, adminUser.emailAddress],
+      )
+    }
+
+    const updatedResult = await client.query(
+      `SELECT
+        br.*,
+        b.title AS "currentBlogTitle",
+        b.author AS "currentBlogAuthor",
+        b."coverImage" AS "currentBlogCoverImage",
+        b."dateOfPublish" AS "currentBlogPublishedAt",
+        (b.id IS NOT NULL) AS "blogStillLive"
+       FROM blog_reports br
+       LEFT JOIN blogs b ON b.id = br."blogId"
+       WHERE br.id = $1
+       LIMIT 1`,
+      [reportId],
+    )
+
+    await client.query('COMMIT')
+    return updatedResult.rows[0]
+  } catch (error) {
+    await client.query('ROLLBACK')
+    throw error
+  } finally {
+    client.release()
+  }
 }

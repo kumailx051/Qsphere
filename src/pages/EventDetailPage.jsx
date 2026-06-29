@@ -1,14 +1,22 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import {
   ArrowLeft,
   ArrowUpRight,
+  Briefcase,
+  Building2,
   Calendar,
   Clock,
   Copy,
+  ExternalLink,
+  Mail,
   MapPin,
+  Phone,
   Sparkles,
+  User,
+  UserCheck,
   Users,
+  X,
 } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
@@ -17,11 +25,25 @@ import { darkTheme, dayTheme } from '../themeColors'
 import {
   formatEventFullDate,
   formatEventTime,
-  getEventById,
   getRegistrationState,
-  getStoredEvents,
   parseEventDate,
 } from '../utils/eventStore'
+import {
+  checkEventRegistrationConflicts,
+  fetchEventById,
+  fetchEventRegistration,
+  fetchEvents,
+  submitEventRegistration,
+} from '../utils/opportunitiesApi'
+import {
+  getCurrentUserAffiliation,
+  getCurrentUserEmail,
+  getCurrentUserLocation,
+  getCurrentUserName,
+  getCurrentUserPhone,
+  getCurrentUserRoleSummary,
+  readStoredProfile,
+} from '../utils/profileStore'
 
 const getTypeStyle = (type, isDayMode) => {
   if (type === 'Workshop') {
@@ -154,21 +176,183 @@ const getDeadlineToneStyle = (tone, isDayMode) => {
   return { color: isDayMode ? '#0e9660' : '#6ee7b7' }
 }
 
+const showSnackbar = (message, type = 'success') => {
+  window.dispatchEvent(new CustomEvent('qsphere-snackbar', { detail: { message, type } }))
+}
+
+const buildRegistrationDraft = (profile, existingRegistration = null) => ({
+  fullName: existingRegistration?.fullName || getCurrentUserName(profile) || '',
+  email: existingRegistration?.email || getCurrentUserEmail(profile) || '',
+  phone: existingRegistration?.phone || getCurrentUserPhone(profile) || '',
+  affiliation: existingRegistration?.affiliation || getCurrentUserAffiliation(profile) || '',
+  roleTitle: existingRegistration?.roleTitle || getCurrentUserRoleSummary(profile) || '',
+  location: existingRegistration?.location || getCurrentUserLocation(profile) || '',
+  profileUrl: existingRegistration?.profileUrl || '',
+  expectations: existingRegistration?.expectations || '',
+  notes: existingRegistration?.notes || '',
+})
+
 const EventDetailPage = () => {
   const { id } = useParams()
   const [copied, setCopied] = useState(false)
-  const event = getEventById(id)
+  const [event, setEvent] = useState(null)
+  const [relatedEvents, setRelatedEvents] = useState([])
+  const [currentRegistration, setCurrentRegistration] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [notFound, setNotFound] = useState(false)
+  const profile = readStoredProfile()
+  const currentUserEmail = getCurrentUserEmail(profile)
+  const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false)
+  const [registrationSubmitting, setRegistrationSubmitting] = useState(false)
+  const [registrationComplete, setRegistrationComplete] = useState(false)
+  const [registrationErrors, setRegistrationErrors] = useState({})
+  const [registrationConflictState, setRegistrationConflictState] = useState({
+    emailRegistered: false,
+    phoneRegistered: false,
+  })
+  const [registrationForm, setRegistrationForm] = useState(() => buildRegistrationDraft(profile))
   const { theme } = useTheme()
 
   const isDayMode = theme === 'light'
   const palette = isDayMode ? dayTheme : darkTheme
 
-  const relatedEvents = useMemo(() => {
-    if (!event) return []
-    return getStoredEvents().filter((item) => item.id !== event.id).slice(0, 3)
-  }, [event])
+  useEffect(() => {
+    let active = true
 
-  if (!event) {
+    const loadEvent = async () => {
+      setLoading(true)
+      setNotFound(false)
+
+      try {
+        const [eventData, allEvents, savedRegistration] = await Promise.all([
+          fetchEventById(id),
+          fetchEvents(),
+          currentUserEmail ? fetchEventRegistration(id, currentUserEmail) : Promise.resolve(null),
+        ])
+
+        if (!active) return
+
+        setEvent(eventData)
+        setRelatedEvents(
+          (Array.isArray(allEvents) ? allEvents : [])
+            .filter((item) => String(item.id) !== String(eventData.id))
+            .slice(0, 3),
+        )
+        setCurrentRegistration(savedRegistration)
+        setRegistrationForm(buildRegistrationDraft(profile, savedRegistration))
+        setRegistrationComplete(Boolean(savedRegistration))
+      } catch (error) {
+        console.error('Failed to load event details:', error)
+        if (!active) return
+        setEvent(null)
+        setRelatedEvents([])
+        setCurrentRegistration(null)
+        setRegistrationComplete(false)
+        setNotFound(error?.status === 404)
+      } finally {
+        if (active) {
+          setLoading(false)
+        }
+      }
+    }
+
+    loadEvent()
+
+    return () => {
+      active = false
+    }
+  }, [id, currentUserEmail])
+
+  useEffect(() => {
+    if (!isRegisterModalOpen || registrationComplete || !event?.id) return
+
+    const trimmedEmail = registrationForm.email.trim()
+    const trimmedPhone = registrationForm.phone.trim()
+    const normalizedPhone = trimmedPhone.replace(/\D/g, '')
+    const shouldCheckEmail = trimmedEmail.includes('@')
+    const shouldCheckPhone = normalizedPhone.length >= 7
+
+    if (!shouldCheckEmail && !shouldCheckPhone) {
+      setRegistrationConflictState({ emailRegistered: false, phoneRegistered: false })
+      return
+    }
+
+    let active = true
+    const timerId = window.setTimeout(async () => {
+      try {
+        const result = await checkEventRegistrationConflicts(event.id, {
+          email: shouldCheckEmail ? trimmedEmail : '',
+          phone: shouldCheckPhone ? trimmedPhone : '',
+          excludeId: currentRegistration?.id || '',
+        })
+
+        if (!active) return
+
+        setRegistrationConflictState({
+          emailRegistered: Boolean(result?.emailRegistered),
+          phoneRegistered: Boolean(result?.phoneRegistered),
+        })
+      } catch {
+        if (!active) return
+        setRegistrationConflictState({ emailRegistered: false, phoneRegistered: false })
+      }
+    }, 350)
+
+    return () => {
+      active = false
+      window.clearTimeout(timerId)
+    }
+  }, [
+    currentRegistration?.id,
+    event?.id,
+    isRegisterModalOpen,
+    registrationComplete,
+    registrationForm.email,
+    registrationForm.phone,
+  ])
+
+  if (loading) {
+    return (
+      <div
+        className="relative"
+        style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: palette.bgPrimary }}
+      >
+        <Navbar currentPage="events" />
+
+        <main className="relative z-10 flex-grow px-6 pt-32 pb-24 md:px-12 lg:px-20 xl:px-28">
+          <div
+            className="overflow-hidden rounded-[36px] p-10 text-center md:p-16"
+            style={{
+              border: `1px solid ${palette.borderPrimary}`,
+              background: isDayMode
+                ? 'linear-gradient(145deg, rgba(255,255,255,0.96), rgba(247,247,245,0.90))'
+                : 'linear-gradient(to bottom right, rgba(255,255,255,0.04), rgba(255,255,255,0.02), transparent)',
+              boxShadow: isDayMode ? '0 30px 120px rgba(15,23,42,0.08)' : '0 30px 120px rgba(0,0,0,0.45)',
+            }}
+          >
+            <span
+              className="inline-flex rounded-full px-4 py-1.5 text-[11px] font-bold uppercase tracking-[0.28em]"
+              style={{ border: `1px solid ${palette.accentBorder}`, backgroundColor: palette.accentSoft, color: palette.accentDark }}
+            >
+              Loading Event
+            </span>
+            <h1 className="mt-6 type-heading-soft max-w-2xl mx-auto" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
+              Pulling the latest event signal.
+            </h1>
+            <p className="mt-6 mx-auto max-w-2xl text-base leading-8 md:text-lg" style={{ color: palette.textSecondary }}>
+              We are loading this event and its registration details from the QSphere database.
+            </p>
+          </div>
+        </main>
+
+        <div style={{ position: 'relative', zIndex: 1 }}>
+          <Footer />
+        </div>
+      </div>
+    )
+  }
+
+  if (notFound || !event) {
     return (
       <div
         className="relative"
@@ -193,11 +377,11 @@ const EventDetailPage = () => {
             >
               Event Signal Lost
             </span>
-            <h1 className="mt-6 max-w-3xl text-4xl font-bold leading-[0.94] md:text-6xl" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
+            <h1 className="mt-6 max-w-3xl type-heading-soft" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
               That event is not available anymore.
             </h1>
             <p className="mt-6 max-w-2xl text-base leading-8 md:text-lg" style={{ color: palette.textSecondary }}>
-              The event may have been removed, renamed, or never existed in local storage. Head back to the events grid and choose another live signal.
+              The event may have been removed, renamed, or is no longer available in the live database. Head back to the events grid and choose another live signal.
             </p>
             <div className="mt-10 flex flex-wrap gap-4">
               <Link
@@ -222,7 +406,143 @@ const EventDetailPage = () => {
   const tone = getEventTone(event.type, isDayMode)
   const dateInfo = parseEventDate(event.date)
   const deadlineInfo = getRegistrationState(event.deadline)
+  const eventTimestamp = new Date(event.date).getTime()
+  const isEventArchived =
+    deadlineInfo.badge === 'Closed' || (!Number.isNaN(eventTimestamp) && eventTimestamp < Date.now())
   const experienceNotes = getExperienceNotes(event)
+  const registrationCount = Number(event.registrationCount || 0)
+
+  const formatPhone = (raw) => {
+    const digits = raw.replace(/\D/g, '').slice(0, 11)
+    if (digits.startsWith('03') && digits.length > 4) {
+      return digits.slice(0, 4) + '-' + digits.slice(4)
+    }
+    return digits
+  }
+
+  const updateRegistrationField = (key, value) => {
+    if (key === 'phone') value = formatPhone(value)
+    setRegistrationForm((current) => ({ ...current, [key]: value }))
+    if (key === 'email' || key === 'phone') {
+      setRegistrationConflictState((current) => ({
+        ...current,
+        ...(key === 'email' ? { emailRegistered: false } : {}),
+        ...(key === 'phone' ? { phoneRegistered: false } : {}),
+      }))
+    }
+    setRegistrationErrors((current) => {
+      if (!current[key]) return current
+      const next = { ...current }
+      delete next[key]
+      return next
+    })
+  }
+
+  const openRegistrationModal = () => {
+    if (isEventArchived) {
+      showSnackbar('Registration for this event is already closed.', 'error')
+      return
+    }
+
+    setRegistrationConflictState({ emailRegistered: false, phoneRegistered: false })
+
+    if (currentRegistration) {
+      setRegistrationComplete(true)
+    } else {
+      setRegistrationForm(buildRegistrationDraft(profile))
+      setRegistrationErrors({})
+      setRegistrationComplete(false)
+    }
+    setIsRegisterModalOpen(true)
+  }
+
+  const closeRegistrationModal = () => {
+    if (registrationSubmitting) return
+    setIsRegisterModalOpen(false)
+  }
+
+  const handleRegistrationSubmit = async (submitEvent) => {
+    submitEvent.preventDefault()
+
+    const nextErrors = {}
+    if (!registrationForm.fullName.trim()) nextErrors.fullName = 'Full name is required'
+    if (!registrationForm.email.trim()) nextErrors.email = 'Email is required'
+    else if (!registrationForm.email.includes('@')) nextErrors.email = 'Enter a valid email with @'
+    if (!registrationForm.phone.trim()) nextErrors.phone = 'Phone number is required'
+    if (!registrationForm.affiliation.trim()) nextErrors.affiliation = 'Institute or organization is required'
+
+    const liveConflicts = await checkEventRegistrationConflicts(event.id, {
+      email: registrationForm.email.trim(),
+      phone: registrationForm.phone.trim(),
+      excludeId: currentRegistration?.id || '',
+    }).catch(() => ({ emailRegistered: false, phoneRegistered: false }))
+
+    if (liveConflicts.emailRegistered) {
+      nextErrors.email = 'This email is already registered.'
+    }
+
+    if (liveConflicts.phoneRegistered) {
+      nextErrors.phone = 'This phone number is already registered.'
+    }
+
+    setRegistrationConflictState({
+      emailRegistered: Boolean(liveConflicts.emailRegistered),
+      phoneRegistered: Boolean(liveConflicts.phoneRegistered),
+    })
+
+    if (Object.keys(nextErrors).length > 0) {
+      setRegistrationErrors(nextErrors)
+      showSnackbar('Please complete the required registration details.', 'error')
+      return
+    }
+
+    setRegistrationSubmitting(true)
+
+    try {
+      const hadExistingRegistration = Boolean(currentRegistration?.id)
+      const savedRegistration = await submitEventRegistration(event.id, {
+        registrationId: currentRegistration?.id || '',
+        fullName: registrationForm.fullName.trim(),
+        email: registrationForm.email.trim(),
+        phone: registrationForm.phone.trim(),
+        affiliation: registrationForm.affiliation.trim(),
+        roleTitle: registrationForm.roleTitle.trim(),
+        location: registrationForm.location.trim(),
+        profileUrl: registrationForm.profileUrl.trim(),
+        expectations: registrationForm.expectations.trim(),
+        notes: registrationForm.notes.trim(),
+      })
+
+      setCurrentRegistration(savedRegistration)
+      setRegistrationForm(buildRegistrationDraft(profile, savedRegistration))
+      setRegistrationComplete(true)
+      setRegistrationConflictState({ emailRegistered: false, phoneRegistered: false })
+      setEvent((current) =>
+        current
+          ? {
+              ...current,
+              registrationCount: Number(current.registrationCount || 0) + (hadExistingRegistration ? 0 : 1),
+            }
+          : current,
+      )
+      showSnackbar(hadExistingRegistration ? 'Your registration has been updated.' : 'You are registered for this event.', 'success')
+    } catch (error) {
+      const message = error?.message || ''
+      if (message.toLowerCase().includes('email is already registered')) {
+        setRegistrationConflictState((current) => ({ ...current, emailRegistered: true }))
+        setRegistrationErrors((current) => ({ ...current, email: 'This email is already registered.' }))
+        showSnackbar('This email is already registered for this event.', 'error')
+      } else if (message.toLowerCase().includes('phone number is already registered')) {
+        setRegistrationConflictState((current) => ({ ...current, phoneRegistered: true }))
+        setRegistrationErrors((current) => ({ ...current, phone: 'This phone number is already registered.' }))
+        showSnackbar('This phone number is already registered for this event.', 'error')
+      } else {
+        showSnackbar(message || 'Unable to save your registration right now.', 'error')
+      }
+    } finally {
+      setRegistrationSubmitting(false)
+    }
+  }
 
   const handleCopy = async () => {
     try {
@@ -314,15 +634,11 @@ const EventDetailPage = () => {
                 </div>
 
                 <h1
-                  className="mt-7 max-w-5xl text-4xl font-bold leading-[0.9] md:text-6xl xl:text-[5.35rem]"
-                  style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary, textShadow: isDayMode ? '0 12px 36px rgba(255,255,255,0.55)' : '0 0 40px rgba(16,185,129,0.08)' }}
+                  className="mt-7 max-w-3xl xl:max-w-[54rem] type-heading-soft"
+                  style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary, textShadow: isDayMode ? '0 12px 36px rgba(255,255,255,0.55)' : '0 0 40px rgba(16,185,129,0.08)' }}
                 >
                   {event.title}
                 </h1>
-
-                <p className="mt-7 max-w-4xl text-base leading-8 md:text-lg xl:text-[1.15rem]" style={{ color: palette.textSecondary }}>
-                  {event.description || 'A high-signal event crafted for the QSphere community. Explore the schedule, context, and registration window below.'}
-                </p>
 
                 <div className="mt-8 grid gap-4 sm:grid-cols-2 2xl:grid-cols-4">
                   <div className="rounded-[28px] p-5 backdrop-blur-xl" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: isDayMode ? 'rgba(255,255,255,0.74)' : 'rgba(0,0,0,0.2)' }}>
@@ -330,21 +646,21 @@ const EventDetailPage = () => {
                       <Calendar size={15} />
                       Event date
                     </div>
-                    <div className="mt-4 text-xl font-semibold md:text-2xl" style={{ color: palette.textPrimary }}>{formatEventFullDate(event.date)}</div>
+                    <div className="mt-4 text-base font-semibold md:text-[1.05rem]" style={{ color: palette.textPrimary }}>{formatEventFullDate(event.date)}</div>
                   </div>
                   <div className="rounded-[28px] p-5 backdrop-blur-xl" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: isDayMode ? 'rgba(255,255,255,0.74)' : 'rgba(0,0,0,0.2)' }}>
                     <div className="flex items-center gap-3 text-[11px] font-bold uppercase tracking-[0.22em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.85)' }}>
                       <Clock size={15} />
                       Start time
                     </div>
-                    <div className="mt-4 text-xl font-semibold md:text-2xl" style={{ color: palette.textPrimary }}>{formatEventTime(event.date)}</div>
+                    <div className="mt-4 text-base font-semibold md:text-[1.05rem]" style={{ color: palette.textPrimary }}>{formatEventTime(event.date)}</div>
                   </div>
                   <div className="rounded-[28px] p-5 backdrop-blur-xl" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: isDayMode ? 'rgba(255,255,255,0.74)' : 'rgba(0,0,0,0.2)' }}>
                     <div className="flex items-center gap-3 text-[11px] font-bold uppercase tracking-[0.22em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.85)' }}>
                       <MapPin size={15} />
                       Location mode
                     </div>
-                    <div className="mt-4 text-lg font-semibold leading-7" style={{ color: palette.textPrimary }}>{event.location || 'To be announced'}</div>
+                    <div className="mt-4 text-base font-semibold leading-7 md:text-[1.05rem]" style={{ color: palette.textPrimary }}>{event.location || 'To be announced'}</div>
                   </div>
                   <div className="rounded-[28px] p-5 backdrop-blur-xl" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: isDayMode ? 'rgba(255,255,255,0.74)' : 'rgba(0,0,0,0.2)' }}>
                     <div className="flex items-center gap-3 text-[11px] font-bold uppercase tracking-[0.22em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.85)' }}>
@@ -372,7 +688,7 @@ const EventDetailPage = () => {
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <div className="text-[11px] font-bold uppercase tracking-[0.3em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.8)' }}>Signal window</div>
-                      <div className="mt-3 text-6xl font-bold leading-none" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
+                      <div className="type-statValue mt-3" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
                         {dateInfo.day}
                       </div>
                       <div className="mt-2 text-sm uppercase tracking-[0.26em]" style={{ color: palette.textMuted }}>{dateInfo.month} {dateInfo.year}</div>
@@ -414,7 +730,11 @@ const EventDetailPage = () => {
                   <div className="flex items-center justify-between gap-4">
                     <div>
                       <div className="text-[10px] font-bold uppercase tracking-[0.28em]" style={{ color: palette.textMuted }}>Action layer</div>
-                      <div className="mt-2 text-2xl font-semibold" style={{ color: palette.textPrimary }}>Make it unforgettable</div>
+                      <div className="mt-2 type-cardHeading" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>Make it unforgettable</div>
+                      <div className="mt-3 flex items-center gap-2 text-sm" style={{ color: palette.textSecondary }}>
+                        <UserCheck size={15} style={{ color: palette.accentPrimary }} />
+                        {registrationCount} attendee{registrationCount === 1 ? '' : 's'} registered
+                      </div>
                     </div>
                     <div className="rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.24em]" style={{ border: `1px solid ${palette.accentBorder}`, backgroundColor: palette.accentSoft, color: isDayMode ? palette.accentDark : palette.accentLight }}>
                       {deadlineInfo.badge}
@@ -422,6 +742,21 @@ const EventDetailPage = () => {
                   </div>
 
                   <div className="mt-5 grid gap-3">
+                    {!isEventArchived ? (
+                      <button
+                        type="button"
+                        onClick={openRegistrationModal}
+                        className="inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3.5 text-sm font-semibold transition-all"
+                        style={{ backgroundColor: palette.btnPrimaryBg, color: palette.btnPrimaryText }}
+                      >
+                        <UserCheck size={16} />
+                        {currentRegistration ? 'View registration' : 'Register now'}
+                      </button>
+                    ) : (
+                      <div className="rounded-[24px] px-4 py-4 text-sm leading-7" style={{ border: `1px solid ${palette.borderSoft}`, backgroundColor: isDayMode ? 'rgba(247,247,245,0.82)' : 'rgba(0,0,0,0.2)', color: palette.textSecondary }}>
+                        This event is archived now, so this page is view-only and registrations are closed.
+                      </div>
+                    )}
                     <button
                       type="button"
                       onClick={handleCopy}
@@ -460,10 +795,10 @@ const EventDetailPage = () => {
                 <Sparkles size={15} />
                 Experience overview
               </div>
-              <h2 className="mt-5 text-3xl font-bold md:text-4xl" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
+              <h2 className="type-sectionHeading mt-5 max-w-2xl" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
                 Built for clarity, momentum, and serious curiosity.
               </h2>
-              <div className="mt-6 space-y-6 text-[1.02rem] leading-8" style={{ color: palette.textSecondary }}>
+              <div className="mt-6 space-y-6 text-base leading-8" style={{ color: palette.textSecondary }}>
                 <p>
                   {event.description || 'This event is designed as a strong entry point into the next conversation shaping the QSphere ecosystem.'}
                 </p>
@@ -493,12 +828,12 @@ const EventDetailPage = () => {
               }}
             >
               <div className="text-[11px] font-bold uppercase tracking-[0.28em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.8)' }}>Audience focus</div>
-              <h2 className="mt-5 text-3xl font-bold" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
+              <h2 className="type-sectionHeading mt-5 max-w-xl" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
                 Who this event is tuned for.
               </h2>
               <div className="mt-6 rounded-[28px] p-5" style={{ border: `1px solid ${palette.accentBorder}`, backgroundColor: palette.accentSoft }}>
                 <div className="text-[10px] uppercase tracking-[0.24em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.8)' }}>Recommended audience</div>
-                <div className="mt-3 text-xl font-semibold leading-8" style={{ color: palette.textPrimary }}>{event.audience || 'Open community access'}</div>
+                <div className="mt-3 text-lg font-semibold leading-8" style={{ color: palette.textPrimary }}>{event.audience || 'Open community access'}</div>
               </div>
 
               <div className="mt-5 space-y-3">
@@ -531,7 +866,7 @@ const EventDetailPage = () => {
               <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                 <div>
                   <div className="text-[11px] font-bold uppercase tracking-[0.28em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.8)' }}>More signals</div>
-                  <h2 className="mt-4 text-3xl font-bold md:text-4xl" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
+                  <h2 className="type-sectionHeading mt-4 max-w-xl" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
                     Other events worth opening next.
                   </h2>
                 </div>
@@ -558,7 +893,7 @@ const EventDetailPage = () => {
                       <div className="flex items-start justify-between gap-4">
                         <div>
                           <div className="text-[10px] font-bold uppercase tracking-[0.24em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.78)' }}>{itemDate.month} {itemDate.day}</div>
-                          <h3 className="mt-3 text-2xl font-semibold leading-tight transition-colors" style={{ fontFamily: "'Syne', sans-serif", color: palette.textPrimary }}>
+                          <h3 className="mt-3 text-xl font-semibold leading-tight transition-colors" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
                             {item.title}
                           </h3>
                         </div>
@@ -582,6 +917,281 @@ const EventDetailPage = () => {
           )}
         </div>
       </main>
+
+      {!isEventArchived && isRegisterModalOpen && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center px-4 py-10">
+          <button
+            type="button"
+            aria-label="Close registration popup"
+            onClick={closeRegistrationModal}
+            className="absolute inset-0 border-0 bg-black/45 p-0"
+          />
+
+          <div
+            className="relative z-10 max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-[34px] p-6 md:p-8"
+            style={{
+              border: `1px solid ${palette.borderPrimary}`,
+              background: isDayMode
+                ? 'linear-gradient(145deg, rgba(255,255,255,0.98), rgba(247,247,245,0.95))'
+                : 'linear-gradient(145deg, rgba(7,12,10,0.98), rgba(4,8,7,0.92))',
+              boxShadow: isDayMode
+                ? '0 30px 120px rgba(15,23,42,0.18)'
+                : '0 30px 120px rgba(0,0,0,0.62)',
+            }}
+          >
+            <div className="absolute inset-x-8 top-0 h-px" style={{ background: `linear-gradient(90deg, transparent, ${tone.edge}, transparent)` }} />
+
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-[0.3em]" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.8)' }}>
+                  Event registration
+                </div>
+                <h2 className="type-cardHeading mt-4 leading-tight" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
+                  Step into {event.title}
+                </h2>
+                <p className="mt-4 max-w-2xl text-sm leading-7 md:text-base" style={{ color: palette.textSecondary }}>
+                  Share the attendee details organizers usually need so the event owner can plan communication, check-in, and the room experience properly.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={closeRegistrationModal}
+                className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border transition-all"
+                style={{ borderColor: palette.borderPrimary, backgroundColor: isDayMode ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.03)', color: palette.textSecondary }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="mt-6 grid gap-4 md:grid-cols-3">
+              {[
+                { label: 'Event date', value: formatEventFullDate(event.date) },
+                { label: 'Time', value: formatEventTime(event.date) },
+                { label: 'Location', value: event.location || 'To be announced' },
+              ].map((item) => (
+                <div key={item.label} className="rounded-[24px] p-4" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: isDayMode ? 'rgba(255,255,255,0.76)' : 'rgba(255,255,255,0.03)' }}>
+                  <div className="text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: palette.textMuted }}>{item.label}</div>
+                  <div className="mt-3 text-sm font-semibold leading-6" style={{ color: palette.textPrimary }}>{item.value}</div>
+                </div>
+              ))}
+            </div>
+
+            {registrationComplete ? (
+              <div className="mt-8 rounded-[28px] p-6" style={{ border: `1px solid ${palette.accentBorder}`, backgroundColor: palette.accentSoft }}>
+                <div className="flex items-start gap-4">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl" style={{ backgroundColor: isDayMode ? 'rgba(255,255,255,0.72)' : 'rgba(0,0,0,0.15)', color: palette.accentPrimary }}>
+                    <UserCheck size={22} />
+                  </div>
+                  <div>
+                    <h3 className="type-cardHeading" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>{currentRegistration?.email === registrationForm.email ? 'You are already registered.' : 'You are on the list.'}</h3>
+                    <p className="mt-3 max-w-2xl text-sm leading-7" style={{ color: palette.textSecondary }}>
+                      {currentRegistration?.email === registrationForm.email
+                        ? 'Your registration for this event is already confirmed. No need to register again.'
+                        : 'Your registration details are saved for this event.'}
+                    </p>
+                    <div className="mt-5 flex flex-wrap gap-3">
+                      <button
+                        type="button"
+                        onClick={closeRegistrationModal}
+                        className="inline-flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-semibold"
+                        style={{ backgroundColor: palette.btnPrimaryBg, color: palette.btnPrimaryText }}
+                      >
+                        Done
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={handleRegistrationSubmit} className="mt-8 rounded-[30px] p-5 md:p-6" style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: isDayMode ? 'rgba(255,255,255,0.82)' : 'rgba(255,255,255,0.03)' }}>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: palette.accentPrimary }}>Full name *</label>
+                    <div className="mt-2 rounded-2xl border" style={{ borderColor: registrationErrors.fullName ? '#ef4444' : palette.borderPrimary, backgroundColor: palette.bgSecondary }}>
+                      <div className="flex items-center gap-3 px-4 py-3.5">
+                        <User size={16} style={{ color: palette.accentPrimary }} />
+                        <input
+                          type="text"
+                          value={registrationForm.fullName}
+                          onChange={(event) => updateRegistrationField('fullName', event.target.value)}
+                          placeholder="Your full name"
+                          className="w-full bg-transparent outline-none"
+                          style={{ color: palette.textPrimary }}
+                        />
+                      </div>
+                    </div>
+                    {registrationErrors.fullName && <p className="mt-2 text-xs" style={{ color: '#ef4444' }}>{registrationErrors.fullName}</p>}
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: palette.accentPrimary }}>Email address *</label>
+                    {registrationConflictState.emailRegistered && (
+                      <p className="mt-2 text-xs font-semibold" style={{ color: '#ef4444' }}>
+                        This email is already registered.
+                      </p>
+                    )}
+                    <div className="mt-2 rounded-2xl border" style={{ borderColor: registrationErrors.email || registrationConflictState.emailRegistered ? '#ef4444' : palette.borderPrimary, backgroundColor: palette.bgSecondary }}>
+                      <div className="flex items-center gap-3 px-4 py-3.5">
+                        <Mail size={16} style={{ color: palette.accentPrimary }} />
+                        <input
+                          type="email"
+                          value={registrationForm.email}
+                          onChange={(event) => updateRegistrationField('email', event.target.value)}
+                          placeholder="you@example.com"
+                          className="w-full bg-transparent outline-none"
+                          style={{ color: palette.textPrimary }}
+                        />
+                      </div>
+                    </div>
+                    {registrationErrors.email && <p className="mt-2 text-xs" style={{ color: '#ef4444' }}>{registrationErrors.email}</p>}
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: palette.accentPrimary }}>Phone number *</label>
+                    {registrationConflictState.phoneRegistered && (
+                      <p className="mt-2 text-xs font-semibold" style={{ color: '#ef4444' }}>
+                        This phone number is already registered.
+                      </p>
+                    )}
+                    <div className="mt-2 rounded-2xl border" style={{ borderColor: registrationErrors.phone || registrationConflictState.phoneRegistered ? '#ef4444' : palette.borderPrimary, backgroundColor: palette.bgSecondary }}>
+                      <div className="flex items-center gap-3 px-4 py-3.5">
+                        <Phone size={16} style={{ color: palette.accentPrimary }} />
+                        <input
+                          type="text"
+                          value={registrationForm.phone}
+                          onChange={(event) => updateRegistrationField('phone', event.target.value)}
+                          placeholder="+92..."
+                          className="w-full bg-transparent outline-none"
+                          style={{ color: palette.textPrimary }}
+                        />
+                      </div>
+                    </div>
+                    {registrationErrors.phone && <p className="mt-2 text-xs" style={{ color: '#ef4444' }}>{registrationErrors.phone}</p>}
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: palette.accentPrimary }}>Institute / organization *</label>
+                    <div className="mt-2 rounded-2xl border" style={{ borderColor: registrationErrors.affiliation ? '#ef4444' : palette.borderPrimary, backgroundColor: palette.bgSecondary }}>
+                      <div className="flex items-center gap-3 px-4 py-3.5">
+                        <Building2 size={16} style={{ color: palette.accentPrimary }} />
+                        <input
+                          type="text"
+                          value={registrationForm.affiliation}
+                          onChange={(event) => updateRegistrationField('affiliation', event.target.value)}
+                          placeholder="Your university, company, or lab"
+                          className="w-full bg-transparent outline-none"
+                          style={{ color: palette.textPrimary }}
+                        />
+                      </div>
+                    </div>
+                    {registrationErrors.affiliation && <p className="mt-2 text-xs" style={{ color: '#ef4444' }}>{registrationErrors.affiliation}</p>}
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: palette.accentPrimary }}>Role / title</label>
+                    <div className="mt-2 rounded-2xl border" style={{ borderColor: palette.borderPrimary, backgroundColor: palette.bgSecondary }}>
+                      <div className="flex items-center gap-3 px-4 py-3.5">
+                        <Briefcase size={16} style={{ color: palette.accentPrimary }} />
+                        <input
+                          type="text"
+                          value={registrationForm.roleTitle}
+                          onChange={(event) => updateRegistrationField('roleTitle', event.target.value)}
+                          placeholder="Student, Researcher, Engineer..."
+                          className="w-full bg-transparent outline-none"
+                          style={{ color: palette.textPrimary }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: palette.accentPrimary }}>City / location</label>
+                    <div className="mt-2 rounded-2xl border" style={{ borderColor: palette.borderPrimary, backgroundColor: palette.bgSecondary }}>
+                      <div className="flex items-center gap-3 px-4 py-3.5">
+                        <MapPin size={16} style={{ color: palette.accentPrimary }} />
+                        <input
+                          type="text"
+                          value={registrationForm.location}
+                          onChange={(event) => updateRegistrationField('location', event.target.value)}
+                          placeholder="Your city or region"
+                          className="w-full bg-transparent outline-none"
+                          style={{ color: palette.textPrimary }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <label className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: palette.accentPrimary }}>LinkedIn / portfolio URL</label>
+                  <div className="mt-2 rounded-2xl border" style={{ borderColor: palette.borderPrimary, backgroundColor: palette.bgSecondary }}>
+                    <div className="flex items-center gap-3 px-4 py-3.5">
+                      <ExternalLink size={16} style={{ color: palette.accentPrimary }} />
+                      <input
+                        type="text"
+                        value={registrationForm.profileUrl}
+                        onChange={(event) => updateRegistrationField('profileUrl', event.target.value)}
+                        placeholder="https://linkedin.com/in/..."
+                        className="w-full bg-transparent outline-none"
+                        style={{ color: palette.textPrimary }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <label className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: palette.accentPrimary }}>What do you hope to gain from this event?</label>
+                  <div className="mt-2 rounded-2xl border" style={{ borderColor: palette.borderPrimary, backgroundColor: palette.bgSecondary }}>
+                    <textarea
+                      value={registrationForm.expectations}
+                      onChange={(event) => updateRegistrationField('expectations', event.target.value)}
+                      placeholder="Share your goals, expectations, or what you want to learn."
+                      rows={4}
+                      className="w-full resize-none bg-transparent px-4 py-3.5 outline-none"
+                      style={{ color: palette.textPrimary }}
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <label className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: palette.accentPrimary }}>Special requirements or notes</label>
+                  <div className="mt-2 rounded-2xl border" style={{ borderColor: palette.borderPrimary, backgroundColor: palette.bgSecondary }}>
+                    <textarea
+                      value={registrationForm.notes}
+                      onChange={(event) => updateRegistrationField('notes', event.target.value)}
+                      placeholder="Accessibility needs, dietary notes, or anything the organizer should know."
+                      rows={3}
+                      className="w-full resize-none bg-transparent px-4 py-3.5 outline-none"
+                      style={{ color: palette.textPrimary }}
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+                  <button
+                    type="submit"
+                    disabled={registrationSubmitting}
+                    className="inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3.5 text-sm font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-50"
+                    style={{ backgroundColor: palette.btnPrimaryBg, color: palette.btnPrimaryText }}
+                  >
+                    <UserCheck size={16} />
+                    {registrationSubmitting ? 'Saving registration...' : 'Confirm registration'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={closeRegistrationModal}
+                    className="inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3.5 text-sm font-semibold transition-all"
+                    style={{ border: `1px solid ${palette.borderPrimary}`, backgroundColor: palette.btnSecondaryBg, color: palette.btnSecondaryText }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
 
       <div style={{ position: 'relative', zIndex: 1 }}>
         <Footer />

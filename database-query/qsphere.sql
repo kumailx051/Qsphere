@@ -45,10 +45,6 @@ CREATE TABLE IF NOT EXISTS users (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-ALTER TABLE users ADD COLUMN IF NOT EXISTS "isActive" BOOLEAN DEFAULT TRUE;
-ALTER TABLE users ADD COLUMN IF NOT EXISTS "mustChangePassword" BOOLEAN DEFAULT FALSE;
-ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
-
 CREATE TABLE IF NOT EXISTS pending_registrations (
   "emailAddress" VARCHAR(255) PRIMARY KEY,
   "fullName" VARCHAR(255) NOT NULL,
@@ -91,13 +87,34 @@ CREATE TABLE IF NOT EXISTS blog_comments (
   "blogId" INTEGER NOT NULL REFERENCES blogs(id) ON DELETE CASCADE,
   name VARCHAR(255),
   text TEXT NOT NULL,
+  "updated_at" TIMESTAMPTZ,
+  "parentId" INTEGER REFERENCES blog_comments(id) ON DELETE CASCADE,
+  "commenterEmail" VARCHAR(255),
+  "heartedBy" JSONB DEFAULT '[]'::jsonb,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-ALTER TABLE blog_comments ADD COLUMN IF NOT EXISTS "updated_at" TIMESTAMPTZ;
-ALTER TABLE blog_comments ADD COLUMN IF NOT EXISTS "parentId" INTEGER REFERENCES blog_comments(id) ON DELETE CASCADE;
-ALTER TABLE blog_comments ADD COLUMN IF NOT EXISTS "commenterEmail" VARCHAR(255);
-ALTER TABLE blog_comments ADD COLUMN IF NOT EXISTS "heartedBy" JSONB DEFAULT '[]'::jsonb;
+CREATE TABLE IF NOT EXISTS blog_reports (
+  id SERIAL PRIMARY KEY,
+  "blogId" INTEGER REFERENCES blogs(id) ON DELETE SET NULL,
+  "blogTitle" TEXT NOT NULL,
+  "blogAuthorEmail" VARCHAR(255),
+  "reportedByEmail" VARCHAR(255) REFERENCES users("emailAddress") ON DELETE SET NULL,
+  "reportedByName" VARCHAR(255) NOT NULL,
+  reason VARCHAR(100) NOT NULL,
+  details TEXT,
+  status VARCHAR(30) NOT NULL DEFAULT 'pending',
+  "adminAction" VARCHAR(30) NOT NULL DEFAULT 'none',
+  "adminNote" TEXT,
+  "reviewedAt" TIMESTAMPTZ,
+  "reviewedByEmail" VARCHAR(255) REFERENCES users("emailAddress") ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE ("blogId", "reportedByEmail")
+);
+CREATE INDEX IF NOT EXISTS idx_blog_reports_status ON blog_reports (status);
+CREATE INDEX IF NOT EXISTS idx_blog_reports_blog_id ON blog_reports ("blogId");
+CREATE INDEX IF NOT EXISTS idx_blog_reports_created_at ON blog_reports (created_at DESC);
 
 CREATE TABLE IF NOT EXISTS group_types (
   id SERIAL PRIMARY KEY,
@@ -135,6 +152,7 @@ CREATE TABLE IF NOT EXISTS projects (
   "dueDate" DATE,
   status VARCHAR(50) DEFAULT 'Planning',
   "referenceMaterialUrl" TEXT,
+  "completedAt" TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -159,8 +177,99 @@ CREATE TABLE IF NOT EXISTS task_submissions (
   "fileUrl" TEXT,
   notes TEXT,
   status VARCHAR(50) DEFAULT 'Review',
+  "reviewRemarks" TEXT,
+  "reviewedAt" TIMESTAMPTZ,
+  "reviewedByEmail" VARCHAR(255) REFERENCES users("emailAddress") ON DELETE SET NULL,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+CREATE TABLE IF NOT EXISTS events (
+  id SERIAL PRIMARY KEY,
+  title TEXT NOT NULL,
+  type VARCHAR(100) DEFAULT 'Event',
+  date TIMESTAMPTZ NOT NULL,
+  location TEXT NOT NULL,
+  audience TEXT,
+  deadline DATE,
+  description TEXT,
+  "ownerEmail" VARCHAR(255),
+  "ownerName" VARCHAR(255),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_events_owner_email ON events ("ownerEmail");
+CREATE INDEX IF NOT EXISTS idx_events_date ON events (date);
+
+CREATE TABLE IF NOT EXISTS positions (
+  id SERIAL PRIMARY KEY,
+  title TEXT NOT NULL,
+  type VARCHAR(100) DEFAULT 'Opportunity',
+  location VARCHAR(100),
+  deadline DATE,
+  contact TEXT NOT NULL,
+  requirements TEXT,
+  description TEXT,
+  "ownerEmail" VARCHAR(255),
+  "ownerName" VARCHAR(255),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_positions_owner_email ON positions ("ownerEmail");
+CREATE INDEX IF NOT EXISTS idx_positions_deadline ON positions (deadline);
+
+CREATE TABLE IF NOT EXISTS event_applicants (
+  id SERIAL PRIMARY KEY,
+  "eventId" INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  "fullName" VARCHAR(255) NOT NULL,
+  email VARCHAR(255) NOT NULL,
+  phone VARCHAR(100) NOT NULL,
+  affiliation TEXT NOT NULL,
+  "roleTitle" VARCHAR(255),
+  location VARCHAR(255),
+  "profileUrl" TEXT,
+  expectations TEXT,
+  notes TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE ("eventId", email)
+);
+
+CREATE INDEX IF NOT EXISTS idx_event_applicants_event_id ON event_applicants ("eventId");
+CREATE INDEX IF NOT EXISTS idx_event_applicants_email ON event_applicants (email);
+
+CREATE TABLE IF NOT EXISTS position_applicants (
+  id SERIAL PRIMARY KEY,
+  "positionId" INTEGER NOT NULL REFERENCES positions(id) ON DELETE CASCADE,
+  "fullName" VARCHAR(255) NOT NULL,
+  email VARCHAR(255) NOT NULL,
+  phone VARCHAR(100) NOT NULL,
+  location VARCHAR(255),
+  "currentRole" VARCHAR(255),
+  organization VARCHAR(255),
+  "linkedinUrl" TEXT,
+  "portfolioUrl" TEXT,
+  availability VARCHAR(255),
+  "yearsExperience" VARCHAR(255),
+  skills JSONB DEFAULT '[]'::jsonb,
+  motivation TEXT NOT NULL,
+  "resumeFileName" TEXT,
+  "resumeFileUrl" TEXT,
+  "resumeSummary" TEXT,
+  "resumeAutofillUsed" BOOLEAN DEFAULT FALSE,
+  "decisionStatus" VARCHAR(20) DEFAULT 'pending',
+  "interviewDate" DATE,
+  "interviewTime" VARCHAR(100),
+  "interviewLocation" TEXT,
+  "decisionNote" TEXT,
+  "decisionSentAt" TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE ("positionId", email)
+);
+CREATE INDEX IF NOT EXISTS idx_position_applicants_position_id ON position_applicants ("positionId");
+CREATE INDEX IF NOT EXISTS idx_position_applicants_email ON position_applicants (email);
 
 CREATE TABLE IF NOT EXISTS notifications (
   id SERIAL PRIMARY KEY,
@@ -174,30 +283,31 @@ CREATE TABLE IF NOT EXISTS notifications (
   "groupId" INTEGER REFERENCES groups(id) ON DELETE CASCADE,
   "memberEmail" VARCHAR(255),
   "isRead" BOOLEAN DEFAULT FALSE,
+  "projectId" INTEGER REFERENCES projects(id) ON DELETE CASCADE,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
-
-ALTER TABLE notifications ADD COLUMN IF NOT EXISTS "linkUrl" TEXT;
-ALTER TABLE notifications ADD COLUMN IF NOT EXISTS "blogId" INTEGER REFERENCES blogs(id) ON DELETE CASCADE;
-ALTER TABLE notifications ADD COLUMN IF NOT EXISTS "commentId" INTEGER REFERENCES blog_comments(id) ON DELETE CASCADE;
-ALTER TABLE notifications ADD COLUMN IF NOT EXISTS "groupId" INTEGER REFERENCES groups(id) ON DELETE CASCADE;
-ALTER TABLE notifications ADD COLUMN IF NOT EXISTS "memberEmail" VARCHAR(255);
-ALTER TABLE notifications ADD COLUMN IF NOT EXISTS "isRead" BOOLEAN DEFAULT FALSE;
-ALTER TABLE notifications ADD COLUMN IF NOT EXISTS "projectId" INTEGER REFERENCES projects(id) ON DELETE CASCADE;
 
 CREATE TABLE IF NOT EXISTS project_chat (
   id SERIAL PRIMARY KEY,
   "projectId" INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   "senderEmail" VARCHAR(255),
+  "recipientEmail" VARCHAR(255),
+  "conversationType" VARCHAR(20) DEFAULT 'channel',
   message TEXT NOT NULL,
+  "attachmentUrl" TEXT,
+  "attachmentType" VARCHAR(20),
+  "attachmentName" TEXT,
+  "attachmentMimeType" VARCHAR(255),
+  "attachmentSizeBytes" BIGINT,
+  "editedAt" TIMESTAMPTZ,
+  "editedByEmail" VARCHAR(255),
+  "deletedAt" TIMESTAMPTZ,
+  "deletedByEmail" VARCHAR(255),
+  "deletedForEveryone" BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
-
-ALTER TABLE project_chat ADD COLUMN IF NOT EXISTS "editedAt" TIMESTAMPTZ;
-ALTER TABLE project_chat ADD COLUMN IF NOT EXISTS "editedByEmail" VARCHAR(255);
-ALTER TABLE project_chat ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMPTZ;
-ALTER TABLE project_chat ADD COLUMN IF NOT EXISTS "deletedByEmail" VARCHAR(255);
-ALTER TABLE project_chat ADD COLUMN IF NOT EXISTS "deletedForEveryone" BOOLEAN DEFAULT FALSE;
+CREATE INDEX IF NOT EXISTS idx_project_chat_project_conversation_created ON project_chat ("projectId", "conversationType", created_at);
+CREATE INDEX IF NOT EXISTS idx_project_chat_recipient_email ON project_chat ("recipientEmail");
 
 CREATE TABLE IF NOT EXISTS project_chat_hidden (
   id SERIAL PRIMARY KEY,
@@ -215,15 +325,120 @@ CREATE TABLE IF NOT EXISTS project_chat_reads (
   UNIQUE("messageId", "userEmail")
 );
 
+CREATE TABLE IF NOT EXISTS project_chat_reactions (
+  id SERIAL PRIMARY KEY,
+  "messageId" INTEGER NOT NULL REFERENCES project_chat(id) ON DELETE CASCADE,
+  "userEmail" VARCHAR(255) NOT NULL REFERENCES users("emailAddress") ON DELETE CASCADE,
+  emoji VARCHAR(32) NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE("messageId", "userEmail")
+);
+
+CREATE INDEX IF NOT EXISTS idx_project_chat_reactions_message_id
+  ON project_chat_reactions ("messageId");
+CREATE TABLE IF NOT EXISTS thread_communities (
+  id SERIAL PRIMARY KEY,
+  slug VARCHAR(120) NOT NULL UNIQUE,
+  name VARCHAR(255) NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  color VARCHAR(32) NOT NULL DEFAULT '#2EC58A',
+  "createdByEmail" VARCHAR(255) REFERENCES users("emailAddress") ON DELETE SET NULL,
+  "isDefault" BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Threads / Q&A tables (Reddit-style discussion)
+CREATE TABLE IF NOT EXISTS threads (
+  id SERIAL PRIMARY KEY,
+  title TEXT NOT NULL,
+  body TEXT NOT NULL DEFAULT '',
+  "authorEmail" VARCHAR(255) NOT NULL REFERENCES users("emailAddress") ON DELETE CASCADE,
+  "authorName" VARCHAR(255) NOT NULL DEFAULT '',
+  tags TEXT DEFAULT '',
+  "communitySlug" VARCHAR(120) NOT NULL DEFAULT 'general-questions' REFERENCES thread_communities(slug) ON DELETE RESTRICT,
+  "upvoteCount" INTEGER DEFAULT 0,
+  "downvoteCount" INTEGER DEFAULT 0,
+  "replyCount" INTEGER DEFAULT 0,
+  "isPinned" BOOLEAN DEFAULT FALSE,
+  "isLocked" BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "deletedAt" TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_threads_author_email ON threads ("authorEmail");
+CREATE INDEX IF NOT EXISTS idx_threads_created_at ON threads (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_threads_upvote_count ON threads ("upvoteCount" DESC);
+
+CREATE TABLE IF NOT EXISTS thread_votes (
+  id SERIAL PRIMARY KEY,
+  "threadId" INTEGER NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
+  "userEmail" VARCHAR(255) NOT NULL REFERENCES users("emailAddress") ON DELETE CASCADE,
+  value SMALLINT NOT NULL CHECK (value IN (1, -1)),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE ("threadId", "userEmail")
+);
+
+CREATE INDEX IF NOT EXISTS idx_thread_votes_thread_id ON thread_votes ("threadId");
+
+CREATE TABLE IF NOT EXISTS thread_replies (
+  id SERIAL PRIMARY KEY,
+  "threadId" INTEGER NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
+  "parentId" INTEGER REFERENCES thread_replies(id) ON DELETE CASCADE,
+  body TEXT NOT NULL,
+  "authorEmail" VARCHAR(255) NOT NULL REFERENCES users("emailAddress") ON DELETE CASCADE,
+  "authorName" VARCHAR(255) NOT NULL DEFAULT '',
+  "upvoteCount" INTEGER DEFAULT 0,
+  "downvoteCount" INTEGER DEFAULT 0,
+  "isAcceptedAnswer" BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "deletedAt" TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_thread_replies_thread_id ON thread_replies ("threadId");
+CREATE INDEX IF NOT EXISTS idx_thread_replies_parent_id ON thread_replies ("parentId");
+
+CREATE TABLE IF NOT EXISTS thread_reply_votes (
+  id SERIAL PRIMARY KEY,
+  "replyId" INTEGER NOT NULL REFERENCES thread_replies(id) ON DELETE CASCADE,
+  "userEmail" VARCHAR(255) NOT NULL REFERENCES users("emailAddress") ON DELETE CASCADE,
+  value SMALLINT NOT NULL CHECK (value IN (1, -1)),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE ("replyId", "userEmail")
+);
+
+CREATE INDEX IF NOT EXISTS idx_thread_reply_votes_reply_id ON thread_reply_votes ("replyId");
+
+INSERT INTO thread_communities (slug, name, description, color, "isDefault")
+VALUES
+  ('general-questions', 'General Questions', 'Ask broad questions and get help from the QSphere community.', '#2EC58A', TRUE),
+  ('quantum-basics', 'Quantum Basics', 'Foundational questions around quantum mechanics and entry-level learning.', '#22c55e', TRUE),
+  ('algorithms', 'Algorithms', 'Discuss quantum algorithms, complexity, and problem-solving strategies.', '#6366f1', TRUE),
+  ('hardware', 'Hardware', 'Talk about devices, qubits, control systems, and physical implementations.', '#06b6d4', TRUE),
+  ('careers', 'Careers', 'Ask about internships, jobs, applications, resumes, and research pathways.', '#f59e0b', TRUE),
+  ('research-showcase', 'Research Showcase', 'Share experiments, findings, and active research progress.', '#ec4899', TRUE)
+ON CONFLICT (slug) DO NOTHING;
+
+CREATE INDEX IF NOT EXISTS idx_threads_community_slug ON threads ("communitySlug");
+
 -- Admin user bootstrap
--- Change the name, email, and password below before running this query.
+-- Change the values below before running this query to create a real admin account.
+-- Replace 'QSphere Administrator' with the real admin name.
+-- Replace 'admin@qsphere.com' in BOTH places below with the real admin email.
+-- Replace 'ChangeMe123!' with a temporary password the admin will use for first login.
+-- The admin will receive an OTP on that email, verify it, then be forced to set a new password.
+-- If that email already belongs to a normal user account, use a different email instead.
 -- pgcrypto is used to produce the SHA-256 password format expected by the backend.
 -- The first successful login sends an OTP and then forces a new password.
 -- If this email already belongs to a regular user, the query stops instead of
 -- silently converting that account into an administrator.
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
-ALTER TABLE users ADD COLUMN IF NOT EXISTS "mustChangePassword" BOOLEAN DEFAULT FALSE;
 
 DO $$
 BEGIN
