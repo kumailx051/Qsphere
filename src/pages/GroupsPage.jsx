@@ -55,6 +55,11 @@ const GroupsPage = () => {
   const navigate = useNavigate()
   const currentUserEmail = readCurrentUserEmail()
 
+  const profile = useMemo(() => {
+    try { return JSON.parse(localStorage.getItem('qsphere_onboarding_profile') || '{}') } catch { return {} }
+  }, [])
+  const isStudent = String(profile.role || '').toLowerCase() === 'student'
+
   useEffect(() => {
     let isCancelled = false
 
@@ -243,15 +248,17 @@ const GroupsPage = () => {
                 </p>
 
                 <div className="mt-8 flex flex-wrap gap-4">
-                  <button
-                    type="button"
-                    onClick={() => navigate('/groups/new')}
-                    className="inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold transition-all"
-                    style={{ border: `1px solid ${isDayMode ? 'transparent' : palette.btnPrimaryBorder}`, backgroundColor: palette.btnPrimaryBg, color: palette.btnPrimaryText, boxShadow: isDayMode ? '0 20px 45px rgba(30,158,107,0.18)' : 'none' }}
-                  >
-                    Create a group
-                    <ArrowUpRight size={16} />
-                  </button>
+                  {!isStudent ? (
+                    <button
+                      type="button"
+                      onClick={() => navigate('/groups/new')}
+                      className="inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold transition-all"
+                      style={{ border: `1px solid ${isDayMode ? 'transparent' : palette.btnPrimaryBorder}`, backgroundColor: palette.btnPrimaryBg, color: palette.btnPrimaryText, boxShadow: isDayMode ? '0 20px 45px rgba(30,158,107,0.18)' : 'none' }}
+                    >
+                      Create a group
+                      <ArrowUpRight size={16} />
+                    </button>
+                  ) : null}
                   <a
                     href="#group-grid"
                     className="inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold no-underline transition-all"
@@ -383,15 +390,17 @@ const GroupsPage = () => {
               <p className="max-w-xl text-sm leading-7" style={{ color: palette.textSecondary }}>
                 Turn more filters back on or create a fresh research space to start building the network you want to see.
               </p>
-              <button
-                type="button"
-                onClick={() => navigate('/groups/new')}
-                className="mt-8 inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold transition-all"
-                style={{ border: `1px solid ${isDayMode ? 'transparent' : palette.btnPrimaryBorder}`, backgroundColor: palette.btnPrimaryBg, color: palette.btnPrimaryText, boxShadow: isDayMode ? '0 20px 45px rgba(30,158,107,0.18)' : 'none' }}
-              >
-                Create a group
-                <ArrowUpRight size={16} />
-              </button>
+              {!isStudent ? (
+                <button
+                  type="button"
+                  onClick={() => navigate('/groups/new')}
+                  className="mt-8 inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold transition-all"
+                  style={{ border: `1px solid ${isDayMode ? 'transparent' : palette.btnPrimaryBorder}`, backgroundColor: palette.btnPrimaryBg, color: palette.btnPrimaryText, boxShadow: isDayMode ? '0 20px 45px rgba(30,158,107,0.18)' : 'none' }}
+                >
+                  Create a group
+                  <ArrowUpRight size={16} />
+                </button>
+              ) : null}
             </motion.section>
           ) : (
             <motion.section

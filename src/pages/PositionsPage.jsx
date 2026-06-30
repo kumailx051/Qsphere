@@ -112,6 +112,11 @@ const PositionsPage = () => {
   const isDayMode = theme === 'light'
   const palette = isDayMode ? dayTheme : darkTheme
 
+  const profile = useMemo(() => {
+    try { return JSON.parse(localStorage.getItem('qsphere_onboarding_profile') || '{}') } catch { return {} }
+  }, [])
+  const isStudent = String(profile.role || '').toLowerCase() === 'student'
+
   const [positions, setPositions] = useState([])
   const [loading, setLoading] = useState(true)
   const [positionTab, setPositionTab] = useState('active')
@@ -234,14 +239,16 @@ const PositionsPage = () => {
                 </p>
 
                 <div className="mt-8 flex flex-wrap gap-4">
-                  <Link
-                    to="/positions/new"
-                    className="inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold no-underline transition-all"
-                    style={{ border: `1px solid ${isDayMode ? 'transparent' : palette.btnPrimaryBorder}`, backgroundColor: palette.btnPrimaryBg, color: palette.btnPrimaryText, boxShadow: isDayMode ? '0 20px 45px rgba(30,158,107,0.18)' : 'none' }}
-                  >
-                    Post an opening
-                    <ArrowUpRight size={16} />
-                  </Link>
+                  {!isStudent ? (
+                    <Link
+                      to="/positions/new"
+                      className="inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold no-underline transition-all"
+                      style={{ border: `1px solid ${isDayMode ? 'transparent' : palette.btnPrimaryBorder}`, backgroundColor: palette.btnPrimaryBg, color: palette.btnPrimaryText, boxShadow: isDayMode ? '0 20px 45px rgba(30,158,107,0.18)' : 'none' }}
+                    >
+                      Post an opening
+                      <ArrowUpRight size={16} />
+                    </Link>
+                  ) : null}
                   <a
                     href="#position-grid"
                     className="inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold no-underline transition-all"
@@ -329,37 +336,7 @@ const PositionsPage = () => {
                   </h2>
                 </div>
 
-                <div className="flex flex-wrap gap-3">
-                  {[
-                    { key: 'active', label: 'Live', count: sortedActivePositions.length },
-                    { key: 'archived', label: 'Archived', count: sortedArchivedPositions.length },
-                  ].map((tab) => {
-                    const activeTab = positionTab === tab.key
 
-                    return (
-                      <button
-                        key={tab.key}
-                        type="button"
-                        onClick={() => setPositionTab(tab.key)}
-                        className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold transition-all"
-                        style={{
-                          border: `1px solid ${activeTab ? palette.accentBorder : palette.borderPrimary}`,
-                          backgroundColor: activeTab
-                            ? palette.accentSoft
-                            : isDayMode
-                              ? 'rgba(255,255,255,0.82)'
-                              : 'rgba(255,255,255,0.03)',
-                          color: activeTab ? palette.accentPrimary : palette.textSecondary,
-                        }}
-                      >
-                        {tab.label}
-                        <span className="inline-flex min-w-[22px] items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ backgroundColor: activeTab ? 'rgba(255,255,255,0.78)' : palette.accentSoft, color: activeTab ? palette.textPrimary : palette.accentPrimary }}>
-                          {tab.count}
-                        </span>
-                      </button>
-                    )
-                  })}
-                </div>
               </div>
 
               <motion.div

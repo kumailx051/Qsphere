@@ -123,6 +123,11 @@ const EventsPage = () => {
   const glowY1 = useTransform(scrollY, [0, 500], [0, -60])
   const glowY2 = useTransform(scrollY, [0, 500], [0, -30])
 
+  const profile = useMemo(() => {
+    try { return JSON.parse(localStorage.getItem('qsphere_onboarding_profile') || '{}') } catch { return {} }
+  }, [])
+  const isStudent = String(profile.role || '').toLowerCase() === 'student'
+
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
   const [eventTab, setEventTab] = useState('active')
@@ -240,14 +245,16 @@ const EventsPage = () => {
                 </p>
 
                 <div className="mt-8 flex flex-wrap gap-4">
-                  <Link
-                    to="/events/new"
-                    className="inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold no-underline transition-all"
-                    style={{ border: `1px solid ${isDayMode ? 'transparent' : palette.btnPrimaryBorder}`, backgroundColor: palette.btnPrimaryBg, color: palette.btnPrimaryText, boxShadow: isDayMode ? '0 20px 45px rgba(30,158,107,0.18)' : 'none' }}
-                  >
-                    Launch an event
-                    <ArrowUpRight size={16} />
-                  </Link>
+                  {!isStudent ? (
+                    <Link
+                      to="/events/new"
+                      className="inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold no-underline transition-all"
+                      style={{ border: `1px solid ${isDayMode ? 'transparent' : palette.btnPrimaryBorder}`, backgroundColor: palette.btnPrimaryBg, color: palette.btnPrimaryText, boxShadow: isDayMode ? '0 20px 45px rgba(30,158,107,0.18)' : 'none' }}
+                    >
+                      Launch an event
+                      <ArrowUpRight size={16} />
+                    </Link>
+                  ) : null}
                   <a
                     href="#event-grid"
                     className="inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold no-underline transition-all"

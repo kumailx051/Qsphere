@@ -66,6 +66,15 @@ const CreateGroupPage = () => {
       return
     }
 
+    try {
+      const profile = JSON.parse(localStorage.getItem('qsphere_onboarding_profile') || '{}')
+      if (String(profile.role || '').toLowerCase() === 'student') {
+        window.dispatchEvent(new CustomEvent('qsphere-snackbar', { detail: { message: 'Students are not allowed to create groups.', type: 'error' } }))
+        navigate('/groups')
+        return
+      }
+    } catch {}
+
     fetch('/api/group-types')
       .then(res => res.json())
       .then(data => {

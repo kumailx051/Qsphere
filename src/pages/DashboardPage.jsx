@@ -574,7 +574,7 @@ const DashboardPage = () => {
                   to: '/blogs/new',
                   accent: isDayMode ? 'rgba(46,197,138,0.10)' : 'rgba(16,185,129,0.14)',
                 },
-                {
+                !isStudentRole && {
                   icon: Users2,
                   title: 'Create a group',
                   description: 'Open a focused collaboration room for research, members, and delivery around a shared objective.',

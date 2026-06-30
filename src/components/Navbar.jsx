@@ -142,6 +142,7 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
 
   const isLoggedIn = !!profile
   const isAdmin = String(profile?.role || '').toLowerCase() === 'admin'
+  const isStudent = String(profile?.role || '').toLowerCase() === 'student'
   const profileAvatar = getProfileAvatar(profile)
   const profileEmail = getProfileEmail(profile)
   const unreadNotifications = notifications.filter((item) => item.unread).length
@@ -668,9 +669,9 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
       {/* Desktop + Tablet Navbar */}
       <div className="fixed left-0 right-0 top-0 z-50 pointer-events-none">
         <div className="pointer-events-auto mx-auto w-full max-w-[90rem] px-6 pt-6">
-          <div ref={homeNavFrameRef} className="qs-nav-shell flex items-center justify-between rounded-full border border-emerald-400/35 bg-black/70 px-5 py-3.5 backdrop-blur-2xl shadow-[0_0_36px_rgba(16,185,129,0.28)]">
+          <div ref={homeNavFrameRef} className="qs-nav-shell flex items-center justify-between rounded-full border border-emerald-400/35 bg-black/70 px-6 py-4 backdrop-blur-2xl shadow-[0_0_36px_rgba(16,185,129,0.28)]">
             {/* Logo */}
-            <div className="flex items-center">
+            <div className="flex items-center flex-shrink-0">
               <div
                 ref={homeBrandRef}
                 className="qs-nav-brand text-[1.35rem] font-bold leading-none transition-opacity duration-200"
@@ -682,7 +683,7 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
             </div>
 
             {/* Desktop Navigation */}
-            <nav className={`type-navText hidden md:flex items-center ${isAdmin ? 'gap-6' : 'gap-10'}`}>
+            <nav className={`type-navText hidden md:flex flex-1 items-center justify-center gap-8`}>
               <Link to="/" className={navItemClassName(isHomePage)}>
                 Home
                 {isHomePage && (
@@ -769,7 +770,7 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
                     <span className="absolute -bottom-2 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
                   )}
                 </Link>
-                {isLoggedIn && !isAdmin ? (
+                {isLoggedIn && !isAdmin && !isStudent ? (
                   <div
                     className={`${submenuClassName} ${groupsMenuOpen ? 'opacity-100 scale-100 pointer-events-auto' : 'opacity-0 scale-95 pointer-events-none'}`}
                     onMouseEnter={() => clearHoverCloseTimer()}
@@ -826,7 +827,7 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
             </nav>
 
             {/* CTA / Profile Avatar + Menu Button */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-shrink-0">
               {isLoggedIn ? (
                 /* ── Logged-in: Profile Avatar with hover dropdown ── */
                 <div className="flex items-center gap-2">

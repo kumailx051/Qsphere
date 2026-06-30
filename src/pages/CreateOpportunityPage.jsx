@@ -101,6 +101,12 @@ const CreateOpportunityPage = () => {
       navigate('/auth', { state: { redirectTo: location.pathname } })
       return
     }
+
+    const profile = readStoredProfile()
+    if (String(profile?.role || '').toLowerCase() === 'student') {
+      window.dispatchEvent(new CustomEvent('qsphere-snackbar', { detail: { message: 'Students are not allowed to create events or positions.', type: 'error' } }))
+      navigate('/dashboard')
+    }
   }, [navigate, location.pathname])
 
   useEffect(() => {
