@@ -6,6 +6,9 @@ import {
   chat,
   groupDescription,
   groupTitle,
+  providerConnect,
+  providerDisconnect,
+  providerStatus,
   projectDescription,
   text,
   titles,
@@ -14,6 +17,9 @@ import {
 
 const router = Router()
 
+router.get('/providers/status', providerStatus)
+router.post('/providers/connect', providerConnect)
+router.delete('/providers/:provider', providerDisconnect)
 router.post('/generate-topic', topic)
 router.post('/optimize-group-title', groupTitle)
 router.post('/generate-group-description', groupDescription)

@@ -116,6 +116,28 @@ CREATE INDEX IF NOT EXISTS idx_blog_reports_status ON blog_reports (status);
 CREATE INDEX IF NOT EXISTS idx_blog_reports_blog_id ON blog_reports ("blogId");
 CREATE INDEX IF NOT EXISTS idx_blog_reports_created_at ON blog_reports (created_at DESC);
 
+CREATE TABLE IF NOT EXISTS font_settings (
+  id SERIAL PRIMARY KEY,
+  "fontFamily" VARCHAR(100) NOT NULL DEFAULT 'default',
+  "sizeScales" JSONB NOT NULL DEFAULT '{}',
+  "updatedBy" VARCHAR(255),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_font_settings_updated_by ON font_settings ("updatedBy");
+
+CREATE TABLE IF NOT EXISTS font_templates (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(120) NOT NULL UNIQUE,
+  "fontFamily" VARCHAR(100) NOT NULL DEFAULT 'default',
+  "sizeScales" JSONB NOT NULL DEFAULT '{}',
+  "createdBy" VARCHAR(255),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_font_templates_created_by ON font_templates ("createdBy");
+
 CREATE TABLE IF NOT EXISTS group_types (
   id SERIAL PRIMARY KEY,
   name VARCHAR(255) UNIQUE NOT NULL,
@@ -425,6 +447,21 @@ VALUES
 ON CONFLICT (slug) DO NOTHING;
 
 CREATE INDEX IF NOT EXISTS idx_threads_community_slug ON threads ("communitySlug");
+
+CREATE TABLE IF NOT EXISTS user_ai_connections (
+  id SERIAL PRIMARY KEY,
+  "userEmail" VARCHAR(255) NOT NULL REFERENCES users("emailAddress") ON DELETE CASCADE,
+  provider VARCHAR(50) NOT NULL,
+  "apiKey" TEXT NOT NULL,
+  model VARCHAR(255) NOT NULL,
+  "isActive" BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE ("userEmail", provider)
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_ai_connections_user_email
+  ON user_ai_connections ("userEmail");
 
 -- Admin user bootstrap
 -- Change the values below before running this query to create a real admin account.

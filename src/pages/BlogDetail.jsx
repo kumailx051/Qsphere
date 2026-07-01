@@ -1226,7 +1226,7 @@ export default function BlogDetail() {
                             <div className="flex flex-1 flex-col p-5">
                               <div className="text-[10px] font-semibold uppercase tracking-[0.32em]" style={{ color: palette.accentPrimary }}>{item.category}</div>
                               <h5 className="type-cardHeading mt-3 transition group-hover:opacity-80" style={{ color: palette.textPrimary, fontFamily: 'var(--font-heading)' }}>{item.title}</h5>
-                              <p className="mt-3 line-clamp-4 text-sm leading-6" style={{ color: palette.textSecondary }}>{item.excerpt}</p>
+                              <p className="type-cardBody mt-3 line-clamp-4" style={{ color: palette.textSecondary }}>{item.excerpt}</p>
                               <div className="mt-4 inline-flex items-center gap-2 text-sm font-semibold transition-all group-hover:gap-3 group-hover:brightness-125" style={{ color: palette.accentPrimary }}>
                                 Read article
                                 <ArrowUpRight size={15} />

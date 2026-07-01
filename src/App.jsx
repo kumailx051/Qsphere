@@ -31,6 +31,7 @@ import AdminDashboardPage from './pages/admin/AdminDashboardPage'
 import AdminBlogManagementPage from './pages/admin/AdminBlogManagementPage'
 import AdminUsersPage from './pages/admin/AdminUsersPage'
 import AdminUserDetailPage from './pages/admin/AdminUserDetailPage'
+import FontManagementPage from './pages/admin/FontManagementPage'
 
 import ScrollToTop from './components/ScrollToTop'
 import GlobalSnackbar from './components/GlobalSnackbar'
@@ -126,6 +127,7 @@ function App() {
               <Route path="/admin/blog-management" element={<AdminGuard><AdminBlogManagementPage /></AdminGuard>} />
               <Route path="/admin/users" element={<AdminGuard><AdminUsersPage /></AdminGuard>} />
               <Route path="/admin/users/:id" element={<AdminGuard><AdminUserDetailPage /></AdminGuard>} />
+              <Route path="/admin/font-management" element={<AdminGuard><FontManagementPage /></AdminGuard>} />
               <Route path="*" element={<NotFoundPage />} />
             </Routes>
           </AuthProvider>

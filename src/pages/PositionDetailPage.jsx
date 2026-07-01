@@ -1186,7 +1186,7 @@ export default function PositionDetailPage() {
                           {item.type}
                         </span>
                       </div>
-                      <p className="mt-4 line-clamp-3 text-sm leading-7" style={{ color: palette.textSecondary }}>{item.description}</p>
+                      <p className="type-cardBody mt-4 line-clamp-3" style={{ color: palette.textSecondary }}>{item.description}</p>
                       <div className="mt-6 flex items-center justify-between border-t pt-4 text-sm" style={{ borderColor: palette.borderPrimary, color: palette.textMuted }}>
                         <span>{itemDeadline.closed ? 'Closed' : itemDeadline.label}</span>
                         <span className="inline-flex items-center gap-2 font-semibold transition-all group-hover:gap-3 group-hover:brightness-125" style={{ color: palette.accentPrimary }}>

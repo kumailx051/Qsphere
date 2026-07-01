@@ -278,10 +278,10 @@ h6 {
 
 .type-statValue {
   font-family: var(--font-heading);
-  font-size: var(--type-cardHeading-size);
-  line-height: var(--type-cardHeading-lineHeight);
-  letter-spacing: var(--type-cardHeading-letterSpacing);
-  font-weight: var(--type-cardHeading-weight);
+  font-size: var(--type-statValue-size);
+  line-height: var(--type-statValue-lineHeight);
+  letter-spacing: var(--type-statValue-letterSpacing);
+  font-weight: var(--type-statValue-weight);
 }
 
 .type-displayNumber {
@@ -333,24 +333,4 @@ h6 {
   line-height: var(--type-tinyText-lineHeight);
   letter-spacing: var(--type-tinyText-letterSpacing);
   font-weight: var(--type-tinyText-weight);
-}
-
-.text-\[10px\] {
-  font-size: var(--type-microText-size) !important;
-  line-height: var(--type-microText-lineHeight) !important;
-}
-
-.text-\[11px\] {
-  font-size: var(--type-metaText-size) !important;
-  line-height: var(--type-metaText-lineHeight) !important;
-}
-
-.text-\[12px\] {
-  font-size: var(--type-helperText-size) !important;
-  line-height: var(--type-helperText-lineHeight) !important;
-}
-
-.text-\[13px\] {
-  font-size: var(--type-uiText-size) !important;
-  line-height: var(--type-uiText-lineHeight) !important;
 }

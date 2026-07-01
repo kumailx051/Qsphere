@@ -327,7 +327,7 @@ const BlogPage = () => {
 
                   <div className="relative p-7 md:p-10 xl:p-12">
                     <span className="inline-flex items-center rounded-full px-4 py-2 text-[11px] font-extrabold uppercase tracking-[0.28em]" style={{ backgroundColor: palette.accentPrimary, color: '#ffffff', boxShadow: isDayMode ? '0 10px 25px -5px rgba(16,185,129,0.3)' : '0 0 22px rgba(16,185,129,0.35)' }}>Featured Article</span>
-                    <h2 className="mt-5 max-w-3xl type-sectionHeading transition-colors duration-300" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
+                    <h2 className="mt-5 max-w-3xl type-cardHeading transition-colors duration-300" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
                       {featuredPost.title}
                     </h2>
 
@@ -342,7 +342,7 @@ const BlogPage = () => {
                       </span>
                     </div>
 
-                    <p className="mt-7 max-w-2xl text-base leading-8" style={{ color: palette.textSecondary }}>
+                    <p className="type-cardBody mt-7 max-w-2xl" style={{ color: palette.textSecondary }}>
                       {featuredPost.excerpt}
                     </p>
 
@@ -451,13 +451,13 @@ const BlogPage = () => {
                   </div>
 
                   <h3 
-                    className="type-statValue mb-4 transition-colors duration-300"
+                    className="type-cardHeading mb-4 transition-colors duration-300"
                     style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}
                   >
                     {post.title}
                   </h3>
 
-                  <p className="text-sm leading-7 mb-8 flex-grow line-clamp-4" style={{ color: palette.textSecondary }}>
+                  <p className="type-cardBody mb-8 flex-grow line-clamp-4" style={{ color: palette.textSecondary }}>
                     {post.excerpt}
                   </p>
 

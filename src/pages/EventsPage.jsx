@@ -425,12 +425,12 @@ const EventsPage = () => {
                         </div>
                       </div>
 
-                      <h3 className="type-statValue mb-3 transition-colors duration-300 group-hover:text-emerald-400" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
+                      <h3 className="type-cardHeading mb-3 transition-colors duration-300 group-hover:text-emerald-400" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
                         {event.title}
                       </h3>
 
                       {event.description && (
-                        <p className="text-sm leading-7 mb-6 flex-1 line-clamp-3" style={{ color: palette.textSecondary }}>
+                        <p className="type-cardBody mb-6 flex-1 line-clamp-3" style={{ color: palette.textSecondary }}>
                           {event.description}
                         </p>
                       )}

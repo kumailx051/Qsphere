@@ -473,7 +473,7 @@ const HomePage = () => {
                 <h2
                   className="text-white font-bold leading-[0.95] tracking-tight"
                   style={{
-                    fontSize: 'clamp(2.8rem, 6.5vw, 6.5rem)',
+                    fontSize: 'var(--type-heroHeading-size)',
                     fontFamily: 'var(--font-heading)',
                     lineHeight: 'var(--type-heading-lineHeight)',
                     letterSpacing: 'var(--type-heading-letterSpacing)',

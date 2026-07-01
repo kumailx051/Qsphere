@@ -387,12 +387,12 @@ const PositionsPage = () => {
                         </span>
                       </div>
 
-                      <h3 className="type-statValue mb-3 transition-colors duration-300" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
+                      <h3 className="type-cardHeading mb-3 transition-colors duration-300" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
                         {pos.title}
                       </h3>
 
                       {pos.description && (
-                        <p className="text-sm leading-7 mb-5 flex-1 line-clamp-3" style={{ color: palette.textSecondary }}>
+                        <p className="type-cardBody mb-5 flex-1 line-clamp-3" style={{ color: palette.textSecondary }}>
                           {pos.description}
                         </p>
                       )}

@@ -1,31 +1,223 @@
-import { openRouterModel } from '../config.js'
+import pool from '../db.js'
+import {
+  openCodeEndpoint,
+  openCodeModel,
+  openRouterEndpoint,
+  openRouterModel,
+} from '../config.js'
 import { createHttpError } from '../utils/errors.js'
 
-const requestOpenRouter = async (messages) => {
-  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+const providerCatalog = {
+  openrouter: {
+    id: 'openrouter',
+    label: 'OpenRouter',
+    endpoint: openRouterEndpoint,
+    model: openRouterModel,
+    guideUrl: 'https://openrouter.ai/',
+    guideSteps: [
+      'Open the OpenRouter website.',
+      'Create an account or sign in.',
+      'Generate an API key from your dashboard.',
+      'Paste the key into Qubi to start using GPT OSS.',
+    ],
+  },
+  opencode: {
+    id: 'opencode',
+    label: 'OpenCode',
+    endpoint: openCodeEndpoint,
+    model: openCodeModel,
+    guideUrl: 'https://opencode.ai/zen',
+    guideSteps: [
+      'Open the OpenCode Zen page.',
+      'Sign in and create your API key.',
+      'Paste the key into Qubi to enable DeepSeek V4 Flash Free.',
+    ],
+  },
+}
+
+const sanitizeConnection = (row) => ({
+  id: row.id,
+  provider: row.provider,
+  label: providerCatalog[row.provider]?.label || row.provider,
+  model: row.model,
+  isActive: row.isActive === true,
+  created_at: row.created_at,
+  updated_at: row.updated_at,
+})
+
+const getUserConnections = async (emailAddress) => {
+  const result = await pool.query(
+    `SELECT id, provider, model, "isActive", created_at, updated_at
+     FROM user_ai_connections
+     WHERE "userEmail" = $1
+     ORDER BY provider ASC`,
+    [emailAddress],
+  )
+
+  return result.rows.map(sanitizeConnection)
+}
+
+const getActiveConnectionRow = async (emailAddress) => {
+  const result = await pool.query(
+    `SELECT *
+     FROM user_ai_connections
+     WHERE "userEmail" = $1 AND "isActive" = TRUE
+     ORDER BY updated_at DESC
+     LIMIT 1`,
+    [emailAddress],
+  )
+
+  return result.rows[0] || null
+}
+
+const getProviderDefinition = (provider) => {
+  const normalized = String(provider || '').trim().toLowerCase()
+  const definition = providerCatalog[normalized]
+  if (!definition) {
+    throw createHttpError(400, 'Unsupported AI provider')
+  }
+
+  return definition
+}
+
+const requestProviderCompletion = async ({ provider, apiKey, model, messages }) => {
+  const providerDefinition = getProviderDefinition(provider)
+
+  const response = await fetch(providerDefinition.endpoint, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+      Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: openRouterModel,
+      model,
       messages,
     }),
   })
 
-  const data = await response.json()
+  const data = await response.json().catch(() => ({}))
+
   if (!response.ok) {
-    throw createHttpError(500, data.error?.message || 'Failed to fetch from OpenRouter')
+    throw createHttpError(
+      response.status === 401 ? 401 : 500,
+      data.error?.message || `Failed to connect to ${providerDefinition.label}`,
+    )
   }
 
-  return data.choices[0].message.content.trim()
+  const content = data?.choices?.[0]?.message?.content
+  if (!content) {
+    throw createHttpError(500, `${providerDefinition.label} returned an empty response`)
+  }
+
+  return String(content).trim()
 }
 
-export const generateTopic = async ({ topic }) => {
+const getAiConnectionOrThrow = async (user) => {
+  if (!user?.emailAddress) {
+    throw createHttpError(401, 'Not authenticated')
+  }
+
+  const connection = await getActiveConnectionRow(user.emailAddress)
+  if (!connection) {
+    throw createHttpError(428, 'Please connect your AI API to use Qubi')
+  }
+
+  return connection
+}
+
+const runAiPrompt = async (user, messages) => {
+  const connection = await getAiConnectionOrThrow(user)
+
+  return requestProviderCompletion({
+    provider: connection.provider,
+    apiKey: connection.apiKey,
+    model: connection.model,
+    messages,
+  })
+}
+
+export const getAiProviderStatus = async (user) => {
+  if (!user?.emailAddress) throw createHttpError(401, 'Not authenticated')
+
+  const connections = await getUserConnections(user.emailAddress)
+  const activeConnection = connections.find((item) => item.isActive) || null
+
+  return {
+    activeProvider: activeConnection?.provider || null,
+    currentModel: activeConnection?.model || null,
+    providers: Object.values(providerCatalog).map((provider) => {
+      const existing = connections.find((item) => item.provider === provider.id)
+      return {
+        id: provider.id,
+        label: provider.label,
+        model: provider.model,
+        guideUrl: provider.guideUrl,
+        guideSteps: provider.guideSteps,
+        isConnected: !!existing,
+        isActive: existing?.isActive === true,
+      }
+    }),
+  }
+}
+
+export const connectAiProvider = async (user, { provider, apiKey }) => {
+  if (!user?.emailAddress) throw createHttpError(401, 'Not authenticated')
+  if (!apiKey || String(apiKey).trim().length < 8) {
+    throw createHttpError(400, 'Please provide a valid API key')
+  }
+
+  const definition = getProviderDefinition(provider)
+  const normalizedKey = String(apiKey).trim()
+  const client = await pool.connect()
+
+  try {
+    await client.query('BEGIN')
+    await client.query(
+      `UPDATE user_ai_connections
+       SET "isActive" = FALSE, updated_at = NOW()
+       WHERE "userEmail" = $1`,
+      [user.emailAddress],
+    )
+
+    await client.query(
+      `INSERT INTO user_ai_connections ("userEmail", provider, "apiKey", model, "isActive", updated_at)
+       VALUES ($1, $2, $3, $4, TRUE, NOW())
+       ON CONFLICT ("userEmail", provider) DO UPDATE SET
+         "apiKey" = EXCLUDED."apiKey",
+         model = EXCLUDED.model,
+         "isActive" = TRUE,
+         updated_at = NOW()`,
+      [user.emailAddress, definition.id, normalizedKey, definition.model],
+    )
+
+    await client.query('COMMIT')
+  } catch (error) {
+    await client.query('ROLLBACK')
+    throw error
+  } finally {
+    client.release()
+  }
+
+  return getAiProviderStatus(user)
+}
+
+export const disconnectAiProvider = async (user, provider) => {
+  if (!user?.emailAddress) throw createHttpError(401, 'Not authenticated')
+
+  const definition = getProviderDefinition(provider)
+  await pool.query(
+    `DELETE FROM user_ai_connections
+     WHERE "userEmail" = $1 AND provider = $2`,
+    [user.emailAddress, definition.id],
+  )
+
+  return getAiProviderStatus(user)
+}
+
+export const generateTopic = async (user, { topic }) => {
   if (!topic) throw createHttpError(400, 'Topic is required')
   return {
-    topic: await requestOpenRouter([
+    topic: await runAiPrompt(user, [
       {
         role: 'system',
         content:
@@ -36,10 +228,10 @@ export const generateTopic = async ({ topic }) => {
   }
 }
 
-export const optimizeGroupTitle = async ({ title }) => {
+export const optimizeGroupTitle = async (user, { title }) => {
   if (!title) throw createHttpError(400, 'Title is required')
   return {
-    optimized: await requestOpenRouter([
+    optimized: await runAiPrompt(user, [
       {
         role: 'system',
         content:
@@ -50,10 +242,10 @@ export const optimizeGroupTitle = async ({ title }) => {
   }
 }
 
-export const generateGroupDescription = async ({ title }) => {
+export const generateGroupDescription = async (user, { title }) => {
   if (!title) throw createHttpError(400, 'Title is required')
   return {
-    description: await requestOpenRouter([
+    description: await runAiPrompt(user, [
       {
         role: 'system',
         content:
@@ -64,10 +256,10 @@ export const generateGroupDescription = async ({ title }) => {
   }
 }
 
-export const generateBlogExcerpt = async ({ title, content }) => {
+export const generateBlogExcerpt = async (user, { title, content }) => {
   if (!title) throw createHttpError(400, 'Title is required')
   return {
-    excerpt: await requestOpenRouter([
+    excerpt: await runAiPrompt(user, [
       {
         role: 'system',
         content:
@@ -78,10 +270,10 @@ export const generateBlogExcerpt = async ({ title, content }) => {
   }
 }
 
-export const generateBlogContent = async ({ title }) => {
+export const generateBlogContent = async (user, { title }) => {
   if (!title) throw createHttpError(400, 'Title is required')
   return {
-    content: await requestOpenRouter([
+    content: await runAiPrompt(user, [
       {
         role: 'system',
         content:
@@ -92,10 +284,10 @@ export const generateBlogContent = async ({ title }) => {
   }
 }
 
-export const suggestProjectDescription = async ({ title }) => {
+export const suggestProjectDescription = async (user, { title }) => {
   if (!title) throw createHttpError(400, 'Title is required')
   return {
-    description: await requestOpenRouter([
+    description: await runAiPrompt(user, [
       {
         role: 'system',
         content:
@@ -106,10 +298,10 @@ export const suggestProjectDescription = async ({ title }) => {
   }
 }
 
-export const suggestTitles = async ({ topic }) => {
+export const suggestTitles = async (user, { topic }) => {
   if (!topic) throw createHttpError(400, 'Topic is required')
 
-  const content = await requestOpenRouter([
+  const content = await runAiPrompt(user, [
     {
       role: 'system',
       content: `You are an expert SEO blog title generator. Given a topic or existing title, generate exactly 3 highly engaging, SEO-optimized titles (each under 10-15 words). Provide a simulated "SEO rating" out of 100 for each.
@@ -128,11 +320,11 @@ Format your output exactly as a JSON array of objects. Example:
     const jsonString = match ? match[0] : content
     return { titles: JSON.parse(jsonString) }
   } catch {
-    return { titles: [{ title: content.replace(/["\[\]{}]/g, '').split(',')[0], rating: 90 }] }
+    return { titles: [{ title: content.replace(/["[\]{}]/g, '').split(',')[0], rating: 90 }] }
   }
 }
 
-export const modifyText = async ({ text, prompt, mode }) => {
+export const modifyText = async (user, { text, prompt, mode }) => {
   if (!text) throw createHttpError(400, 'Text is required')
 
   let systemPrompt =
@@ -143,7 +335,7 @@ export const modifyText = async ({ text, prompt, mode }) => {
   }
 
   return {
-    text: await requestOpenRouter([
+    text: await runAiPrompt(user, [
       { role: 'system', content: systemPrompt },
       {
         role: 'user',
@@ -153,12 +345,12 @@ export const modifyText = async ({ text, prompt, mode }) => {
   }
 }
 
-export const autocompleteText = async ({ text, context }) => {
+export const autocompleteText = async (user, { text, context }) => {
   if (!text) return { suggestion: '' }
 
   try {
     return {
-      suggestion: await requestOpenRouter([
+      suggestion: await runAiPrompt(user, [
         {
           role: 'system',
           content:
@@ -172,10 +364,10 @@ export const autocompleteText = async ({ text, context }) => {
   }
 }
 
-export const chatWithAssistant = async ({ message }) => {
+export const chatWithAssistant = async (user, { message }) => {
   if (!message) throw createHttpError(400, 'Message is required')
   return {
-    reply: await requestOpenRouter([
+    reply: await runAiPrompt(user, [
       {
         role: 'system',
         content:

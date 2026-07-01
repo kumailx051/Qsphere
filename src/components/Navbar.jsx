@@ -67,6 +67,40 @@ const formatNotificationTime = (dateValue) => {
   })
 }
 
+const qubiProviderOptions = [
+  {
+    id: 'opencode',
+    label: 'OpenCode',
+    model: 'DeepSeek V4 Flash Free',
+    url: 'https://opencode.ai/zen',
+    steps: [
+      'Go to this link: https://opencode.ai/zen',
+      'Login to your account.',
+      'Create an API key.',
+      'Paste that key here in Qubi to start using DeepSeek V4 Flash Free.',
+    ],
+  },
+  {
+    id: 'openrouter',
+    label: 'OpenRouter',
+    model: 'openai/gpt-oss-120b:free',
+    url: 'https://openrouter.ai/',
+    steps: [
+      'Go to this link: https://openrouter.ai/',
+      'Create an account or log in.',
+      'Generate your API key.',
+      'Paste that key here in Qubi to start using GPT OSS.',
+    ],
+  },
+]
+
+const createQubiMessage = (role, text, extras = {}) => ({
+  id: `${role}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  role,
+  text,
+  ...extras,
+})
+
 const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = null }) => {
   const { theme, toggleTheme } = useTheme()
   const location = useLocation()
@@ -82,11 +116,16 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
   const [assistantWaving, setAssistantWaving] = useState(false)
   const [chatInput, setChatInput] = useState('')
   const [chatMessages, setChatMessages] = useState([
-    { id: 1, role: 'assistant', text: 'Hi, I am Qubi, your AI assistant.' },
+    createQubiMessage('assistant', 'Hi, I am Qubi, your AI assistant.'),
   ])
   const [isTyping, setIsTyping] = useState(false)
   const [typedGreeting, setTypedGreeting] = useState('')
+  const [aiProviders, setAiProviders] = useState([])
+  const [activeAiProvider, setActiveAiProvider] = useState(null)
+  const [pendingProviderConnect, setPendingProviderConnect] = useState(null)
+  const [showSlashCommands, setShowSlashCommands] = useState(false)
   const typingTimerRef = useRef(null)
+  const assistantTypingIntervalRef = useRef(null)
   const dropdownRef = useRef(null)
   const notificationsRef = useRef(null)
   const blogsMenuRef = useRef(null)
@@ -148,13 +187,47 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
   const unreadNotifications = notifications.filter((item) => item.unread).length
   const isDayMode = theme === 'light'
   const palette = isDayMode ? dayTheme : darkTheme
+  const hasConnectedAiProvider = !!activeAiProvider
+  const pendingProviderMeta = qubiProviderOptions.find((provider) => provider.id === pendingProviderConnect) || null
+
+  const pushAssistantMessage = (text, extras = {}) => {
+    setChatMessages((current) => [...current, createQubiMessage('assistant', text, extras)])
+  }
+
+  const streamAssistantMessage = (text, extras = {}) =>
+    new Promise((resolve) => {
+      if (assistantTypingIntervalRef.current) {
+        clearInterval(assistantTypingIntervalRef.current)
+      }
+
+      const messageId = `assistant-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+      setChatMessages((current) => [...current, { id: messageId, role: 'assistant', text: '', ...extras }])
+
+      let index = 0
+      assistantTypingIntervalRef.current = window.setInterval(() => {
+        index += 1
+        const nextText = text.slice(0, index)
+
+        setChatMessages((current) =>
+          current.map((message) =>
+            message.id === messageId ? { ...message, text: nextText } : message,
+          ),
+        )
+
+        if (index >= text.length) {
+          clearInterval(assistantTypingIntervalRef.current)
+          assistantTypingIntervalRef.current = null
+          resolve()
+        }
+      }, 14)
+    })
 
   useEffect(() => {
     if (theme === 'dark' && !localStorage.getItem('qsphere_theme_hint_seen')) {
       const timer = setTimeout(() => setShowThemeHint(true), 2500)
       const hideTimer = setTimeout(() => {
         setShowThemeHint(false)
-        try { localStorage.setItem('qsphere_theme_hint_seen', '1') } catch {}
+        try { localStorage.setItem('qsphere_theme_hint_seen', '1') } catch { /* ignore storage failures */ }
       }, 12000)
       return () => { clearTimeout(timer); clearTimeout(hideTimer) }
     }
@@ -163,7 +236,7 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
   const handleThemeToggle = () => {
     toggleTheme()
     setShowThemeHint(false)
-    try { localStorage.setItem('qsphere_theme_hint_seen', '1') } catch {}
+    try { localStorage.setItem('qsphere_theme_hint_seen', '1') } catch { /* ignore storage failures */ }
   }
 
   const themeHintBubble = showThemeHint && (
@@ -450,6 +523,9 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
     if (!profile) {
       setAssistantVisible(false)
       setAssistantOpen(false)
+      setAiProviders([])
+      setActiveAiProvider(null)
+      setPendingProviderConnect(null)
       return
     }
 
@@ -459,6 +535,39 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
 
     return () => window.clearTimeout(timer)
   }, [profile])
+
+  useEffect(() => {
+    if (!assistantVisible || !isLoggedIn) return undefined
+
+    let isCancelled = false
+
+    const loadAiStatus = async () => {
+      try {
+        const res = await fetch('/api/ai/providers/status')
+        const data = await res.json()
+        if (!res.ok || isCancelled) return
+
+        setAiProviders(Array.isArray(data.providers) ? data.providers : [])
+        setActiveAiProvider(data.activeProvider || null)
+      } catch {
+        if (!isCancelled) {
+          setAiProviders([])
+          setActiveAiProvider(null)
+        }
+      }
+    }
+
+    loadAiStatus()
+    return () => {
+      isCancelled = true
+    }
+  }, [assistantVisible, isLoggedIn])
+
+  useEffect(() => () => {
+    if (assistantTypingIntervalRef.current) {
+      clearInterval(assistantTypingIntervalRef.current)
+    }
+  }, [])
 
   const greetingText = 'Hi, I am Qubi, your AI assistant'
 
@@ -575,6 +684,115 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
     }
   }
 
+  const showAiGuidePrompt = () => {
+    pushAssistantMessage('Please connect your API to use Qubi AI.', {
+      actions: [
+        { id: 'guide', label: 'Guide', type: 'guide' },
+      ],
+    })
+  }
+
+  const showProviderGuideOptions = () => {
+    pushAssistantMessage('Choose the provider you want to connect.', {
+      actions: qubiProviderOptions.map((provider) => ({
+        id: provider.id,
+        label: provider.label,
+        type: 'provider-guide',
+        providerId: provider.id,
+      })),
+    })
+  }
+
+  const showProviderConnectOptions = () => {
+    pushAssistantMessage('Pick a provider to connect or manage.', {
+      actions: qubiProviderOptions.map((provider) => {
+        const match = aiProviders.find((item) => item.id === provider.id || item.provider === provider.id)
+        return {
+          id: provider.id,
+          label: match?.isConnected ? `${provider.label} · Connected` : provider.label,
+          type: match?.isConnected ? 'provider-connected' : 'provider-connect',
+          providerId: provider.id,
+        }
+      }),
+    })
+  }
+
+  const handleGuideSelection = (providerId) => {
+    const provider = qubiProviderOptions.find((item) => item.id === providerId)
+    if (!provider) return
+
+    pushAssistantMessage(
+      `${provider.label} setup\n\n${provider.steps.map((step, index) => `${index + 1}. ${step}`).join('\n')}`,
+      {
+        actions: [
+          { id: `${provider.id}-open`, label: 'Open link', type: 'open-link', url: provider.url },
+          { id: `${provider.id}-connect`, label: 'Paste API key', type: 'provider-connect', providerId: provider.id },
+        ],
+      },
+    )
+  }
+
+  const handleProviderConnectChoice = (providerId) => {
+    const provider = qubiProviderOptions.find((item) => item.id === providerId)
+    if (!provider) return
+
+    setPendingProviderConnect(providerId)
+    pushAssistantMessage(`Paste your ${provider.label} API key in the chat input below and I’ll connect it for you.`)
+  }
+
+  const handleProviderDisconnect = async (providerId) => {
+    try {
+      const res = await fetch(`/api/ai/providers/${providerId}`, { method: 'DELETE' })
+      const data = await res.json()
+
+      if (!res.ok) {
+        pushAssistantMessage(data.error || 'I could not disconnect that provider right now.')
+        return
+      }
+
+      setAiProviders(Array.isArray(data.providers) ? data.providers : [])
+      setActiveAiProvider(data.activeProvider || null)
+      if (pendingProviderConnect === providerId) {
+        setPendingProviderConnect(null)
+      }
+
+      pushAssistantMessage(`${qubiProviderOptions.find((item) => item.id === providerId)?.label || 'Provider'} disconnected.`)
+    } catch {
+      pushAssistantMessage('Disconnect failed because of a network issue. Please try again.')
+    }
+  }
+
+  const handleAssistantAction = (action) => {
+    if (action.type === 'guide') {
+      showProviderGuideOptions()
+      return
+    }
+
+    if (action.type === 'provider-guide') {
+      handleGuideSelection(action.providerId)
+      return
+    }
+
+    if (action.type === 'provider-connect' || action.type === 'provider-connected') {
+      handleProviderConnectChoice(action.providerId)
+      return
+    }
+
+    if (action.type === 'provider-disconnect') {
+      handleProviderDisconnect(action.providerId)
+      return
+    }
+
+    if (action.type === 'open-link' && action.url) {
+      window.open(action.url, '_blank', 'noopener,noreferrer')
+    }
+  }
+
+  useEffect(() => {
+    if (!assistantOpen || hasConnectedAiProvider || pendingProviderConnect || chatMessages.length > 1) return
+    showAiGuidePrompt()
+  }, [assistantOpen, hasConnectedAiProvider, pendingProviderConnect, chatMessages.length])
+
   const handleAssistantSend = async (event) => {
     event.preventDefault()
     const text = chatInput.trim()
@@ -582,10 +800,56 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
 
     setChatMessages((current) => [
       ...current,
-      { id: Date.now(), role: 'user', text },
+      createQubiMessage('user', text),
     ])
     setChatInput('')
+    setShowSlashCommands(false)
     setIsTyping(true)
+
+    if (text === '/guide' || text === '/connect') {
+      setIsTyping(false)
+      if (text === '/guide') {
+        showProviderGuideOptions()
+      } else {
+        showProviderConnectOptions()
+      }
+      return
+    }
+
+    if (pendingProviderConnect) {
+      try {
+        const selectedProvider = pendingProviderConnect
+        const res = await fetch('/api/ai/providers/connect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ provider: selectedProvider, apiKey: text }),
+        })
+        const data = await res.json()
+
+        if (!res.ok) {
+          pushAssistantMessage(data.error || 'I could not save that API key.')
+          return
+        }
+
+        setAiProviders(Array.isArray(data.providers) ? data.providers : [])
+        setActiveAiProvider(data.activeProvider || null)
+        setPendingProviderConnect(null)
+        await streamAssistantMessage(
+          `${qubiProviderOptions.find((item) => item.id === selectedProvider)?.label || 'Provider'} connected. You can now use Qubi AI.`,
+        )
+      } catch {
+        pushAssistantMessage('Connection failed because of a network issue. Please try again.')
+      } finally {
+        setIsTyping(false)
+      }
+      return
+    }
+
+    if (!hasConnectedAiProvider) {
+      setIsTyping(false)
+      showAiGuidePrompt()
+      return
+    }
 
     try {
       const res = await fetch('/api/ai/chat', {
@@ -595,21 +859,16 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
       })
       const data = await res.json()
       if (res.ok) {
-        setChatMessages((current) => [
-          ...current,
-          { id: Date.now() + 1, role: 'assistant', text: data.reply }
-        ])
+        await streamAssistantMessage(data.reply)
       } else {
-        setChatMessages((current) => [
-          ...current,
-          { id: Date.now() + 1, role: 'assistant', text: 'Sorry, I am having trouble connecting to my neural net.' }
-        ])
+        if (res.status === 428) {
+          showAiGuidePrompt()
+        } else {
+          pushAssistantMessage(data.error || 'Sorry, I am having trouble connecting to my neural net.')
+        }
       }
-    } catch (err) {
-      setChatMessages((current) => [
-        ...current,
-        { id: Date.now() + 1, role: 'assistant', text: 'Network error. Please try again later.' }
-      ])
+    } catch {
+      pushAssistantMessage('Network error. Please try again later.')
     } finally {
       setIsTyping(false)
     }
@@ -699,26 +958,12 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
                 </Link>
               )}
               {isAdmin && (
-                <>
-                  <Link to="/admin" className={navItemClassName(location.pathname === '/admin')}>
-                    Admin Dashboard
-                    {location.pathname === '/admin' && (
-                      <span className="absolute -bottom-2 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
-                    )}
-                  </Link>
-                  <Link to="/admin/users" className={navItemClassName(location.pathname.startsWith('/admin/users'))}>
-                    Users
-                    {location.pathname.startsWith('/admin/users') && (
-                      <span className="absolute -bottom-2 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
-                    )}
-                  </Link>
-                  <Link to="/admin/blog-management" className={navItemClassName(location.pathname.startsWith('/admin/blog-management'))}>
-                    Blog Management
-                    {location.pathname.startsWith('/admin/blog-management') && (
-                      <span className="absolute -bottom-2 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
-                    )}
-                  </Link>
-                </>
+                <Link to="/admin" className={navItemClassName(location.pathname === '/admin')}>
+                  Admin
+                  {location.pathname === '/admin' && (
+                    <span className="absolute -bottom-2 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
+                  )}
+                </Link>
               )}
               {!isAdmin && (
               <div
@@ -1167,12 +1412,21 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
               <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: `1px solid ${isDayMode ? palette.borderSoft : 'rgba(255,255,255,0.06)'}` }}>
                 <div>
                   <div className="text-xs uppercase tracking-[0.28em]" style={{ color: isDayMode ? palette.accentPrimary : 'rgba(110,231,183,0.70)' }}>Qubi Assistant</div>
-                  <div className="text-sm font-semibold" style={{ color: palette.textPrimary }}>Ask me anything</div>
+                  <div className="text-sm font-semibold" style={{ color: palette.textPrimary }}>
+                    {pendingProviderMeta
+                      ? `Waiting for ${pendingProviderMeta.label} API`
+                      : activeAiProvider
+                        ? `Connected via ${qubiProviderOptions.find((provider) => provider.id === activeAiProvider)?.label || activeAiProvider}`
+                        : 'Ask me anything'}
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => setChatMessages([{ id: Date.now(), role: 'assistant', text: 'Hi, I am Qubi, your AI assistant.' }])}
+                    onClick={() => {
+                      setPendingProviderConnect(null)
+                      setChatMessages([createQubiMessage('assistant', 'Hi, I am Qubi, your AI assistant.')])
+                    }}
                     className="flex h-8 w-8 items-center justify-center rounded-full transition-colors"
                     style={{
                       border: `1px solid ${isDayMode ? palette.borderPrimary : 'rgba(255,255,255,0.10)'}`,
@@ -1218,7 +1472,47 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
                       className="max-w-[85%] rounded-2xl px-3 py-2 text-sm leading-6"
                       style={message.role === 'user' ? { backgroundColor: palette.accentPrimary, color: '#000' } : { border: `1px solid ${isDayMode ? palette.accentBorder : 'rgba(255,255,255,0.06)'}`, backgroundColor: isDayMode ? palette.bgInput : 'rgba(255,255,255,0.05)', color: palette.textSecondary }}
                     >
-                      {message.text}
+                      <div className="whitespace-pre-line">{message.text}</div>
+                      {Array.isArray(message.actions) && message.actions.length ? (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {message.actions.map((action) => (
+                            <button
+                              key={action.id}
+                              type="button"
+                              onClick={() => handleAssistantAction(action)}
+                              className="rounded-full border px-2.5 py-1 text-[11px] font-semibold transition"
+                              style={{
+                                borderColor: isDayMode ? palette.accentBorder : 'rgba(16,185,129,0.24)',
+                                backgroundColor: isDayMode ? palette.bgSurface : 'rgba(16,185,129,0.10)',
+                                color: palette.textPrimary,
+                              }}
+                            >
+                              {action.label}
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
+                      {message.role === 'assistant' && Array.isArray(message.actions) && message.actions.some((action) => action.type === 'provider-connected') ? (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {message.actions
+                            .filter((action) => action.type === 'provider-connected')
+                            .map((action) => (
+                              <button
+                                key={`${action.id}-disconnect`}
+                                type="button"
+                                onClick={() => handleProviderDisconnect(action.providerId)}
+                                className="rounded-full border px-2.5 py-1 text-[11px] font-semibold transition"
+                                style={{
+                                  borderColor: isDayMode ? 'rgba(239,68,68,0.22)' : 'rgba(248,113,113,0.30)',
+                                  backgroundColor: isDayMode ? 'rgba(254,242,242,0.9)' : 'rgba(127,29,29,0.20)',
+                                  color: isDayMode ? '#dc2626' : '#fca5a5',
+                                }}
+                              >
+                                Disconnect
+                              </button>
+                            ))}
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                 ))}
@@ -1239,12 +1533,40 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
               </div>
 
               <form onSubmit={handleAssistantSend} className="p-3" style={{ borderTop: `1px solid ${isDayMode ? palette.borderSoft : 'rgba(255,255,255,0.06)'}` }}>
+                {showSlashCommands ? (
+                  <div
+                    className="mb-2 rounded-2xl border px-2 py-2"
+                    style={{
+                      borderColor: isDayMode ? palette.borderPrimary : 'rgba(255,255,255,0.10)',
+                      backgroundColor: isDayMode ? palette.bgSurface : 'rgba(255,255,255,0.04)',
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setChatInput('/connect')
+                        setShowSlashCommands(false)
+                      }}
+                      className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm transition"
+                      style={{ color: palette.textPrimary }}
+                    >
+                      <span>/connect</span>
+                      <span className="text-[11px]" style={{ color: palette.textMuted }}>
+                        {hasConnectedAiProvider ? 'manage providers' : 'connect a provider'}
+                      </span>
+                    </button>
+                  </div>
+                ) : null}
                 <div className="flex items-center gap-2 rounded-2xl px-3 py-2" style={{ border: `1px solid ${isDayMode ? palette.borderPrimary : 'rgba(255,255,255,0.10)'}`, backgroundColor: isDayMode ? palette.bgInput : 'rgba(0,0,0,0.40)' }}>
                   <input
                     value={chatInput}
-                    onChange={(event) => setChatInput(event.target.value)}
+                    onChange={(event) => {
+                      const nextValue = event.target.value
+                      setChatInput(nextValue)
+                      setShowSlashCommands(nextValue.trim() === '/')
+                    }}
                     type="text"
-                    placeholder="Write a message..."
+                    placeholder={pendingProviderMeta ? `Paste ${pendingProviderMeta.label} API key...` : 'Write a message...'}
                     className="min-w-0 flex-1 bg-transparent text-sm outline-none"
                     style={{ color: palette.textPrimary }}
                   />
@@ -1443,26 +1765,12 @@ const Navbar = ({ currentPage = 'home', homeBrandRef = null, homeNavFrameRef = n
                 </Link>
               )}
               {isAdmin && (
-                <>
-                  <Link to="/admin" className={mobileNavItemClassName(location.pathname === '/admin')} onClick={() => setMenuOpen(false)}>
-                    Admin Dashboard
-                    {location.pathname === '/admin' && (
-                      <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
-                    )}
-                  </Link>
-                  <Link to="/admin/users" className={mobileNavItemClassName(location.pathname.startsWith('/admin/users'))} onClick={() => setMenuOpen(false)}>
-                    Users
-                    {location.pathname.startsWith('/admin/users') && (
-                      <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
-                    )}
-                  </Link>
-                  <Link to="/admin/blog-management" className={mobileNavItemClassName(location.pathname.startsWith('/admin/blog-management'))} onClick={() => setMenuOpen(false)}>
-                    Blog Management
-                    {location.pathname.startsWith('/admin/blog-management') && (
-                      <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
-                    )}
-                  </Link>
-                </>
+                <Link to="/admin" className={mobileNavItemClassName(location.pathname === '/admin')} onClick={() => setMenuOpen(false)}>
+                  Admin
+                  {location.pathname === '/admin' && (
+                    <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
+                  )}
+                </Link>
               )}
 
               {/* Mobile-only: Account, Logout when logged in */}

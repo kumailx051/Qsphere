@@ -220,7 +220,7 @@ const ActionCard = ({ icon: Icon, title, description, to, onClick, accent, palet
         <h3 className="type-cardHeading mt-4 leading-tight transition-colors duration-300" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
           {title}
         </h3>
-        <p className="mt-4 text-sm leading-7" style={{ color: palette.textSecondary }}>{description}</p>
+        <p className="type-cardBody mt-4" style={{ color: palette.textSecondary }}>{description}</p>
 
         <div className="mt-auto pt-8">
           <span className="inline-flex items-center gap-2 text-sm font-semibold transition-all duration-300 group-hover:gap-3" style={{ color: isDayMode ? palette.accentDark : palette.accentLight }}>
@@ -254,7 +254,7 @@ const RouteCard = ({ icon: Icon, label, description, to, palette, isDayMode }) =
     </span>
     <div className="min-w-0 flex-1">
       <div className="text-sm font-semibold transition-colors" style={{ color: palette.textPrimary }}>{label}</div>
-      <div className="mt-1 text-xs leading-5" style={{ color: palette.textMuted }}>{description}</div>
+      <div className="type-cardBody mt-1" style={{ color: palette.textMuted }}>{description}</div>
     </div>
     <ArrowRight size={15} className="transition-all group-hover:translate-x-1" style={{ color: isDayMode ? palette.accentDark : 'rgba(110,231,183,0.7)' }} />
   </Link>

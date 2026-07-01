@@ -458,7 +458,7 @@ const GroupsPage = () => {
                             >
                               {group.groupType || 'Research Group'}
                             </span>
-                            <h3 className="type-statValue mt-5 leading-tight transition-colors duration-300" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
+                            <h3 className="type-cardHeading mt-5 leading-tight transition-colors duration-300" style={{ fontFamily: 'var(--font-heading)', color: palette.textPrimary }}>
                               {group.groupTitle}
                             </h3>
                           </div>
@@ -476,7 +476,7 @@ const GroupsPage = () => {
                         </div>
 
                         {group.groupDescription && (
-                          <p className="mt-5 text-sm leading-7 line-clamp-4" style={{ color: palette.textSecondary }}>
+                          <p className="type-cardBody mt-5 line-clamp-4" style={{ color: palette.textSecondary }}>
                             {group.groupDescription}
                           </p>
                         )}

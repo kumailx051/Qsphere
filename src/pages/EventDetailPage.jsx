@@ -901,7 +901,7 @@ const EventDetailPage = () => {
                           {item.type}
                         </span>
                       </div>
-                      <p className="line-clamp-3 mt-4 text-sm leading-7" style={{ color: palette.textSecondary }}>{item.description}</p>
+                      <p className="type-cardBody line-clamp-3 mt-4" style={{ color: palette.textSecondary }}>{item.description}</p>
                       <div className="mt-6 flex items-center justify-between border-t pt-4 text-sm" style={{ borderColor: palette.borderSoft, color: palette.textMuted }}>
                         <span>{formatEventTime(item.date)}</span>
                         <span className="inline-flex items-center gap-2 font-semibold transition-all group-hover:gap-3" style={{ color: isDayMode ? palette.accentDark : palette.accentLight }}>
