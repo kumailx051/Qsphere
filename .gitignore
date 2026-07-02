@@ -48,4 +48,9 @@ dist-ssr
 
 # Local runtime uploads/artifacts
 uploads/
-/{console.error(error)
+
+# Database schema reference (non-essential, kept for local reference)
+database-query/
+
+# Email templates reference (non-essential, kept for local reference)
+email-templates/
