@@ -20,7 +20,7 @@ A cutting-edge quantum-themed website showcasing futuristic design patterns, smo
 
 ## 🚀 Live Demo
 
-🌐 **[Visit QSphere Live]([![LinkedIn](https://qsphere-one.vercel.app/))**
+🌐 **[Visit QSphere Live](https://qsphere-one.vercel.app/)**
 
 ## 💻 Tech Stack
 
