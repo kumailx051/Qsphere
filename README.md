@@ -20,7 +20,7 @@ A cutting-edge quantum-themed website showcasing futuristic design patterns, smo
 
 ## 🚀 Live Demo
 
-🌐 **[Visit QSphere Live](https://kumailx051.github.io/Qsphere/)**
+🌐 **[Visit QSphere Live]([![LinkedIn](https://img.shields.io/badge/LinkedIn-Kumail%20Raza-0A66C2?style=flat-square&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/kumail-raza-096946265/))**
 
 ## 💻 Tech Stack
 
